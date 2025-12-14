@@ -1,8 +1,8 @@
 ---
 # config.yaml
 salesforce:
-  # Use test.salesforce.com for Sandboxes, login.salesforce.com for Production
-  login_domain: "test.salesforce.com"
+  # Use test.salesforce.com for Sandboxes, login.salesforce.com for Production. Dev sandboxes are on `login`.
+  login_domain: "login.salesforce.com"
   client_id: "YOUR_SALESFORCE_CONSUMER_KEY"
   client_secret: "YOUR_SALESFORCE_CONSUMER_SECRET"
 
@@ -12,4 +12,4 @@ database_path: "./reconciliation.db"
 
 # Default date range start (YYYY-MM-DD) for fetching records.
 # Used by sync commands if --fromDate is not provided.
-date_range_start: "2025-04-01"
+date_range_start: "2025-07-01"
