@@ -1,62 +1,65 @@
 package db
 
-// schema defines the SQL statements to create the application's database schema.
+// schema defines the SQL statements to create the application's database schema for SQLite.
 // It is designed to be idempotent using `CREATE TABLE IF NOT EXISTS`.
 const schema = `
 CREATE TABLE IF NOT EXISTS bank_transactions (
-    id                  UUID PRIMARY KEY,
-    type                VARCHAR,
-    status              VARCHAR,
-    reference           VARCHAR,
-    total               DECIMAL(18, 2),
-    is_reconciled       BOOLEAN,
-    date                TIMESTAMP,
-    updated_at          TIMESTAMP,
-    contact_id          UUID,
-    contact_name        VARCHAR,
-    bank_account_id     UUID,
-    bank_account_name   VARCHAR,
-    bank_account_code   VARCHAR
+    id                  TEXT PRIMARY KEY, -- Using TEXT for UUIDs is common in SQLite
+    type                TEXT,
+    status              TEXT,
+    reference           TEXT,
+    total               REAL,
+    is_reconciled       INTEGER, -- INTEGER 0 for false, 1 for true
+    date                DATETIME,
+    updated_at          DATETIME,
+    contact_id          TEXT,
+    contact_name        TEXT,
+    bank_account_id     TEXT,
+    bank_account_name   TEXT,
+    bank_account_code   TEXT
 );
 
 CREATE TABLE IF NOT EXISTS bank_transaction_line_items (
-    id              UUID PRIMARY KEY,
-    transaction_id  UUID,
-    description     VARCHAR,
-    quantity        DECIMAL(18, 4),
-    unit_amount     DECIMAL(18, 4),
-    line_amount     DECIMAL(18, 2),
-    account_code    VARCHAR,
-    tax_amount      DECIMAL(18, 2)
+    id              TEXT PRIMARY KEY,
+    transaction_id  TEXT,
+    description     TEXT,
+    quantity        REAL,
+    unit_amount     REAL,
+    line_amount     REAL,
+    account_code    TEXT,
+    tax_amount      REAL,
+    FOREIGN KEY(transaction_id) REFERENCES bank_transactions(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS invoices (
-    id                  UUID PRIMARY KEY,
-    type                VARCHAR,
-    status              VARCHAR,
-    invoice_number      VARCHAR,
-    reference           VARCHAR,
-    total               DECIMAL(18, 2),
-    amount_paid         DECIMAL(18, 2),
-    date                TIMESTAMP,
-    updated_at          TIMESTAMP,
-    contact_id          UUID,
-    contact_name        VARCHAR
+    id                  TEXT PRIMARY KEY,
+    type                TEXT,
+    status              TEXT,
+    invoice_number      TEXT,
+    reference           TEXT,
+    total               REAL,
+    amount_paid         REAL,
+    date                DATETIME,
+    updated_at          DATETIME,
+    contact_id          TEXT,
+    contact_name        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS invoice_line_items (
-    id              UUID PRIMARY KEY,
-    invoice_id      UUID,
-    description     VARCHAR,
-    quantity        DECIMAL(18, 4),
-    unit_amount     DECIMAL(18, 4),
-    line_amount     DECIMAL(18, 2),
-    account_code    VARCHAR,
-    tax_amount      DECIMAL(18, 2)
+    id              TEXT PRIMARY KEY,
+    invoice_id      TEXT,
+    description     TEXT,
+    quantity        REAL,
+    unit_amount     REAL,
+    line_amount     REAL,
+    account_code    TEXT,
+    tax_amount      REAL,
+    FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
 `
 
-// btUpsertSQL is the SQL statement for inserting or updating a bank transaction.
+// btUpsertSQL is the SQL statement for inserting or updating a bank transaction in SQLite.
+// SQLite uses `INSERT ... ON CONFLICT ... DO UPDATE`.
 const btUpsertSQL = `
 INSERT INTO bank_transactions (id, type, status, reference, total, is_reconciled, date, updated_at, contact_id, contact_name, bank_account_id, bank_account_name, bank_account_code)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -84,7 +87,7 @@ INSERT INTO bank_transaction_line_items (id, transaction_id, description, quanti
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 `
 
-// invUpsertSQL is the SQL statement for inserting or updating an invoice.
+// invUpsertSQL is the SQL statement for inserting or updating an invoice in SQLite.
 const invUpsertSQL = `
 INSERT INTO invoices (id, type, status, invoice_number, reference, total, amount_paid, date, updated_at, contact_id, contact_name)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

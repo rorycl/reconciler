@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/duckdb/duckdb-go/v2"
 	"xerocli/app/xero"
+
+	_ "modernc.org/sqlite" // Import the pure Go SQLite driver
 )
 
 // DB provides a wrapper around the sql.DB connection for application-specific database operations.
@@ -15,9 +16,12 @@ type DB struct {
 	*sql.DB
 }
 
-// New creates a new connection to a DuckDB database at the given path.
+// New creates a new connection to an SQLite database at the given path.
+// It enables WAL mode for better concurrency and foreign key support.
 func New(path string) (*DB, error) {
-	db, err := sql.Open("duckdb", path)
+	// The "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)" query parameters
+	// are a convenient way to set essential connection properties.
+	db, err := sql.Open("sqlite", fmt.Sprintf("%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", path))
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +72,9 @@ func (db *DB) UpsertBankTransactions(transactions []xero.BankTransaction) error 
 	}
 	defer btStmt.Close()
 
+	// In SQLite, child records with a foreign key constraint and ON DELETE CASCADE
+	// are automatically deleted when the parent is, but we upsert the parent,
+	// so we still need to manage the children explicitly. Deleting first is the simplest way.
 	lineDeleteStmt, err := tx.PrepareContext(context.Background(), btLineDeleteSQL)
 	if err != nil {
 		return fmt.Errorf("failed to prepare line item delete statement: %w", err)
@@ -81,6 +88,10 @@ func (db *DB) UpsertBankTransactions(transactions []xero.BankTransaction) error 
 	defer lineInsertStmt.Close()
 
 	for _, t := range transactions {
+		if _, err := lineDeleteStmt.ExecContext(context.Background(), t.BankTransactionID); err != nil {
+			return fmt.Errorf("failed to delete old line items for transaction %s: %w", t.BankTransactionID, err)
+		}
+
 		_, err := btStmt.ExecContext(context.Background(),
 			t.BankTransactionID, t.Type, t.Status, t.Reference, t.Total, t.IsReconciled,
 			t.Date, t.Updated, t.Contact.ContactID, t.Contact.Name, t.BankAccount.AccountID,
@@ -88,10 +99,6 @@ func (db *DB) UpsertBankTransactions(transactions []xero.BankTransaction) error 
 		)
 		if err != nil {
 			return fmt.Errorf("failed to upsert bank transaction %s: %w", t.BankTransactionID, err)
-		}
-
-		if _, err := lineDeleteStmt.ExecContext(context.Background(), t.BankTransactionID); err != nil {
-			return fmt.Errorf("failed to delete old line items for transaction %s: %w", t.BankTransactionID, err)
 		}
 
 		for _, line := range t.LineItems {
@@ -139,16 +146,16 @@ func (db *DB) UpsertInvoices(invoices []xero.Invoice) error {
 	defer lineInsertStmt.Close()
 
 	for _, inv := range invoices {
+		if _, err := lineDeleteStmt.ExecContext(context.Background(), inv.InvoiceID); err != nil {
+			return fmt.Errorf("failed to delete old line items for invoice %s: %w", inv.InvoiceID, err)
+		}
+
 		_, err := invStmt.ExecContext(context.Background(),
 			inv.InvoiceID, inv.Type, inv.Status, inv.InvoiceNumber, inv.Reference,
 			inv.Total, inv.AmountPaid, inv.Date, inv.Updated, inv.Contact.ContactID, inv.Contact.Name,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to upsert invoice %s: %w", inv.InvoiceID, err)
-		}
-
-		if _, err := lineDeleteStmt.ExecContext(context.Background(), inv.InvoiceID); err != nil {
-			return fmt.Errorf("failed to delete old line items for invoice %s: %w", inv.InvoiceID, err)
 		}
 
 		for _, line := range inv.LineItems {
