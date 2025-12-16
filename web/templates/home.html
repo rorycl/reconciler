@@ -1,0 +1,93 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}{{ .PageTitle }} - Charity Reconciler{{ end }}
+
+{{ define "nav" }}
+<div class="flex items-center space-x-4 text-sm font-medium">
+    <a href="/home" class="text-sky-700 border-b-2 border-sky-700 pb-1">Home</a>
+    <a href="/refresh" class="text-slate-500 hover:text-sky-700">Refresh</a>
+    <a href="/connect" class="text-slate-500 hover:text-sky-700">Logout</a>
+</div>
+{{ end }}
+
+{{ define "content" }}
+<div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+    <!-- Financial Year Selector -->
+    <div class="mb-4 text-sm">
+        Showing data for the <span class="font-bold">2025</span> financial year. <a href="#" class="text-sky-600 hover:underline">Change financial year</a>.
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-slate-200 mb-4">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            <a href="/home" class="border-sky-600 text-sky-700 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">Xero Invoices</a>
+            <a href="#" class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">Xero Bank Transactions</a>
+            <a href="#" class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">Salesforce Donations</a>
+        </nav>
+    </div>
+
+    <!-- Search Form -->
+    <form class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end text-sm mb-6 p-4 bg-slate-50 rounded-md border">
+        <div>
+            <label for="status" class="block font-medium text-slate-700">Status</label>
+            <select id="status" name="status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                <option>Unreconciled</option>
+                <option>Reconciled</option>
+                <option>All</option>
+            </select>
+        </div>
+        <div>
+            <label for="date-from" class="block font-medium text-slate-700">Date From</label>
+            <input type="date" id="date-from" name="date-from" value="2025-07-01" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div>
+            <label for="date-to" class="block font-medium text-slate-700">Date To</label>
+            <input type="date" id="date-to" name="date-to" value="2026-06-30" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div class="md:col-span-2">
+            <button type="submit" class="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">Search Invoices</button>
+        </div>
+    </form>
+
+    <!-- Results Table -->
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">No.</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Date</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">To</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Description</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Total</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Donations</th>
+                    <th class="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-slate-200">
+                {{ range .Invoices }}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3"><a href="/invoice/{{ .UUID }}" class="text-sky-600 hover:underline">{{ .InvoiceNumber }}</a></td>
+                    <td class="px-4 py-3 whitespace-nowrap">{{ .Date.Format "02/01/2006" }}</td>
+                    <td class="px-4 py-3">{{ .ContactName }}</td>
+                    <td class="px-4 py-3 max-w-xs truncate">{{ .Description }}</td>
+                    <td class="px-4 py-3 text-right font-mono">{{ printf "%.2f" .Total }}</td>
+                    <td class="px-4 py-3 text-right font-mono">{{ printf "%.2f" .DonationsTotal }}</td>
+                    <td class="px-4 py-3 text-center">
+                        {{ if .IsReconciled }}
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">OK</span>
+                        {{ else }}
+                        <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">!</span>
+                        {{ end }}
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="mt-6 text-center text-sm text-slate-600">
+        Page &lt;1&gt; of &lt;1&gt;
+    </div>
+</div>
+{{ end }}

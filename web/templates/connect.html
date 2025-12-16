@@ -1,0 +1,31 @@
+{{ template "base.html" . }}
+
+{{ define "content" }}
+<div class="max-w-xl mx-auto bg-white p-8 rounded-lg shadow-md border border-slate-200">
+    <div class="prose">
+        <h2>Welcome to the Charity Reconciler App</h2>
+        <p>This application helps streamline financial reconciliation between Xero and Salesforce records for ROS.</p>
+        <p>To begin, please connect to both services using your standard login details. You will be asked to grant this application permission to access your data.</p>
+    </div>
+
+    <div class="mt-8 space-y-6">
+        <!-- Connect to Xero -->
+        <div class="p-4 border rounded-md">
+            <h3 class="font-semibold">Connect to Xero</h3>
+            <p class="text-sm text-slate-600 mb-3">Authorize the app to read invoices and bank transactions.</p>
+            <a href="/refresh" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+                Connect
+            </a>
+        </div>
+
+        <!-- Connect to Salesforce -->
+        <div class="p-4 border rounded-md">
+            <h3 class="font-semibold">Connect to Salesforce</h3>
+            <p class="text-sm text-slate-600 mb-3">Authorize the app to read and update donation records.</p>
+            <a href="/refresh" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+                Connect
+            </a>
+        </div>
+    </div>
+</div>
+{{ end }}

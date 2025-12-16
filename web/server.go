@@ -41,12 +41,7 @@ type Donation struct {
 
 // --- MAIN APPLICATION ---
 
-var tpl *template.Template
-
 func main() {
-	// At startup, parse all templates into a single *template.Template object.
-	// Using .Funcs() can add helper functions to templates later.
-	tpl = template.Must(template.ParseGlob("templates/*.html"))
 
 	mux := http.NewServeMux()
 
@@ -86,12 +81,14 @@ func handleRedirectToConnect(w http.ResponseWriter, r *http.Request) {
 
 // handleConnect serves the initial OAuth connection page.
 func handleConnect(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "connect.html", nil)
+	templates := []string{"templates/base.html", "templates/connect.html"}
+	renderTemplate(w, "connect", templates, nil)
 }
 
 // handleRefresh serves the data refresh page.
 func handleRefresh(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "refresh.html", nil)
+	templates := []string{"templates/base.html", "templates/refresh.html"}
+	renderTemplate(w, "refresh", templates, nil)
 }
 
 // handleHome serves the main dashboard view, which is the invoice list.
@@ -104,7 +101,8 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 		PageTitle: "Home",
 		Invoices:  getDummyInvoices(),
 	}
-	renderTemplate(w, "home.html", data)
+	templates := []string{"templates/base.html", "templates/home.html"}
+	renderTemplate(w, "home", templates, data)
 }
 
 // handleInvoiceDetail serves the detail page for a single invoice.
@@ -129,14 +127,16 @@ func handleInvoiceDetail(w http.ResponseWriter, r *http.Request) {
 		Invoice:   invoice,
 		Donations: getDummySearchDonations(),
 	}
-	renderTemplate(w, "invoice_detail.html", data)
+	templates := []string{"templates/base.html", "templates/invoice.html"}
+	renderTemplate(w, "invoice", templates, data)
 }
 
 // --- HELPER FUNCTIONS ---
 
 // renderTemplate is a helper to execute templates and handle errors.
-func renderTemplate(w http.ResponseWriter, name string, data any) {
-	err := tpl.ExecuteTemplate(w, name, data)
+func renderTemplate(w http.ResponseWriter, name string, templates []string, data any) {
+	tpl := template.Must(template.ParseFiles(templates...))
+	err := tpl.ExecuteTemplate(w, name+".html", data)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error rendering template %s: %v", name, err), http.StatusInternalServerError)
 		log.Printf("Error rendering template %s: %v", name, err)

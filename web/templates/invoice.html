@@ -1,0 +1,132 @@
+{{ template "base.html" . }}
+
+{{ define "title" }}{{ .PageTitle }} - Charity Reconciler{{ end }}
+
+{{ define "nav" }}
+<div class="flex items-center space-x-4 text-sm font-medium">
+    <a href="/home" class="text-slate-500 hover:text-sky-700">Home</a>
+    <a href="/refresh" class="text-slate-500 hover:text-sky-700">Refresh</a>
+    <a href="/connect" class="text-slate-500 hover:text-sky-700">Logout</a>
+</div>
+{{ end }}
+
+{{ define "content" }}
+<div class="space-y-6">
+    <!-- Breadcrumb -->
+    <div class="text-sm text-slate-500">
+        <a href="/home" class="hover:underline">Invoices</a> &gt;
+        <span class="font-medium text-slate-700">Invoice {{ .Invoice.InvoiceNumber }}</span> |
+        <a href="#" class="text-sky-600 hover:underline">view in Xero</a>
+    </div>
+
+    <!-- Invoice Header Panel -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+                <h3 class="text-xs text-slate-500 font-semibold uppercase">Number</h3>
+                <p class="font-mono">{{ .Invoice.InvoiceNumber }}</p>
+            </div>
+            <div>
+                <h3 class="text-xs text-slate-500 font-semibold uppercase">Date</h3>
+                <p class="font-mono">{{ .Invoice.Date.Format "02 Jan 2006" }}</p>
+            </div>
+            <div>
+                <h3 class="text-xs text-slate-500 font-semibold uppercase">To</h3>
+                <p>{{ .Invoice.ContactName }}</p>
+            </div>
+            <div class="text-right">
+                <h3 class="text-xs text-slate-500 font-semibold uppercase">Invoice Total</h3>
+                <p class="text-2xl font-mono font-bold">{{ printf "£%.2f" .Invoice.Total }}</p>
+            </div>
+            <div class="md:col-span-4">
+                <h3 class="text-xs text-slate-500 font-semibold uppercase">Description</h3>
+                <p>{{ .Invoice.Description }}</p>
+            </div>
+            <div class="md:col-span-4 text-right">
+                <h3 class="text-xs text-slate-500 font-semibold uppercase">Linked Donations</h3>
+                <p class="text-lg font-mono font-semibold">{{ printf "£%.2f" .Invoice.DonationsTotal }}</p>
+                <h3 class="text-xs font-semibold uppercase {{ if .Invoice.IsReconciled }}text-green-600{{ else }}text-red-600{{ end }}">
+                    {{ if .Invoice.IsReconciled }}Reconciled{{ else }}Out by {{ printf "£%.2f" .Invoice.Total }}{{ end }}
+                </h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linked Donations Panel -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">Linked Donation Records</h2>
+            {{ if .Invoice.LinkedDonations }}
+            <button class="text-sm bg-red-500 text-white font-bold py-1 px-3 rounded hover:bg-red-600">Unlink Selected</button>
+            {{ end }}
+        </div>
+
+        {{ if not .Invoice.LinkedDonations }}
+        <p class="text-sm text-slate-500">No Salesforce donation records are linked to this invoice.</p>
+        {{ else }}
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead><tr>
+                <th class="py-2 w-8"></th>
+                <th class="py-2 text-left font-semibold text-slate-600">Contact</th>
+                <th class="py-2 text-left font-semibold text-slate-600">Description</th>
+                <th class="py-2 text-right font-semibold text-slate-600">Amount</th>
+            </tr></thead>
+            <tbody class="divide-y divide-slate-200">
+                {{ range .Invoice.LinkedDonations }}
+                <tr>
+                    <td class="py-2"><input type="checkbox"></td>
+                    <td class="py-2">{{ .ContactName }}</td>
+                    <td class="py-2">{{ .Description }}</td>
+                    <td class="py-2 text-right font-mono">{{ printf "%.2f" .Amount }}</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+        {{ end }}
+    </div>
+
+    <!-- Search for Donations Panel -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">Find Salesforce Donations to Link</h2>
+            <button class="text-sm bg-green-600 text-white font-bold py-1 px-3 rounded hover:bg-green-700">Link Selected</button>
+        </div>
+
+        <form class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end text-sm mb-6 p-4 bg-slate-50 rounded-md border">
+            <div>
+                <label for="sf-status" class="block font-medium text-slate-700">Status</label>
+                <select id="sf-status" name="sf-status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm">
+                    <option>No Payout Reference</option>
+                    <option>All</option>
+                </select>
+            </div>
+            <div>
+                <label for="sf-details" class="block font-medium text-slate-700">Details Search</label>
+                <input type="text" id="sf-details" name="sf-details" placeholder="Galway..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm">
+            </div>
+            <div class="md:col-span-2">
+                <button type="submit" class="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700">Search Donations</button>
+            </div>
+        </form>
+
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead><tr>
+                <th class="py-2 w-8"></th>
+                <th class="py-2 text-left font-semibold text-slate-600">Contact</th>
+                <th class="py-2 text-left font-semibold text-slate-600">Description</th>
+                <th class="py-2 text-right font-semibold text-slate-600">Amount</th>
+            </tr></thead>
+            <tbody class="divide-y divide-slate-200">
+                {{ range .Donations }}
+                <tr>
+                    <td class="py-2"><input type="checkbox"></td>
+                    <td class="py-2">{{ .ContactName }}</td>
+                    <td class="py-2">{{ .Description }}</td>
+                    <td class="py-2 text-right font-mono">{{ printf "%.2f" .Amount }}</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
