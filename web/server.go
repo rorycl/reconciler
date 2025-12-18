@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 // --- DUMMY DATA STRUCTURES ---
@@ -27,6 +33,7 @@ type Invoice struct {
 	DonationsTotal  float64
 	IsReconciled    bool
 	LinkedDonations []Donation
+	LineItems       []Invoice // faked for the moment.
 }
 
 type Donation struct {
@@ -41,30 +48,96 @@ type Donation struct {
 
 // --- MAIN APPLICATION ---
 
+func rebuildTailwind() error {
+	log.Println("rebulding tailwind")
+	cmdArgs := `run --rm --name tailwindcss-builder -v %s:/project d3fk/tailwindcss:stable -i static/css/input.css -o static/css/output.css`
+	curDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	args := fmt.Sprintf(cmdArgs, curDir)
+	cmd := exec.Command("/usr/bin/docker", strings.Split(args, " ")...)
+	out, err := cmd.CombinedOutput()
+	log.Println(string(out))
+	return err
+}
+
 func main() {
 
-	mux := http.NewServeMux()
+	var server *http.Server
 
-	// Serve static files (CSS, JS) from the 'static' directory.
-	fs := http.FileServer(http.Dir("./static"))
-	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+	// The filewatcher watches for file changes.
+	filewatcher, err := NewFileChangeNotifier(
+		[]DirFilesDescriptor{
+			DirFilesDescriptor{"templates", []string{"html"}},
+			DirFilesDescriptor{"static/css", []string{"css"}},
+			DirFilesDescriptor{"static/js", []string{"js"}},
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		err := filewatcher.Watch(context.Background())
+		if err != nil {
+			log.Fatal("watcher error", err)
+		}
+	})
+	go func() {
+		wg.Wait()
+	}()
+	updater := filewatcher.Update()
 
-	// Register page handlers.
-	mux.HandleFunc("/connect", handleConnect)
-	mux.HandleFunc("/refresh", handleRefresh)
-	mux.HandleFunc("/home", handleHome) // Also serves /invoices
+	for {
 
-	// This simple routing handles both example states for the invoice detail page.
-	// A more robust router (like chi or gorillamux) would be used in a larger app.
-	mux.HandleFunc("/invoice", handleInvoiceDetail)
+		// rebuild tailwind
+		err := rebuildTailwind()
+		if err != nil {
+			log.Fatalf("tailwind rebuild failed: %s", err)
+		}
 
-	mux.HandleFunc("/", handleRedirectToConnect)
+		server = &http.Server{Addr: "127.0.0.1:8080"}
+		r := mux.NewRouter()
 
-	loggedRouter := handlers.LoggingHandler(os.Stdout, mux)
+		// Serve static files (CSS, JS) from the 'static' directory.
+		fs := http.FileServer(http.Dir("./static"))
+		r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	log.Println("Starting server on :8080")
-	if err := http.ListenAndServe(":8080", loggedRouter); err != nil {
-		log.Fatalf("Could not start server: %s\n", err)
+		// Register page handlers.
+		r.HandleFunc("/connect", handleConnect)
+		r.HandleFunc("/refresh", handleRefresh)
+		r.HandleFunc("/home", handleHome) // will also serve /invoices
+		r.HandleFunc("/invoice", handleInvoiceDetail)
+
+		r.HandleFunc("/", handleRedirectToConnect)
+
+		logging := func(handler http.Handler) http.Handler {
+			return handlers.CombinedLoggingHandler(os.Stdout, handler)
+		}
+		r.Use(logging)
+
+		// Attach router to server handler.
+		server.Handler = r
+
+		go func() {
+			log.Println("Starting server on 127.0.0.1:8080")
+			err := server.ListenAndServe()
+			if err != nil {
+				if !errors.Is(err, http.ErrServerClosed) {
+					log.Fatalf("server error: %s\n", err)
+				}
+				fmt.Println("shutting down server")
+				return
+			}
+		}()
+		select {
+		case <-updater:
+			log.Println("file update detected")
+			_ = server.Shutdown(context.Background())
+			break
+		}
+		log.Println("restarting server")
 	}
 }
 
@@ -122,10 +195,12 @@ func handleInvoiceDetail(w http.ResponseWriter, r *http.Request) {
 		PageTitle string
 		Invoice   Invoice
 		Donations []Donation // For the "find donations" search result mock
+		LineItems []Invoice
 	}{
 		PageTitle: fmt.Sprintf("Invoice %s", invoice.InvoiceNumber),
 		Invoice:   invoice,
 		Donations: getDummySearchDonations(),
+		LineItems: getDummyInvoices(),
 	}
 	templates := []string{"templates/base.html", "templates/invoice.html"}
 	renderTemplate(w, "invoice", templates, data)
