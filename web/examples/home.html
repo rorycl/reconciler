@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Charity Reconciler</title>
+    <link href="/static/css/output.css" rel="stylesheet">
+    <script src="/static/js/htmx.min.js" defer></script>
+    <script src="/static/js/hyperscript.min.js" defer></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans">
+    <div class="container mx-auto max-w-7xl p-4">
+
+        
+        <header class="flex justify-between items-center pb-2 mb-2">
+            <h1 class="text-2xl font-bold text-sky-700">Reconciler App</h1>
+            <nav>
+                
+<div class="flex items-center space-x-4 text-sm font-medium">
+    <a href="/home" class="text-sky-700 border-b-2 border-sky-700 pb-1">Home</a>
+    <a href="/refresh" class="text-slate-500 border-b-2 border-transparent pb-1 hover:text-sky-700">Refresh</a>
+    <a href="/connect" class="text-slate-500 border-b-2 border-transparent pb-1 hover:text-sky-700">Logout</a>
+</div>
+
+            </nav>
+        </header>
+
+        
+        <main>
+            
+
+<div class="bg-white p-6 rounded-lg shadow-md border border-slate-400">
+    
+    <div class="mb-4 text-sm">
+        Showing data for the <span class="font-bold">2025</span> financial year. <a href="#" class="text-sky-600 hover:underline">Change financial year</a>.
+    </div>
+
+    
+    <div class="border-b border-slate-300 mb-2 border-b-2">
+        <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+            
+            <a href="/home" class="border-sky-600 mb-0 rounded-md text-sky-700 whitespace-nowrap py-3 px-4 border-2 border-b-white border-b-4 borderfont-medium">Xero Invoices</a>
+            <a href="#" class="bg-slate-100 text-slate-500 mb-0 rounded-md border-transparent hover:text-slate-700 hover:whitespace-nowrap py-3 px-4 border-b-4 font-medium">Xero Bank Transactions</a>
+            <a href="#" class="bg-slate-100 text-slate-500 mb-0 rounded-md border-transparent hover:text-slate-700 hover:whitespace-nowrap py-3 px-4 border-b-4 font-medium">Salesforce Donations</a>
+        </nav>
+    </div>
+
+    
+    <form class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end text-sm mt-6 mb-6 p-4 bg-slate-100 rounded-md border border-slate-400">
+        <div>
+            <label for="status" class="block font-medium text-slate-700 pb-2">Status</label>
+            <select id="status" name="status" class="border mt-1 block w-full border-slate-300 shadow-sm bg-white focus:border-sky-500 p-1 focus:ring-sky-500">
+                <option>Unreconciled</option>
+                <option>Reconciled</option>
+                <option>All</option>
+            </select>
+        </div>
+        <div>
+            <label for="date-from" class="block font-medium text-slate-700 pb-2">Date From</label>
+            <input type="date" id="date-from" name="date-from" value="2025-07-01" class="border mt-1 block w-full border-slate-300 shadow-sm p-1 focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div>
+            <label for="date-to" class="block font-medium text-slate-700 pb-2">Date To</label>
+            <input type="date" id="date-to" name="date-to" value="2026-06-30" class="border mt-1 block w-full border-slate-300 shadow-sm p-1 focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div class="md:col-span-1">
+            <label for="search" class="block font-medium text-slate-700 pb-2">Search Text</label>
+            <input type="text" id="search" name="search" value="" class="border mt-1 block w-full border-slate-300 shadow-sm p-1 focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div class="md:col-span-1">
+            <button type="submit" class="bg-slate-400 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">Reset</button>
+            <button type="submit" class="float-right w-1/2 bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">Search</button>
+        </div>
+    </form>
+
+    
+    <div class="overflow-x-auto rounded-md border border-slate-400">
+        <table class="min-w-full divide-y divide-slate-300 text-sm">
+            <thead class="bg-slate-100">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">No.</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Date</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">To</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Description</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Total</th>
+                    <th class="px-4 py-3 text-right font-semibold text-slate-600">Donations</th>
+                    <th class="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-slate-300">
+                
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-2"><a href="/invoice" class="text-sky-600 hover:underline">INV-0234</a></td>
+                    <td class="px-4 py-2 whitespace-nowrap">01/07/2025</td>
+                    <td class="px-4 py-2">James Galway</td>
+                    <td class="px-4 py-2 max-w-xs truncate">James Galway (family) Donation</td>
+                    <td class="px-4 py-2 text-right font-mono">117.48</td>
+                    <td class="px-4 py-2 text-right font-mono">0.00</td>
+                    <td class="px-4 py-2 text-center">
+                        
+                        <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">!</span>
+                        
+                    </td>
+                </tr>
+                
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-2"><a href="/invoice" class="text-sky-600 hover:underline">INV-0236</a></td>
+                    <td class="px-4 py-2 whitespace-nowrap">03/07/2025</td>
+                    <td class="px-4 py-2">Julie Joyce</td>
+                    <td class="px-4 py-2 max-w-xs truncate">STO J. Joyce Standing Order</td>
+                    <td class="px-4 py-2 text-right font-mono">50.00</td>
+                    <td class="px-4 py-2 text-right font-mono">50.00</td>
+                    <td class="px-4 py-2 text-center">
+                        
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">OK</span>
+                        
+                    </td>
+                </tr>
+                
+            </tbody>
+        </table>
+    </div>
+
+    
+    <div class="my-6 text-right text-sm text-slate-600">
+        Page 1 of 1
+    </div>
+</div>
+
+        </main>
+
+        
+        <footer class="text-center text-xs text-slate-500 mt-4 pt-4">
+            <p>Charity Reconciler App is a CoData.xyz project. Contact &lt;info@codata.xyz&gt; for more info.</p>
+        </footer>
+
+    </div>
+</body>
+</html>
+
+
+
+
+
+
+
