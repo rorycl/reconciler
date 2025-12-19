@@ -1,3 +1,18 @@
-@tailwind base;                                                   
-@tailwind components;                                             
-@tailwind utilities; 
+@import "tailwindcss";
+
+@theme {
+  --content: "./web/templates/**/*.html", "./web/**/*.go";
+}
+
+/* migration of default border color from tailwind v3 */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-slate-200, currentColor);
+  }
+}
+
+@import './components.css';

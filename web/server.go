@@ -33,7 +33,24 @@ type Invoice struct {
 	DonationsTotal  float64
 	IsReconciled    bool
 	LinkedDonations []Donation
-	LineItems       []Invoice // faked for the moment.
+	LineItems       []LineItem // faked for the moment.
+}
+
+type LineItem struct {
+	Description string
+	UnitAmount  float64
+	AccountCode string
+	LineItemID  string
+	Quantity    float64
+	TaxAmount   float64
+	LineAmount  float64
+}
+
+func (l *LineItem) IsDonation() bool {
+	if len(l.AccountCode) > 0 && string(l.AccountCode[0]) == "4" {
+		return true
+	}
+	return false
 }
 
 type Donation struct {
@@ -50,11 +67,14 @@ type Donation struct {
 
 func rebuildTailwind() error {
 	log.Println("rebulding tailwind")
-	curDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	cmdArgs := strings.Split(fmt.Sprintf(`docker run --rm --name tailwindcss-builder -v %s:/project d3fk/tailwindcss:stable -i static/css/input.css -o static/css/output.css`, curDir), " ")
+	/*
+		curDir, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		cmdArgs := strings.Split(fmt.Sprintf(`docker run --rm --name tailwindcss-builder -v %s:/project d3fk/tailwindcss:stable -i static/css/input.css -o static/css/output.css`, curDir), " ")
+	*/
+	cmdArgs := strings.Split(`/home/rory/bin/tailwindcss-linux-x64-v4.0.7 -i static/css/input.css -o static/css/output.css`, " ")
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	out, err := cmd.CombinedOutput()
 	log.Println(string(out))
@@ -256,6 +276,26 @@ func getDummyUnreconciledInvoice() Invoice {
 		DonationsTotal:  0.00,
 		IsReconciled:    false,
 		LinkedDonations: []Donation{}, // Empty slice
+		LineItems: []LineItem{
+			LineItem{
+				Description: "Stripe donation",
+				UnitAmount:  200.00,
+				AccountCode: "412",
+				LineItemID:  "eab3ce9f-dd31-11f0-8de1-8c16455f785b",
+				Quantity:    1,
+				TaxAmount:   0.00,
+				LineAmount:  200.00,
+			},
+			LineItem{
+				Description: "Stripe platform fees",
+				UnitAmount:  -2.80,
+				AccountCode: "500",
+				LineItemID:  "1bf7ffcf-dd32-11f0-b2d3-8c16455f785b",
+				Quantity:    1,
+				TaxAmount:   0.00,
+				LineAmount:  -2.80,
+			},
+		},
 	}
 }
 
@@ -281,6 +321,26 @@ func getDummyReconciledInvoice() Invoice {
 		DonationsTotal:  117.20,
 		IsReconciled:    true,
 		LinkedDonations: linkedDonations,
+		LineItems: []LineItem{
+			LineItem{
+				Description: "Stripe donation",
+				UnitAmount:  200.00,
+				AccountCode: "412",
+				LineItemID:  "eab3ce9f-dd31-11f0-8de1-8c16455f785b",
+				Quantity:    1,
+				TaxAmount:   0.00,
+				LineAmount:  200.00,
+			},
+			LineItem{
+				Description: "Stripe platform fees",
+				UnitAmount:  -2.80,
+				AccountCode: "500",
+				LineItemID:  "1bf7ffcf-dd32-11f0-b2d3-8c16455f785b",
+				Quantity:    1,
+				TaxAmount:   0.00,
+				LineAmount:  -2.80,
+			},
+		},
 	}
 }
 
