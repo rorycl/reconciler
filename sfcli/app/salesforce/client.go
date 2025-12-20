@@ -8,15 +8,18 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
 
 // Client is a wrapper for making authenticated calls to the Salesforce API.
 type Client struct {
-	httpClient  *http.Client
-	instanceURL string
-	apiVersion  string
+	httpClient    *http.Client
+	instanceURL   string
+	apiVersion    string
+	inDevelopment bool
+	dumpFile      string // path to dump http body response if inDevelopment
 }
 
 // GetOpportunities fetches Opportunity records from Salesforce, applying appropriate filters.
@@ -125,13 +128,18 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 
+	body, _ := ioutil.ReadAll(resp.Body)
+	if c.inDevelopment && c.dumpFile != "" {
+		_ = os.WriteFile(c.dumpFile, body, 0644)
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	if v != nil {
-		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		// if err := json.UnmarshalNewDecoder(resp.Body).Decode(v); err != nil {
+		if err := json.Unmarshal(body, v); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}

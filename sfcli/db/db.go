@@ -62,7 +62,7 @@ func (db *DB) UpsertOpportunities(opportunities []salesforce.Opportunity) error 
 			opp.StageName,
 			opp.RecordType.Name,
 			opp.PayoutReference, // sql.driver will handle nil pointer correctly
-			opp.LastModifiedDate,
+			opp.LastModifiedDate.ToString(),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to upsert opportunity %s: %w", opp.ID, err)

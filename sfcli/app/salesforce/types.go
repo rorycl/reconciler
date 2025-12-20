@@ -1,6 +1,33 @@
 package salesforce
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// SalesforceTime is a customised time for Salesforce objects
+type SalesforceTime struct {
+	time.Time
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (st *SalesforceTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "null" {
+		return nil
+	}
+	// Salesforce's custom format:  "2025-07-14T02:25:51.000+0000"
+	t, err := time.Parse("2006-01-02T15:04:05.000-0700", s)
+	if err != nil {
+		return err
+	}
+	st.Time = t
+	return nil
+}
+
+func (st SalesforceTime) ToString() string {
+	return st.Format("2006-01-02T15:04:05Z07:00")
+}
 
 // SOQLResponse is the top-level envelope for a SOQL query response.
 type SOQLResponse struct {
@@ -12,14 +39,14 @@ type SOQLResponse struct {
 
 // Opportunity represents the data for a single Opportunity record.
 type Opportunity struct {
-	ID                string     `json:"Id"`
-	Name              string     `json:"Name"`
-	Amount            float64    `json:"Amount"`
-	CloseDate         string     `json:"CloseDate"` // Kept as string for simplicity in DB
-	StageName         string     `json:"StageName"`
-	RecordType        RecordType `json:"RecordType"`
-	LastModifiedDate  time.Time  `json:"LastModifiedDate"`
-	PayoutReference   *string    `json:"Payout_Reference__c"` // Pointer to handle null values
+	ID               string         `json:"Id"`
+	Name             string         `json:"Name"`
+	Amount           float64        `json:"Amount"`
+	CloseDate        string         `json:"CloseDate"` // Kept as string for simplicity in DB
+	StageName        string         `json:"StageName"`
+	RecordType       RecordType     `json:"RecordType"`
+	LastModifiedDate SalesforceTime `json:"LastModifiedDate"`
+	PayoutReference  *string        `json:"Payout_Reference__c"` // Pointer to handle null values
 }
 
 // RecordType is a nested object within the Opportunity response.
