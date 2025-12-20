@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sfcli/app/salesforce"
 
@@ -15,7 +16,6 @@ type DB struct {
 }
 
 // New creates a new connection to an SQLite database at the given path.
-// It enables WAL mode for better concurrency and foreign key support.
 func New(path string) (*DB, error) {
 	db, err := sql.Open("sqlite", fmt.Sprintf("%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", path))
 	if err != nil {
@@ -36,9 +36,9 @@ func (db *DB) InitSchema() error {
 	return nil
 }
 
-// UpsertOpportunities performs a transactional upsert for a slice of Opportunities.
-func (db *DB) UpsertOpportunities(opportunities []salesforce.Opportunity) error {
-	if len(opportunities) == 0 {
+// UpsertOpportunities performs a transactional upsert for a slice of Salesforce Records.
+func (db *DB) UpsertOpportunities(records []salesforce.Record) error {
+	if len(records) == 0 {
 		return nil
 	}
 	tx, err := db.Begin()
@@ -53,19 +53,26 @@ func (db *DB) UpsertOpportunities(opportunities []salesforce.Opportunity) error 
 	}
 	defer stmt.Close()
 
-	for _, opp := range opportunities {
-		_, err := stmt.ExecContext(context.Background(),
-			opp.ID,
-			opp.Name,
-			opp.Amount,
-			opp.CloseDate,
-			opp.StageName,
-			opp.RecordType.Name,
-			opp.PayoutReference, // sql.driver will handle nil pointer correctly
-			opp.LastModifiedDate.ToString(),
+	for _, rec := range records {
+		additionalFieldsJSON, err := json.Marshal(rec.AdditionalFields)
+		if err != nil {
+			return fmt.Errorf("failed to marshal additional fields for record %s: %w", rec.ID, err)
+		}
+
+		_, err = stmt.ExecContext(context.Background(),
+			rec.ID,
+			rec.Name,
+			rec.Amount,
+			rec.CloseDate,
+			rec.PayoutReference,
+			rec.CreatedDate.Time,      // Pass the underlying time.Time object
+			rec.CreatedBy.Name,
+			rec.LastModifiedDate.Time, // Pass the underlying time.Time object
+			rec.LastModifiedBy.Name,
+			string(additionalFieldsJSON),
 		)
 		if err != nil {
-			return fmt.Errorf("failed to upsert opportunity %s: %w", opp.ID, err)
+			return fmt.Errorf("failed to upsert opportunity %s: %w", rec.ID, err)
 		}
 	}
 

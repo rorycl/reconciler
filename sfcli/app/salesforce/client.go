@@ -11,19 +11,20 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"sfcli/app" // Import the app package to access config structs
 )
 
 // Client is a wrapper for making authenticated calls to the Salesforce API.
 type Client struct {
-	httpClient    *http.Client
-	instanceURL   string
-	apiVersion    string
-	inDevelopment bool
-	dumpFile      string // path to dump http body response if inDevelopment
+	httpClient  *http.Client
+	instanceURL string
+	apiVersion  string
+	config      app.SalesforceConfig
 }
 
-// GetOpportunities fetches Opportunity records from Salesforce, applying appropriate filters.
-func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Opportunity, error) {
+// GetOpportunities fetches records from Salesforce using the configurable SOQL query.
+func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Record, error) {
 	var conditions []string
 	toDate := fromDate.AddDate(1, 0, 0) // One year from the start date
 	conditions = append(conditions, fmt.Sprintf("CloseDate >= %s", fromDate.Format("2006-01-02")))
@@ -32,11 +33,15 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 	if !ifModifiedSince.IsZero() {
 		conditions = append(conditions, fmt.Sprintf("LastModifiedDate > %s", ifModifiedSince.UTC().Format(time.RFC3339)))
 	}
-
 	whereClause := strings.Join(conditions, " AND ")
-	soql := fmt.Sprintf("SELECT Id, Name, Amount, CloseDate, StageName, RecordType.Name, LastModifiedDate, Payout_Reference__c FROM Opportunity WHERE %s", whereClause)
 
-	requestURL := fmt.Sprintf("%s/services/data/%s/query?q=%s", c.instanceURL, c.apiVersion, url.QueryEscape(soql))
+	// Replace the placeholder in the query template with the generated WHERE clause.
+	finalSOQL := strings.Replace(c.config.Query, "{{.WhereClause}}", whereClause, 1)
+
+	// Dump the final query for debugging purposes.
+	_ = os.WriteFile("salesforce_query.log", []byte(finalSOQL), 0644)
+
+	requestURL := fmt.Sprintf("%s/services/data/%s/query?q=%s", c.instanceURL, c.apiVersion, url.QueryEscape(finalSOQL))
 	req, err := c.newRequest(ctx, "GET", requestURL, nil)
 	if err != nil {
 		return nil, err
@@ -47,22 +52,17 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 		return nil, err
 	}
 
-	// The query API supports pagination, but for simplicity in this CLI,
-	// we assume the result set is small enough to fit in one response.
-	// A more robust implementation would check response.Done and query response.NextRecordsURL.
 	return response.Records, nil
 }
 
 // BatchUpdateOpportunityRefs performs a batch update using the Salesforce Composite API.
 func (c *Client) BatchUpdateOpportunityRefs(ctx context.Context, reference string, ids []string) error {
 	if len(ids) > 25 {
-		// The batch API is limited to 25 subrequests.
-		// A more robust implementation would chunk the IDs into groups of 25.
 		return fmt.Errorf("cannot update more than 25 records in a single batch")
 	}
 
 	batchRequest := BatchRequest{
-		AllOrNone: false, // Continue processing even if one subrequest fails
+		AllOrNone: false,
 		Requests:  make([]Subrequest, len(ids)),
 	}
 
@@ -70,8 +70,7 @@ func (c *Client) BatchUpdateOpportunityRefs(ctx context.Context, reference strin
 		batchRequest.Requests[i] = Subrequest{
 			Method: "PATCH",
 			URL:    fmt.Sprintf("/services/data/%s/sobjects/Opportunity/%s", c.apiVersion, id),
-			// The custom field API name must be correct, e.g., "Payout_Reference__c"
-			Body: map[string]string{"Payout_Reference__c": reference},
+			Body:   map[string]string{"Payout_Reference__c": reference},
 		}
 	}
 
@@ -91,10 +90,8 @@ func (c *Client) BatchUpdateOpportunityRefs(ctx context.Context, reference strin
 		return err
 	}
 
-	// Check for errors within the batch response results.
 	for _, result := range response.Results {
 		if result.StatusCode < 200 || result.StatusCode >= 300 {
-			// A simple error handling approach; a robust one would collect all errors.
 			errorBody, _ := json.Marshal(result.Result)
 			return fmt.Errorf("batch subrequest failed with status %d: %s", result.StatusCode, string(errorBody))
 		}
@@ -128,17 +125,18 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-	if c.inDevelopment && c.dumpFile != "" {
-		_ = os.WriteFile(c.dumpFile, body, 0644)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	_ = os.WriteFile("salesforce_response.json", body, 0644)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	if v != nil {
-		// if err := json.UnmarshalNewDecoder(resp.Body).Decode(v); err != nil {
 		if err := json.Unmarshal(body, v); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}

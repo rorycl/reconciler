@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -21,12 +22,14 @@ type RootConfig struct {
 	DateRangeStartStr string `yaml:"date_range_start"`
 }
 
-// SalesforceConfig holds Salesforce-specific settings.
+// SalesforceConfig holds Salesforce-specific settings, including the query configuration.
 type SalesforceConfig struct {
-	LoginDomain  string `yaml:"login_domain"`
-	ClientID     string `yaml:"client_id"`
-	ClientSecret string `yaml:"client_secret"`
-	OAuth2Config *oauth2.Config
+	LoginDomain   string            `yaml:"login_domain"`
+	ClientID      string            `yaml:"client_id"`
+	ClientSecret  string            `yaml:"client_secret"`
+	Query         string            `yaml:"query"`
+	FieldMappings map[string]string `yaml:"field_mappings"`
+	OAuth2Config  *oauth2.Config
 }
 
 // LoadConfig loads and validates the configuration from the given file path.
@@ -64,6 +67,12 @@ func validateAndPrepareConfig(c *RootConfig) error {
 	}
 	if sc.LoginDomain == "" {
 		return fmt.Errorf("salesforce.login_domain is missing")
+	}
+	if sc.Query == "" {
+		return fmt.Errorf("salesforce.query is missing")
+	}
+	if !strings.Contains(sc.Query, "{{.WhereClause}}") {
+		return fmt.Errorf("salesforce.query must contain the '{{.WhereClause}}' placeholder")
 	}
 	if c.TokenFilePath == "" {
 		return fmt.Errorf("token_file_path is missing")

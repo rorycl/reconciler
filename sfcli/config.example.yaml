@@ -1,15 +1,34 @@
----
 # config.yaml
 salesforce:
-  # Use test.salesforce.com for Sandboxes, login.salesforce.com for Production. Dev sandboxes are on `login`.
-  login_domain: "login.salesforce.com"
+  # Use test.salesforce.com for Sandboxes, login.salesforce.com for Production.
+  login_domain: "test.salesforce.com"
   client_id: "YOUR_SALESFORCE_CONSUMER_KEY"
   client_secret: "YOUR_SALESFORCE_CONSUMER_SECRET"
+
+  # The SOQL query to execute.
+  # Use {{.WhereClause}} as a placeholder for date and modification filters.
+  # Ensure all fields for CoreFields (Id, Name, Amount, CloseDate, LastModifiedDate) are included.
+  query: >-
+    SELECT
+      Id, Name, Amount, CloseDate, LastModifiedDate, Payout_Reference__c,
+      StageName, RecordType.Name, Account.Name,
+      CreatedBy.Name, CreatedDate, LastModifiedBy.Name
+    FROM Opportunity
+    WHERE {{.WhereClause}}
+
+  # Optional: Map API field names from the query to user-friendly local names.
+  # These will be available in the AdditionalFields map for use in templates.
+  # Note: Relationship query names are flattened, e.g., Account.Name becomes AccountName.
+  field_mappings:
+    StageName: Stage
+    RecordTypeName: RecordType
+    AccountName: Account
+    CreatedByName: CreatedBy
+    LastModifiedByName: ModifiedBy
 
 # Default paths used by the application
 token_file_path: "./sf_token.json"
 database_path: "./reconciliation.db"
 
 # Default date range start (YYYY-MM-DD) for fetching records.
-# Used by sync commands if --fromDate is not provided.
-date_range_start: "2025-07-01"
+date_range_start: "2025-04-01"
