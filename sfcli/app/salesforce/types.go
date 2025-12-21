@@ -101,27 +101,29 @@ func (r *Record) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// BatchRequest is the structure for a Salesforce Composite Batch API request.
-type BatchRequest struct {
-	AllOrNone bool         `json:"allOrNone"`
-	Requests  []Subrequest `json:"batchRequests"`
+// CollectionsUpdateRequest is the structure for the sObject Collections
+// API request body.
+type CollectionsUpdateRequest struct {
+	AllOrNone bool                     `json:"allOrNone"`
+	Records   []map[string]interface{} `json:"records"`
 }
 
-// Subrequest represents a single operation within a batch request.
-type Subrequest struct {
-	Method string      `json:"method"`
-	URL    string      `json:"url"`
-	Body   interface{} `json:"richInput"`
+// CollectionsUpdateResponse is the response from the sObject
+// Collections API, which is a slice of SaveResult objects.
+type CollectionsUpdateResponse []SaveResult
+
+// SaveResult represents the outcome of a single record update within
+// the batch.
+type SaveResult struct {
+	ID      string        `json:"id"`
+	Success bool          `json:"success"`
+	Errors  []ErrorDetail `json:"errors"`
 }
 
-// BatchResponse is the structure of the response from the Composite Batch API.
-type BatchResponse struct {
-	HasErrors bool     `json:"hasErrors"`
-	Results   []Result `json:"results"`
-}
-
-// Result represents the outcome of a single subrequest within a batch response.
-type Result struct {
-	StatusCode int         `json:"statusCode"`
-	Result     interface{} `json:"result"`
+// ErrorDetail provides specific information about a failure.
+type ErrorDetail struct {
+	StatusCode string   `json:"statusCode"`
+	Message    string   `json:"message"`
+	Fields     []string `json:"fields"`
+	ErrorCode  string   `json:"errorCode"`
 }

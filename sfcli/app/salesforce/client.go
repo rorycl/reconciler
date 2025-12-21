@@ -55,48 +55,68 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 	return response.Records, nil
 }
 
-// BatchUpdateOpportunityRefs performs a update using the Salesforce Composite API.
+// BatchUpdateOpportunityRefs performs a update using the Salesforce
+// sObject Collections API (which is a synchronous API) for up to 200
+// records at a time.
+// See https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/resources_sobject_describe.htm
 func (c *Client) BatchUpdateOpportunityRefs(ctx context.Context, reference string, ids []string) error {
-	if len(ids) > 25 {
-		return fmt.Errorf("cannot update more than 25 records in a single batch")
+
+	urlTpl := "%s/services/data/%s/composite/sobjects"
+
+	if len(ids) > 200 {
+		return fmt.Errorf("cannot update more than 200 records in a single batch")
 	}
 
-	batchRequest := BatchRequest{
-		AllOrNone: false,
-		Requests:  make([]Subrequest, len(ids)),
-	}
-
+	// Build a slice of records.
+	recordsForUpdate := make([]map[string]any, len(ids))
 	for i, id := range ids {
-		batchRequest.Requests[i] = Subrequest{
-			Method: "PATCH",
-			// URL:    fmt.Sprintf("/services/data/%s/sobjects/Opportunity/%s", c.apiVersion, id),
-			URL:  fmt.Sprintf("/services/data/%s/composite/sobjects/Opportunity/%s", c.apiVersion, id),
-			Body: map[string]string{"Payout_Reference__c": reference},
+		recordsForUpdate[i] = map[string]any{
+			"id":                  id,
+			"Payout_Reference__c": reference,
+			"attributes":          map[string]string{"type": "Opportunity"},
 		}
 	}
 
-	body, err := json.Marshal(batchRequest)
+	// Wrap records in the required request body structure.
+	payload := CollectionsUpdateRequest{
+		AllOrNone: true,
+		Records:   recordsForUpdate,
+	}
+
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal batch request: %w", err)
 	}
 	_ = os.WriteFile("batchRequest", body, 0644)
 
-	requestURL := fmt.Sprintf("%s/services/data/%s/composite/batch", c.instanceURL, c.apiVersion)
-	req, err := c.newRequest(ctx, "POST", requestURL, body)
+	requestURL := fmt.Sprintf(urlTpl, c.instanceURL, c.apiVersion)
+	req, err := c.newRequest(ctx, "PATCH", requestURL, body)
 	if err != nil {
 		return err
 	}
 
-	var response BatchResponse
+	var response CollectionsUpdateResponse
 	if _, err := c.do(req, &response); err != nil {
 		return err
 	}
 
-	for _, result := range response.Results {
-		if result.StatusCode < 200 || result.StatusCode >= 300 {
-			errorBody, _ := json.Marshal(result.Result)
-			return fmt.Errorf("batch subrequest failed with status %d: %s", result.StatusCode, string(errorBody))
+	// Check for errors within the response array.
+	var errorMessages []string
+	for _, result := range response {
+		if !result.Success {
+			var errors []string
+			for _, e := range result.Errors {
+				errors = append(errors, fmt.Sprintf("%s (%s)", e.Message, e.ErrorCode))
+			}
+			msg := fmt.Sprintf("failed to update record %s: %s", result.ID,
+				strings.Join(errors, ", "))
+			errorMessages = append(errorMessages, msg)
 		}
+	}
+
+	if len(errorMessages) > 0 {
+		return fmt.Errorf("one or more records failed to update:\n- %s",
+			strings.Join(errorMessages, "\n- "))
 	}
 
 	return nil
