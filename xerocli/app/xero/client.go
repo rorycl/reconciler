@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,14 +14,28 @@ import (
 
 const baseURL = "https://api.xero.com/api.xro/2.0"
 
-// Client is a wrapper for making authenticated calls to the Xero API.
-type Client struct {
+// APIClient is a wrapper for making authenticated calls to the Xero API.
+type APIClient struct {
 	httpClient *http.Client
 	tenantID   string
+	baseURL    string
+}
+
+// NewAPIClient creates a new Xero API client. If not httpClient is
+// provided http.DefaultClient is used.
+func NewAPIClient(tenantID string, httpClient *http.Client) *APIClient {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
+	return &APIClient{
+		httpClient: httpClient,
+		tenantID:   tenantID,
+		baseURL:    baseURL,
+	}
 }
 
 // GetBankTransactions fetches bank transactions from Xero, applying appropriate filters.
-func (c *Client) GetBankTransactions(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]BankTransaction, error) {
+func (c *APIClient) GetBankTransactions(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]BankTransaction, error) {
 	var allTransactions []BankTransaction
 	page := 1
 
@@ -38,7 +52,7 @@ func (c *Client) GetBankTransactions(ctx context.Context, fromDate, ifModifiedSi
 		params := url.Values{}
 		params.Add("where", whereClause)
 		params.Add("page", fmt.Sprintf("%d", page))
-		requestURL := fmt.Sprintf("%s/BankTransactions?%s", baseURL, params.Encode())
+		requestURL := fmt.Sprintf("%s/BankTransactions?%s", c.baseURL, params.Encode())
 
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {
@@ -46,7 +60,7 @@ func (c *Client) GetBankTransactions(ctx context.Context, fromDate, ifModifiedSi
 		}
 
 		var response BankTransactionsResponse
-		resp, err := c.do(req, &response)
+		resp, err := do(c, req, &response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute request for page %d: %w", page, err)
 		}
@@ -68,7 +82,7 @@ func (c *Client) GetBankTransactions(ctx context.Context, fromDate, ifModifiedSi
 }
 
 // GetInvoices fetches invoices from Xero, applying appropriate filters.
-func (c *Client) GetInvoices(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Invoice, error) {
+func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Invoice, error) {
 	var allInvoices []Invoice
 	page := 1
 
@@ -83,7 +97,7 @@ func (c *Client) GetInvoices(ctx context.Context, fromDate, ifModifiedSince time
 		params := url.Values{}
 		params.Add("where", whereClause)
 		params.Add("page", fmt.Sprintf("%d", page))
-		requestURL := fmt.Sprintf("%s/Invoices?%s", baseURL, params.Encode())
+		requestURL := fmt.Sprintf("%s/Invoices?%s", c.baseURL, params.Encode())
 
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {
@@ -91,7 +105,7 @@ func (c *Client) GetInvoices(ctx context.Context, fromDate, ifModifiedSince time
 		}
 
 		var response InvoiceResponse
-		resp, err := c.do(req, &response)
+		resp, err := do(c, req, &response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute request for page %d: %w", page, err)
 		}
@@ -111,14 +125,14 @@ func (c *Client) GetInvoices(ctx context.Context, fromDate, ifModifiedSince time
 }
 
 // GetAccounts fetches accounts from Xero, applying appropriate filters.
-func (c *Client) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]Account, error) {
+func (c *APIClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]Account, error) {
 	var allAccounts []Account
 	page := 1
 
 	for {
 		params := url.Values{}
 		params.Add("page", fmt.Sprintf("%d", page))
-		requestURL := fmt.Sprintf("%s/Accounts?%s", baseURL, params.Encode())
+		requestURL := fmt.Sprintf("%s/Accounts?%s", c.baseURL, params.Encode())
 
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {
@@ -126,7 +140,7 @@ func (c *Client) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]
 		}
 
 		var response AccountResponse
-		resp, err := c.do(req, &response)
+		resp, err := do(c, req, &response)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute request for page %d: %w", page, err)
 		}
@@ -146,15 +160,15 @@ func (c *Client) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]
 }
 
 // GetBankTransactionByID fetches a single bank transaction by its UUID.
-func (c *Client) GetBankTransactionByID(ctx context.Context, uuid string) (BankTransaction, error) {
-	requestURL := fmt.Sprintf("%s/BankTransactions/%s", baseURL, uuid)
+func (c *APIClient) GetBankTransactionByID(ctx context.Context, uuid string) (BankTransaction, error) {
+	requestURL := fmt.Sprintf("%s/BankTransactions/%s", c.baseURL, uuid)
 	req, err := c.newRequest(ctx, "GET", requestURL, time.Time{}, nil)
 	if err != nil {
 		return BankTransaction{}, err
 	}
 
 	var response BankTransactionsResponse
-	if _, err := c.do(req, &response); err != nil {
+	if _, err := do(c, req, &response); err != nil {
 		return BankTransaction{}, err
 	}
 
@@ -166,7 +180,7 @@ func (c *Client) GetBankTransactionByID(ctx context.Context, uuid string) (BankT
 
 // UpdateBankTransactionReference performs a POST request to update a transaction's reference.
 // It returns the full, updated transaction object from the Xero API response.
-func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTransaction, reference string) (BankTransaction, error) {
+func (c *APIClient) UpdateBankTransactionReference(ctx context.Context, tx BankTransaction, reference string) (BankTransaction, error) {
 	tx.Reference = reference
 	payload := map[string][]BankTransaction{"BankTransactions": {tx}}
 	body, err := json.Marshal(payload)
@@ -174,14 +188,14 @@ func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTran
 		return BankTransaction{}, fmt.Errorf("failed to marshal update payload: %w", err)
 	}
 
-	requestURL := fmt.Sprintf("%s/BankTransactions", baseURL)
+	requestURL := fmt.Sprintf("%s/BankTransactions", c.baseURL)
 	req, err := c.newRequest(ctx, "POST", requestURL, time.Time{}, body)
 	if err != nil {
 		return BankTransaction{}, err
 	}
 
 	var response BankTransactionsResponse
-	if _, err := c.do(req, &response); err != nil {
+	if _, err := do(c, req, &response); err != nil {
 		return BankTransaction{}, err
 	}
 
@@ -192,12 +206,10 @@ func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTran
 }
 
 // newRequest is a helper to create a new HTTP request with common headers.
-func (c *Client) newRequest(ctx context.Context, method, url string, ifModifiedSince time.Time, body []byte) (*http.Request, error) {
-	var bodyReader *bytes.Reader
+func (c *APIClient) newRequest(ctx context.Context, method, url string, ifModifiedSince time.Time, body []byte) (*http.Request, error) {
+	var bodyReader io.Reader
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
-	} else {
-		bodyReader = bytes.NewReader([]byte{})
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
@@ -218,25 +230,30 @@ func (c *Client) newRequest(ctx context.Context, method, url string, ifModifiedS
 	return req, nil
 }
 
-// do is a helper to execute an HTTP request and decode the JSON response.
-func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
+// do is a helper to execute an HTTP request and decode the JSON
+// response. A nil `v` is supported for API calls not providing a
+// response, such as DELETE calls.
+func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Handle non-2xx status codes
+	if resp.StatusCode == http.StatusNotModified {
+		return resp, nil
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		// Don't treat 304 Not Modified as an error, it's an expected response
 		if resp.StatusCode == http.StatusNotModified {
 			return resp, nil
 		}
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	if v != nil {
+	if v != nil { // v might be nil for a DELETE request, for example.
 		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}

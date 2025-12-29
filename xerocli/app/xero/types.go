@@ -168,6 +168,7 @@ type Account struct {
 	AccountID               string `json:"AccountID"`
 	Code                    string `json:"Code"`
 	Name                    string `json:"Name"`
+	Description             string `json:"Description"`
 	Type                    string `json:"Type"`
 	TaxType                 string `json:"TaxType"`
 	EnablePaymentsToAccount bool   `json:"EnablePaymentsToAccount"`
@@ -178,7 +179,6 @@ type Account struct {
 	BankAccountNumber string `json:"BankAccountNumber,omitempty"`
 	BankAccountType   string `json:"BankAccountType,omitempty"`
 	CurrencyCode      string `json:"CurrencyCode,omitempty"`
-	Description       string `json:"Description,omitempty"`
 	SystemAccount     string `json:"SystemAccount,omitempty"`
 
 	// set from UpdatedDateUTC

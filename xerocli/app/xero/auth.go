@@ -15,7 +15,7 @@ import (
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
 // It attempts to use a saved token first and will refresh it if necessary.
 // If no token exists, it will fail, requiring the user to run the `login` command.
-func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*Client, error) {
+func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*APIClient, error) {
 	tok, err := loadTokenFromFile(tokenPath)
 	if err != nil {
 		return nil, fmt.Errorf("no token file found at '%s'. Please run the 'login' command first", tokenPath)
@@ -43,7 +43,7 @@ func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*Clie
 		return nil, fmt.Errorf("failed to determine tenant ID: %w", err)
 	}
 
-	return &Client{
+	return &APIClient{
 		httpClient: oauthClient,
 		tenantID:   tenantID,
 	}, nil
