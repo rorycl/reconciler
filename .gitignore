@@ -9,6 +9,9 @@ reconciliation.db
 xero_token.json
 sf_token.json
 
+# backups
+reconciliation.db.*
+
 # bin files
 bin
 
