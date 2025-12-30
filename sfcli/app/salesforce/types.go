@@ -2,6 +2,7 @@ package salesforce
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -34,6 +35,15 @@ type SOQLResponse struct {
 	Records        []Record `json:"records"`
 }
 
+func (s *SOQLResponse) MapAdditionalFields(mapper map[string]string) error {
+	for _, rr := range s.Records {
+		if err := rr.mapAdditionalFields(mapper); err != nil {
+			return fmt.Errorf("mapping error: %v", err)
+		}
+	}
+	return nil
+}
+
 // CoreFields defines the essential, non-negotiable fields the application requires.
 type CoreFields struct {
 	ID               string         `json:"Id"`
@@ -51,53 +61,59 @@ type CoreFields struct {
 	PayoutReference *string `json:"Payout_Reference__c"` // Pointer to handle null values
 }
 
-// Record represents the data for a single Salesforce record, combining core and additional fields.
+// Record represents the data for a single Salesforce record, combining
+// core and additional fields.
 type Record struct {
 	CoreFields
 	AdditionalFields map[string]interface{}
+	otherFields      map[string]interface{}
 }
 
-// UnmarshalJSON provides custom JSON decoding for the Record type.
-// It populates the static CoreFields and captures all other fields into the dynamic AdditionalFields map.
+// UnmarshalJSON provides custom JSON decoding for the Record type,
+// populating CoreFields and
+// It populates the static CoreFields and captures all other fields into
+// the dynamic AdditionalFields map.
 func (r *Record) UnmarshalJSON(data []byte) error {
-	// First, unmarshal into the embedded CoreFields struct to populate known fields.
+
 	if err := json.Unmarshal(data, &r.CoreFields); err != nil {
 		return err
 	}
-
-	// Second, unmarshal into a generic map to capture all fields from the response.
 	var allFields map[string]interface{}
 	if err := json.Unmarshal(data, &allFields); err != nil {
 		return err
 	}
 
-	// Define the set of fields that are already handled by CoreFields.
-	// This includes "attributes" which is metadata sent by Salesforce in every record.
-	coreFieldNames := map[string]bool{
-		"Id": true, "Name": true, "Amount": true, "CloseDate": true,
-		"CreatedDate": true, "LastModifiedDate": true, "CreatedBy": true,
-		"LastModifiedBy": true, "Payout_Reference__c": true, "attributes": true,
-	}
-
-	// Populate the AdditionalFields map with any fields not in the core set.
-	r.AdditionalFields = make(map[string]interface{})
+	r.otherFields = make(map[string]interface{})
 	for key, value := range allFields {
-		if _, isCore := coreFieldNames[key]; !isCore {
-			// Handle nested relationship objects (e.g., Account.Name) by flattening them.
-			if nestedMap, ok := value.(map[string]interface{}); ok {
-				for nestedKey, nestedValue := range nestedMap {
-					// Exclude metadata fields from nested objects.
-					if nestedKey != "attributes" {
-						// Create a flattened key like "AccountName".
-						flatKey := key + nestedKey
-						r.AdditionalFields[flatKey] = nestedValue
-					}
+		// Flatten nested names.
+		if nestedMap, ok := value.(map[string]interface{}); ok {
+			for nestedKey, nestedValue := range nestedMap {
+				// Exclude metadata fields.
+				if nestedKey != "attributes" {
+					// Create a flattened key like "Account.Name".
+					flatKey := key + "." + nestedKey
+					r.otherFields[flatKey] = nestedValue
 				}
-			} else {
-				r.AdditionalFields[key] = value
 			}
+		} else {
+			r.otherFields[key] = value
 		}
 	}
+	return nil
+}
+
+// mapAdditionalFields maps additional fields of interest with a more
+// usable name.
+func (r *Record) mapAdditionalFields(mapper map[string]string) error {
+	r.AdditionalFields = make(map[string]interface{})
+	for originalFieldName, newFieldName := range mapper {
+		val, ok := r.otherFields[originalFieldName]
+		if !ok {
+			return fmt.Errorf("field %q not found", originalFieldName)
+		}
+		r.AdditionalFields[newFieldName] = val
+	}
+	r.otherFields = make(map[string]interface{}) // clean.
 	return nil
 }
 

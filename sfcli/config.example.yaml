@@ -16,17 +16,18 @@ salesforce:
     FROM Opportunity
     WHERE {{.WhereClause}}
 
-  # Optional: field_mappings map API field names from the query to user-friendly local names.
-  # There are optional additional fields to show in the UI via templates
-  # and are not easily searchable as part of the core Opportunity/Donation object.
-  # These are in AdditionalFields map for use in templates.
-  # Note: Relationship query names are flattened, e.g., Account.Name becomes AccountName.
+  # Optional: field_mappings map API field names from the query to user-friendly
+  # local names. There are optional additional fields to show in the UI via
+  # templates and are not easily searchable as part of the core
+  # Opportunity/Donation object. These are in AdditionalFields map for use in
+  # templates.
+  #
+  # Note: Nested object names are represented with a dot (".") as in Account.Name.
   field_mappings:
     StageName: Stage
-    RecordTypeName: RecordType
-    AccountName: Account
-    CreatedByName: CreatedBy
-    LastModifiedByName: ModifiedBy
+    Account.Name: Account
+    CreatedBy.Name: CreatedBy
+    LastModifiedBy.Name: ModifiedBy
 
   # linking_object and linking_field_name are the object and field name
   # to target for distributed foreign key (DFK) updates. It is very

@@ -1,0 +1,1230 @@
+{
+  "totalSize": 34,
+  "done": true,
+  "records": [
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB97QAF"
+      },
+      "Id": "006gL00000EsB97QAF",
+      "Name": "Dickenson Mobile Generators",
+      "Amount": 15000.0,
+      "CloseDate": "2025-10-04",
+      "LastModifiedDate": "2025-12-20T20:21:32.000+0000",
+      "Payout_Reference__c": "ENTH-20251112",
+      "StageName": "Qualification",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHxQAN"
+        },
+        "Name": "Dickenson plc"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB98QAF"
+      },
+      "Id": "006gL00000EsB98QAF",
+      "Name": "United Oil Office Portable Generators",
+      "Amount": 125000.0,
+      "CloseDate": "2025-09-22",
+      "LastModifiedDate": "2025-12-20T20:21:50.000+0000",
+      "Payout_Reference__c": "ENTH-20251112",
+      "StageName": "Negotiation/Review",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB99QAF"
+      },
+      "Id": "006gL00000EsB99QAF",
+      "Name": "Express Logistics Standby Generator",
+      "Amount": 220000.0,
+      "CloseDate": "2025-08-18",
+      "LastModifiedDate": "2025-12-20T20:21:50.000+0000",
+      "Payout_Reference__c": "ENTH-20251112",
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI0QAN"
+        },
+        "Name": "Express Logistics and Transport"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9AQAV"
+      },
+      "Id": "006gL00000EsB9AQAV",
+      "Name": "GenePoint Standby Generator",
+      "Amount": 85000.0,
+      "CloseDate": "2025-09-25",
+      "LastModifiedDate": "2025-12-21T10:31:03.000+0000",
+      "Payout_Reference__c": "JG-20251221",
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI4QAN"
+        },
+        "Name": "GenePoint"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9BQAV"
+      },
+      "Id": "006gL00000EsB9BQAV",
+      "Name": "Grand Hotels Kitchen Generator",
+      "Amount": 15000.0,
+      "CloseDate": "2025-08-13",
+      "LastModifiedDate": "2025-12-21T10:31:03.000+0000",
+      "Payout_Reference__c": "JG-20251221",
+      "StageName": "Id. Decision Makers",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHyQAN"
+        },
+        "Name": "Grand Hotels & Resorts Ltd"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9CQAV"
+      },
+      "Id": "006gL00000EsB9CQAV",
+      "Name": "United Oil Refinery Generators",
+      "Amount": 270000.0,
+      "CloseDate": "2025-11-06",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Proposal/Price Quote",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9DQAV"
+      },
+      "Id": "006gL00000EsB9DQAV",
+      "Name": "United Oil SLA",
+      "Amount": 120000.0,
+      "CloseDate": "2025-11-13",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9EQAV"
+      },
+      "Id": "006gL00000EsB9EQAV",
+      "Name": "Grand Hotels Guest Portable Generators",
+      "Amount": 250000.0,
+      "CloseDate": "2025-11-21",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Value Proposition",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHyQAN"
+        },
+        "Name": "Grand Hotels & Resorts Ltd"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9FQAV"
+      },
+      "Id": "006gL00000EsB9FQAV",
+      "Name": "Edge Emergency Generator",
+      "Amount": 75000.0,
+      "CloseDate": "2025-11-21",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwBwgQAF"
+        },
+        "Name": "Edge Communications"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9GQAV"
+      },
+      "Id": "006gL00000EsB9GQAV",
+      "Name": "University of AZ Portable Generators",
+      "Amount": 50000.0,
+      "CloseDate": "2025-08-22",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI1QAN"
+        },
+        "Name": "University of Arizona"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9HQAV"
+      },
+      "Id": "006gL00000EsB9HQAV",
+      "Name": "Pyramid Emergency Generators",
+      "Amount": 100000.0,
+      "CloseDate": "2025-09-30",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Prospecting",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwBwiQAF"
+        },
+        "Name": "Pyramid Construction Inc."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9IQAV"
+      },
+      "Id": "006gL00000EsB9IQAV",
+      "Name": "Express Logistics Portable Truck Generators",
+      "Amount": 80000.0,
+      "CloseDate": "2025-08-16",
+      "LastModifiedDate": "2025-12-30T14:59:50.000+0000",
+      "Payout_Reference__c": "XYZ-123",
+      "StageName": "Value Proposition",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI0QAN"
+        },
+        "Name": "Express Logistics and Transport"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9JQAV"
+      },
+      "Id": "006gL00000EsB9JQAV",
+      "Name": "GenePoint Lab Generators",
+      "Amount": 60000.0,
+      "CloseDate": "2025-11-15",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Id. Decision Makers",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI4QAN"
+        },
+        "Name": "GenePoint"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9KQAV"
+      },
+      "Id": "006gL00000EsB9KQAV",
+      "Name": "GenePoint SLA",
+      "Amount": 30000.0,
+      "CloseDate": "2025-11-18",
+      "LastModifiedDate": "2025-12-30T14:59:50.000+0000",
+      "Payout_Reference__c": "XYZ-123",
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI4QAN"
+        },
+        "Name": "GenePoint"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9LQAV"
+      },
+      "Id": "006gL00000EsB9LQAV",
+      "Name": "United Oil Installations",
+      "Amount": 270000.0,
+      "CloseDate": "2025-09-18",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Negotiation/Review",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9MQAV"
+      },
+      "Id": "006gL00000EsB9MQAV",
+      "Name": "Edge Installation",
+      "Amount": 50000.0,
+      "CloseDate": "2025-09-12",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwBwgQAF"
+        },
+        "Name": "Edge Communications"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9NQAV"
+      },
+      "Id": "006gL00000EsB9NQAV",
+      "Name": "Edge SLA",
+      "Amount": 60000.0,
+      "CloseDate": "2025-08-08",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwBwgQAF"
+        },
+        "Name": "Edge Communications"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9OQAV"
+      },
+      "Id": "006gL00000EsB9OQAV",
+      "Name": "United Oil Installations",
+      "Amount": 270000.0,
+      "CloseDate": "2025-09-17",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9PQAV"
+      },
+      "Id": "006gL00000EsB9PQAV",
+      "Name": "Grand Hotels Generator Installations",
+      "Amount": 350000.0,
+      "CloseDate": "2025-11-04",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHyQAN"
+        },
+        "Name": "Grand Hotels & Resorts Ltd"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9QQAV"
+      },
+      "Id": "006gL00000EsB9QQAV",
+      "Name": "United Oil Refinery Generators",
+      "Amount": 915000.0,
+      "CloseDate": "2025-10-30",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9RQAV"
+      },
+      "Id": "006gL00000EsB9RQAV",
+      "Name": "University of AZ Installations",
+      "Amount": 100000.0,
+      "CloseDate": "2025-08-19",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Proposal/Price Quote",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI1QAN"
+        },
+        "Name": "University of Arizona"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9SQAV"
+      },
+      "Id": "006gL00000EsB9SQAV",
+      "Name": "Express Logistics SLA",
+      "Amount": 120000.0,
+      "CloseDate": "2025-08-17",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Perception Analysis",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI0QAN"
+        },
+        "Name": "Express Logistics and Transport"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9TQAV"
+      },
+      "Id": "006gL00000EsB9TQAV",
+      "Name": "University of AZ SLA",
+      "Amount": 90000.0,
+      "CloseDate": "2025-08-26",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI1QAN"
+        },
+        "Name": "University of Arizona"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9UQAV"
+      },
+      "Id": "006gL00000EsB9UQAV",
+      "Name": "Burlington Textiles Weaving Plant Generator",
+      "Amount": 235000.0,
+      "CloseDate": "2025-09-27",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwBwhQAF"
+        },
+        "Name": "Burlington Textiles Corp of America"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9VQAV"
+      },
+      "Id": "006gL00000EsB9VQAV",
+      "Name": "United Oil Installations",
+      "Amount": 235000.0,
+      "CloseDate": "2025-09-29",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9WQAV"
+      },
+      "Id": "006gL00000EsB9WQAV",
+      "Name": "United Oil Emergency Generators",
+      "Amount": 440000.0,
+      "CloseDate": "2025-09-11",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9XQAV"
+      },
+      "Id": "006gL00000EsB9XQAV",
+      "Name": "Grand Hotels SLA",
+      "Amount": 90000.0,
+      "CloseDate": "2025-08-15",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHyQAN"
+        },
+        "Name": "Grand Hotels & Resorts Ltd"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9YQAV"
+      },
+      "Id": "006gL00000EsB9YQAV",
+      "Name": "United Oil Standby Generators",
+      "Amount": 120000.0,
+      "CloseDate": "2025-11-14",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9ZQAV"
+      },
+      "Id": "006gL00000EsB9ZQAV",
+      "Name": "Grand Hotels Emergency Generators",
+      "Amount": 210000.0,
+      "CloseDate": "2025-11-02",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHyQAN"
+        },
+        "Name": "Grand Hotels & Resorts Ltd"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9aQAF"
+      },
+      "Id": "006gL00000EsB9aQAF",
+      "Name": "United Oil Plant Standby Generators",
+      "Amount": 675000.0,
+      "CloseDate": "2025-10-16",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Needs Analysis",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB9bQAF"
+      },
+      "Id": "006gL00000EsB9bQAF",
+      "Name": "Edge Emergency Generator",
+      "Amount": 35000.0,
+      "CloseDate": "2025-11-27",
+      "LastModifiedDate": "2025-11-27T10:21:45.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Id. Decision Makers",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwBwgQAF"
+        },
+        "Name": "Edge Communications"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000FFYbpQAH"
+      },
+      "Id": "006gL00000FFYbpQAH",
+      "Name": "Lazenby Holdings",
+      "Amount": null,
+      "CloseDate": "2026-03-31",
+      "LastModifiedDate": "2025-12-06T16:53:51.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Prospecting",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000XugG6QAJ"
+        },
+        "Name": "Prospects"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      },
+      "CreatedDate": "2025-12-06T16:53:51.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000FFYn7QAH"
+      },
+      "Id": "006gL00000FFYn7QAH",
+      "Name": "Big Bob Holdings",
+      "Amount": 20000.0,
+      "CloseDate": "2026-02-17",
+      "LastModifiedDate": "2025-12-06T16:55:46.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Prospecting",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000XugG6QAJ"
+        },
+        "Name": "Prospects"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      },
+      "CreatedDate": "2025-12-06T16:55:42.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000FFYrxQAH"
+      },
+      "Id": "006gL00000FFYrxQAH",
+      "Name": "ABC direct",
+      "Amount": 15500.0,
+      "CloseDate": "2025-12-10",
+      "LastModifiedDate": "2025-12-06T16:56:58.000+0000",
+      "Payout_Reference__c": null,
+      "StageName": "Qualification",
+      "RecordType": null,
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000XugG6QAJ"
+        },
+        "Name": "Prospects"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      },
+      "CreatedDate": "2025-12-06T16:56:57.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    }
+  ]
+}
