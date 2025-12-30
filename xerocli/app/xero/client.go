@@ -125,38 +125,27 @@ func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince t
 }
 
 // GetAccounts fetches accounts from Xero, applying appropriate filters.
+// There is no pagination.
 func (c *APIClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]Account, error) {
-	var allAccounts []Account
-	page := 1
 
-	for {
-		params := url.Values{}
-		params.Add("page", fmt.Sprintf("%d", page))
-		requestURL := fmt.Sprintf("%s/Accounts?%s", c.baseURL, params.Encode())
+	requestURL := fmt.Sprintf("%s/Accounts", c.baseURL)
 
-		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		var response AccountResponse
-		resp, err := do(c, req, &response)
-		if err != nil {
-			return nil, fmt.Errorf("failed to execute request for page %d: %w", page, err)
-		}
-
-		if resp.StatusCode == http.StatusNotModified {
-			break
-		}
-		if len(response.Accounts) == 0 {
-			break
-		}
-
-		allAccounts = append(allAccounts, response.Accounts...)
-		page++
+	req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
+	if err != nil {
+		return nil, err
 	}
 
-	return allAccounts, nil
+	var response AccountResponse
+	resp, err := do(c, req, &response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request for accounts: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusNotModified {
+		return nil, nil
+	}
+
+	return response.Accounts, nil
 }
 
 // GetBankTransactionByID fetches a single bank transaction by its UUID.

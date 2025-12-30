@@ -64,6 +64,12 @@ func (a *App) SyncInvoices(ctx context.Context, cfgPath string, fromDate, ifModi
 	return a.sync(ctx, cfgPath, fromDate, ifModifiedSince, "invoices")
 }
 
+// SyncAccounts fetches accounts from Xero and persists them to the database.
+// It handles incremental updates.
+func (a *App) SyncAccounts(ctx context.Context, cfgPath string, ifModifiedSince time.Time) error {
+	return a.sync(ctx, cfgPath, time.Time{}, ifModifiedSince, "accounts")
+}
+
 // sync is a generic helper function to handle the common sync logic for different data types.
 func (a *App) sync(ctx context.Context, cfgPath string, fromDate, ifModifiedSince time.Time, dataType string) error {
 	cfg, err := LoadConfig(cfgPath)
@@ -76,7 +82,7 @@ func (a *App) sync(ctx context.Context, cfgPath string, fromDate, ifModifiedSinc
 		log.Printf("No --fromDate specified, using default from config: %s", fromDate.Format("2006-01-02"))
 	}
 
-	if !ifModifiedSince.IsZero() {
+	if !ifModifiedSince.IsZero() && dataType != "accounts" {
 		log.Printf("Only retrieving records modified since: %s", ifModifiedSince.Format(time.RFC1123))
 	}
 
@@ -108,6 +114,7 @@ func (a *App) sync(ctx context.Context, cfgPath string, fromDate, ifModifiedSinc
 			return fmt.Errorf("failed to upsert bank transactions: %w", err)
 		}
 		log.Println("Successfully upserted bank transactions to database.")
+
 	case "invoices":
 		log.Println("Fetching Invoices from Xero...")
 		records, err := xeroClient.GetInvoices(ctx, fromDate, ifModifiedSince)
@@ -119,6 +126,18 @@ func (a *App) sync(ctx context.Context, cfgPath string, fromDate, ifModifiedSinc
 			return fmt.Errorf("failed to upsert invoices: %w", err)
 		}
 		log.Println("Successfully upserted invoices to database.")
+
+	case "accounts":
+		log.Println("Fetching Accounts from Xero...")
+		records, err := xeroClient.GetAccounts(ctx, ifModifiedSince)
+		if err != nil {
+			return err
+		}
+		log.Printf("Fetched %d accounts.", len(records))
+		if err := dbConn.UpsertAccounts(records); err != nil {
+			return fmt.Errorf("failed to upsert invoices: %w", err)
+		}
+		log.Println("Successfully upserted accounts to database.")
 	default:
 		return fmt.Errorf("unknown data type for sync: %s", dataType)
 	}

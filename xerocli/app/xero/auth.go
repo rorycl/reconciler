@@ -45,10 +45,7 @@ func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*APIC
 		return nil, fmt.Errorf("failed to determine tenant ID: %w", err)
 	}
 
-	return &APIClient{
-		httpClient: oauthClient,
-		tenantID:   tenantID,
-	}, nil
+	return NewAPIClient(tenantID, oauthClient), nil
 }
 
 // InitiateLogin starts the interactive OAuth2 flow to get a new token from the web.
