@@ -12,9 +12,10 @@ import (
 // This allows the CLI to be tested independently of the main app implementation.
 type Applicator interface {
 	Login(ctx context.Context, cfgPath string) error
-	Wipe(ctx context.Context, cfgPath string) error
 	SyncBankTransactions(ctx context.Context, cfgPath string, fromDate, ifModifiedSince time.Time) error
 	SyncInvoices(ctx context.Context, cfgPath string, fromDate, ifModifiedSince time.Time) error
+	SyncAccounts(ctx context.Context, cfgPath string, ifModifiedSince time.Time) error
+	Wipe(ctx context.Context, cfgPath string) error
 }
 
 // BuildCLI creates the full CLI command structure for the application.
@@ -56,12 +57,17 @@ func BuildCLI(app Applicator) *cli.Command {
 		},
 	}
 
-	wipeCmd := &cli.Command{
-		Name:  "wipe",
-		Usage: "Delete the local token and database files for security",
-		Flags: []cli.Flag{configFlag},
+	accountsCmd := &cli.Command{
+		Name:    "accounts",
+		Usage:   "Fetch and save accounts from Xero",
+		Aliases: []string{"acc"},
+		Flags:   []cli.Flag{configFlag, agoFlag, sinceFlag, fromDateFlag},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return app.Wipe(ctx, c.String("config"))
+			_, ifModifiedSince, err := parseDateFlags("", c.String("since"), c.String("ago"))
+			if err != nil {
+				return err
+			}
+			return app.SyncAccounts(ctx, c.String("config"), ifModifiedSince)
 		},
 	}
 
@@ -93,11 +99,20 @@ func BuildCLI(app Applicator) *cli.Command {
 		},
 	}
 
+	wipeCmd := &cli.Command{
+		Name:  "wipe",
+		Usage: "Delete the local token and database files for security",
+		Flags: []cli.Flag{configFlag},
+		Action: func(ctx context.Context, c *cli.Command) error {
+			return app.Wipe(ctx, c.String("config"))
+		},
+	}
+
 	// Assemble the root command.
 	rootCmd := &cli.Command{
 		Name:     "xerocli",
 		Usage:    "A CLI tool for interacting with the Xero API",
-		Commands: []*cli.Command{loginCmd, wipeCmd, bankTransactionsCmd, invoicesCmd},
+		Commands: []*cli.Command{loginCmd, accountsCmd, bankTransactionsCmd, invoicesCmd, wipeCmd},
 	}
 
 	return rootCmd
