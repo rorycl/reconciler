@@ -28,6 +28,10 @@ salesforce:
     CreatedByName: CreatedBy
     LastModifiedByName: ModifiedBy
 
+  # link_field_name is the field name to target for distributed foreign
+  # key (DFK) updates.
+  linking_field_name: "Payout_Reference__c"
+
 # Default paths used by the application
 token_file_path: "./sf_token.json"
 database_path: "./reconciliation.db"
