@@ -1,22 +1,15 @@
 package salesforce
 
 import (
-	"encoding/json"
+	"errors"
 	"os"
 	"testing"
 )
 
-func TestTypes(t *testing.T) {
-
+func TestTypesOK(t *testing.T) {
 	b, err := os.ReadFile("testdata/salesforce_response.json")
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	var sr SOQLResponse
-	err = json.Unmarshal(b, &sr)
-	if err != nil {
-		t.Fatalf("json unmarshalling error: %v", err)
 	}
 
 	fieldMappings := map[string]string{
@@ -25,10 +18,47 @@ func TestTypes(t *testing.T) {
 		"CreatedBy.Name":      "CreatedBy",
 		"LastModifiedBy.Name": "ModifiedBy",
 	}
-	if err := sr.MapAdditionalFields(fieldMappings); err != nil {
-		t.Fatalf("mapping error: %v", err)
+
+	unmarshaller := SOQLUnmarshaller{Mapper: fieldMappings}
+	sr, err := unmarshaller.UnmarshalSOQLResponse(b)
+	if err != nil {
+		t.Fatalf("UnmarshalSOQLResponse error: %v", err)
 	}
+
 	if got, want := len(sr.Records), 34; got != want {
 		t.Errorf("got %d records, want %d", got, want)
+	}
+
+	if sr.Records[0].AdditionalFields["Account"] == nil {
+		t.Error("expected 'Account' field to be mapped, but it was nil")
+	}
+}
+
+func TestTypesFail(t *testing.T) {
+	var euf *ErrUnmarshallFieldNotFoundError
+
+	b, err := os.ReadFile("testdata/salesforce_response.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fieldMappings := map[string]string{
+		"Invalid.Name": "Invalid", // subkey
+	}
+
+	unmarshaller := SOQLUnmarshaller{Mapper: fieldMappings}
+	_, err = unmarshaller.UnmarshalSOQLResponse(b)
+	if !errors.As(err, &euf) {
+		t.Fatalf("expected fieldMapping error not triggered")
+	}
+
+	fieldMappings = map[string]string{
+		"DoesNotExist": "dne", // key
+	}
+
+	unmarshaller = SOQLUnmarshaller{Mapper: fieldMappings}
+	_, err = unmarshaller.UnmarshalSOQLResponse(b)
+	if !errors.As(err, &euf) {
+		t.Fatalf("expected fieldMapping error not triggered")
 	}
 }

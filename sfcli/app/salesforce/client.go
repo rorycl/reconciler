@@ -23,7 +23,7 @@ type Client struct {
 	config      config.SalesforceConfig
 }
 
-// GetOpportunities fetches records from Salesforce using the configurable SOQL query.
+// GetOpportunities fetches records from Salesforce using a configurable SOQL query.
 func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Record, error) {
 	var conditions []string
 	toDate := fromDate.AddDate(1, 0, 0) // One year from the start date

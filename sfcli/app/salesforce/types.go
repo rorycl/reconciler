@@ -35,15 +35,6 @@ type SOQLResponse struct {
 	Records        []Record `json:"records"`
 }
 
-func (s *SOQLResponse) MapAdditionalFields(mapper map[string]string) error {
-	for _, rr := range s.Records {
-		if err := rr.mapAdditionalFields(mapper); err != nil {
-			return fmt.Errorf("mapping error: %v", err)
-		}
-	}
-	return nil
-}
-
 // CoreFields defines the essential, non-negotiable fields the application requires.
 type CoreFields struct {
 	ID               string         `json:"Id"`
@@ -65,63 +56,108 @@ type CoreFields struct {
 // core and additional fields.
 type Record struct {
 	CoreFields
-	AdditionalFields map[string]interface{}
-	otherFields      map[string]interface{}
+	AdditionalFields map[string]any
 }
 
-// UnmarshalJSON provides custom JSON decoding for the Record type,
-// populating CoreFields and
-// It populates the static CoreFields and captures all other fields into
-// the dynamic AdditionalFields map.
-func (r *Record) UnmarshalJSON(data []byte) error {
+// SOQLUnmarshaller is a configurable struct for managing the custom
+// unmarshalling of a SOQL response. The Mapper provides a map of
+// fields (other than CoreFields) to store in each Record's
+// AdditionalFields.
+type SOQLUnmarshaller struct {
+	Mapper map[string]string
+}
 
-	if err := json.Unmarshal(data, &r.CoreFields); err != nil {
-		return err
+// ErrUnmarshallFieldNotFoundError reports an error from trying to
+// unmarshall a field that couldn't be found.
+type ErrUnmarshallFieldNotFoundError struct {
+	originalField string
+	newField      string
+}
+
+func (e *ErrUnmarshallFieldNotFoundError) Error() string {
+	return fmt.Sprintf("field %s mapped to %s not found", e.originalField, e.newField)
+}
+
+func (su *SOQLUnmarshaller) UnmarshalSOQLResponse(data []byte) (*SOQLResponse, error) {
+	// rawResponse is an SQLResponse but with json.RawMesage Records,
+	// which are processed below.
+	var rawResponse struct {
+		TotalSize      int               `json:"totalSize"`
+		Done           bool              `json:"done"`
+		NextRecordsURL string            `json:"nextRecordsUrl"`
+		Records        []json.RawMessage `json:"records"`
 	}
-	var allFields map[string]interface{}
+	if err := json.Unmarshal(data, &rawResponse); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal SOQL with raw records: %w", err)
+	}
+
+	// Prepare the final response.
+	finalResponse := &SOQLResponse{
+		TotalSize:      rawResponse.TotalSize,
+		Done:           rawResponse.Done,
+		NextRecordsURL: rawResponse.NextRecordsURL,
+		Records:        make([]Record, 0, len(rawResponse.Records)),
+	}
+
+	// Process rawResponse records into finalResponse.
+	for _, rawRecord := range rawResponse.Records {
+		record, err := su.unmarshalAndMapRecord(rawRecord)
+		if err != nil {
+			return nil, fmt.Errorf("failed to process record: %w", err)
+		}
+		finalResponse.Records = append(finalResponse.Records, record)
+	}
+
+	return finalResponse, nil
+}
+
+// unmarshalAndMapRecord marshals raw data into Record.CoreFields and
+// Record.AdditionalFields.
+func (su *SOQLUnmarshaller) unmarshalAndMapRecord(data []byte) (Record, error) {
+	var record Record
+	var allFields map[string]any
+
 	if err := json.Unmarshal(data, &allFields); err != nil {
-		return err
+		return record, err
 	}
 
-	r.otherFields = make(map[string]interface{})
-	for key, value := range allFields {
-		// Flatten nested names.
-		if nestedMap, ok := value.(map[string]interface{}); ok {
-			for nestedKey, nestedValue := range nestedMap {
-				// Exclude metadata fields.
-				if nestedKey != "attributes" {
-					// Create a flattened key like "Account.Name".
-					flatKey := key + "." + nestedKey
-					r.otherFields[flatKey] = nestedValue
+	// Unmarshal the corefields.
+	if err := json.Unmarshal(data, &record.CoreFields); err != nil {
+		return record, err
+	}
+
+	// Unmarshal the selected additional fields. The provided map uses
+	// Key.Subkey format for specifying second-level fields such as
+	// Account.Name, otherwise the fields are expected to be at the top
+	// level.
+	record.AdditionalFields = make(map[string]any)
+	for originalName, newName := range su.Mapper {
+		if strings.Contains(originalName, ".") {
+			parts := strings.SplitN(originalName, ".", 2)
+			parentKey, childKey := parts[0], parts[1]
+
+			if parent, ok := allFields[parentKey].(map[string]any); ok {
+				if val, exists := parent[childKey]; exists {
+					record.AdditionalFields[newName] = val
+					continue
 				}
 			}
 		} else {
-			r.otherFields[key] = value
+			if val, exists := allFields[originalName]; exists {
+				record.AdditionalFields[newName] = val
+				continue
+			}
 		}
+		return record, &ErrUnmarshallFieldNotFoundError{originalName, newName}
 	}
-	return nil
-}
-
-// mapAdditionalFields maps additional fields of interest with a more
-// usable name.
-func (r *Record) mapAdditionalFields(mapper map[string]string) error {
-	r.AdditionalFields = make(map[string]interface{})
-	for originalFieldName, newFieldName := range mapper {
-		val, ok := r.otherFields[originalFieldName]
-		if !ok {
-			return fmt.Errorf("field %q not found", originalFieldName)
-		}
-		r.AdditionalFields[newFieldName] = val
-	}
-	r.otherFields = make(map[string]interface{}) // clean.
-	return nil
+	return record, nil
 }
 
 // CollectionsUpdateRequest is the structure for the sObject Collections
 // API request body.
 type CollectionsUpdateRequest struct {
-	AllOrNone bool                     `json:"allOrNone"`
-	Records   []map[string]interface{} `json:"records"`
+	AllOrNone bool             `json:"allOrNone"`
+	Records   []map[string]any `json:"records"`
 }
 
 // CollectionsUpdateResponse is the response from the sObject
