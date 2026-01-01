@@ -10,16 +10,16 @@ WITH concrete AS (
         date('2025-04-01') AS DateFrom
         ,date('2026-03-31') AS DateTo
         ,'^(53|55|57).*' AS AccountCodes
+        ,'All' AS ReconciliationStatus -- All | Reconciled | NotReconciled
 )
 
 ,invoice_donation_totals AS (
     SELECT
         li.invoice_id
         ,SUM(li.line_amount) AS total_donation_amount
-    FROM
-        invoice_line_items li
-        JOIN invoices i ON (i.id = li.invoice_id)
-        ,concrete
+    FROM invoice_line_items li
+    JOIN invoices i ON (i.id = li.invoice_id)
+    ,concrete
     WHERE
         account_code REGEXP concrete.AccountCodes
         AND
@@ -34,27 +34,17 @@ crms_donation_totals AS (
     SELECT
         payout_reference_dfk
         ,SUM(amount) AS total_crms_amount
-    FROM
-        salesforce_opportunities
-        ,concrete
+    FROM salesforce_opportunities
+    JOIN concrete
     WHERE
         payout_reference_dfk IS NOT NULL
         AND
-        close_date >= date(concrete.DateFrom,'-60 day')
-        AND
-        close_date <= date(concrete.DateTo, '+60 day')
+        close_date BETWEEN date(concrete.DateFrom,'-60 day') AND date(concrete.DateTo, '+60 day')
     GROUP BY
         payout_reference_dfk
 )
 
-SELECT
-    *
-    ,CASE WHEN donation_total = crms_total
-          THEN 1
-          ELSE 0
-          END AS reconciled
-FROM
-    (
+,reconciliation_data AS (
     SELECT
         i.id
         ,i.invoice_number
@@ -63,15 +53,24 @@ FROM
         ,i.total
         ,COALESCE(idt.total_donation_amount, 0) AS donation_total
         ,COALESCE(cdt.total_crms_amount, 0) AS crms_total
-    FROM
-        invoices i
-        LEFT JOIN invoice_donation_totals idt ON i.id = idt.invoice_id
-        LEFT JOIN crms_donation_totals cdt ON i.invoice_number = cdt.payout_reference_dfk
-        ,concrete
+    FROM invoices i
+    JOIN concrete c ON i.date BETWEEN c.DateFrom AND c.DateTo
+    LEFT JOIN invoice_donation_totals idt ON i.id = idt.invoice_id
+    LEFT JOIN crms_donation_totals cdt ON i.invoice_number = cdt.payout_reference_dfk
     WHERE
         i.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
         AND idt.invoice_id IS NOT NULL 
-        AND
-        i.date >= concrete.DateFrom AND i.date <= concrete.DateTo
-) x
+)
+SELECT 
+    r.*,
+    (donation_total = crms_total) AS is_reconciled
+FROM 
+    reconciliation_data r
+JOIN concrete c
+WHERE
+    (c.ReconciliationStatus = 'All')
+    OR
+    (c.ReconciliationStatus = 'Reconciled' AND r.donation_total = r.crms_total)
+    OR
+    (c.ReconciliationStatus = 'NotReconciled' AND r.donation_total <> r.crms_total);
 ;

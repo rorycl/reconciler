@@ -10,23 +10,22 @@ WITH concrete AS (
         date('2025-04-01') AS DateFrom
         ,date('2026-03-31') AS DateTo
         ,'^(53|55|57).*' AS AccountCodes
+        ,'All' AS ReconciliationStatus -- All | Reconciled | NotReconciled
 )
 
 ,bank_transaction_donation_totals AS (
     SELECT
         li.transaction_id
         ,SUM(li.line_amount) AS total_donation_amount
-    FROM
-        bank_transaction_line_items li
-    JOIN 
-        bank_transactions b ON (b.id = li.transaction_id)
-        ,concrete
+    FROM bank_transaction_line_items li
+    JOIN bank_transactions b ON (b.id = li.transaction_id)
+    ,concrete
     WHERE
         account_code REGEXP concrete.AccountCodes
         AND
-        b.status NOT IN ('AUTHORISED')
+        b.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
         AND
-        date >= concrete.DateFrom AND date <= concrete.DateTo
+        date BETWEEN concrete.DateFrom AND concrete.DateTo
     GROUP BY
         li.transaction_id
 ), 
@@ -35,45 +34,43 @@ crms_donation_totals AS (
     SELECT
         payout_reference_dfk
         ,SUM(amount) AS total_crms_amount
-    FROM
-        salesforce_opportunities
-        ,concrete
+    FROM salesforce_opportunities
+    JOIN concrete
     WHERE
         payout_reference_dfk IS NOT NULL
         AND
-        close_date >= date(concrete.DateFrom,'-60 day')
-        AND
-        close_date <= date(concrete.DateTo, '+60 day')
+        close_date BETWEEN date(concrete.DateFrom,'-60 day') AND date(concrete.DateTo, '+60 day')
     GROUP BY
         payout_reference_dfk
 )
 
-SELECT
-    *
-    ,CASE WHEN donation_total = crms_total
-          THEN 1
-          ELSE 0
-          END AS reconciled
-FROM
-    (
+,reconciliation_data AS (
     SELECT
-        b.id
-        ,b.reference
-        ,date(substring(b.date, 1, 10)) AS date
-        ,b.contact_name
-        ,b.total
-        ,COALESCE(idt.total_donation_amount, 0) AS donation_total
-        ,COALESCE(cdt.total_crms_amount, 0) AS crms_total
-    FROM
-        bank_transactions b
-        LEFT JOIN bank_transaction_donation_totals idt ON b.id = idt.transaction_id
-        LEFT JOIN crms_donation_totals cdt ON b.reference = cdt.payout_reference_dfk
-        ,concrete
+        b.id,
+        b.reference,
+        date(substring(b.date, 1, 10)) AS date,
+        b.contact_name,
+        b.total,
+        COALESCE(bdt.total_donation_amount, 0) AS donation_total,
+        COALESCE(cdt.total_crms_amount, 0) AS crms_total
+    FROM bank_transactions b
+    JOIN concrete c ON b.date BETWEEN c.DateFrom AND c.DateTo
+    LEFT JOIN bank_transaction_donation_totals bdt ON b.id = bdt.transaction_id
+    LEFT JOIN crms_donation_totals cdt ON b.reference = cdt.payout_reference_dfk
     WHERE
         b.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
-        AND
-        idt.transaction_id IS NOT NULL 
-        AND
-        b.date >= concrete.DateFrom AND b.date <= concrete.DateTo
-) x
+        AND bdt.transaction_id IS NOT NULL 
+)
+SELECT 
+    r.*,
+    (donation_total = crms_total) AS is_reconciled
+FROM 
+    reconciliation_data r
+JOIN concrete c
+WHERE
+    (c.ReconciliationStatus = 'All')
+    OR
+    (c.ReconciliationStatus = 'Reconciled' AND r.donation_total = r.crms_total)
+    OR
+    (c.ReconciliationStatus = 'NotReconciled' AND r.donation_total <> r.crms_total);
 ;
