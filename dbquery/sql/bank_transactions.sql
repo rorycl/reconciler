@@ -1,7 +1,7 @@
 /*
  Reconciler app: SQL
- invoices.sql
- list of invoices with reconciliation status
+ bank_transactions.sql
+ list of bank transactions with reconciliation status
  started: 01 January 2026
 */
 
@@ -12,22 +12,23 @@ WITH concrete AS (
         ,'^(53|55|57).*' AS AccountCodes
 )
 
-,invoice_donation_totals AS (
+,bank_transaction_donation_totals AS (
     SELECT
-        li.invoice_id
+        li.transaction_id
         ,SUM(li.line_amount) AS total_donation_amount
     FROM
-        invoice_line_items li
-        JOIN invoices i ON (i.id = li.invoice_id)
+        bank_transaction_line_items li
+    JOIN 
+        bank_transactions b ON (b.id = li.transaction_id)
         ,concrete
     WHERE
         account_code REGEXP concrete.AccountCodes
         AND
-        i.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
+        b.status NOT IN ('AUTHORISED')
         AND
         date >= concrete.DateFrom AND date <= concrete.DateTo
     GROUP BY
-        li.invoice_id
+        li.transaction_id
 ), 
 
 crms_donation_totals AS (
@@ -56,22 +57,23 @@ SELECT
 FROM
     (
     SELECT
-        i.id
-        ,i.invoice_number
-        ,date(substring(i.date, 1, 10)) AS date
-        ,i.contact_name
-        ,i.total
+        b.id
+        ,b.reference
+        ,date(substring(b.date, 1, 10)) AS date
+        ,b.contact_name
+        ,b.total
         ,COALESCE(idt.total_donation_amount, 0) AS donation_total
         ,COALESCE(cdt.total_crms_amount, 0) AS crms_total
     FROM
-        invoices i
-        LEFT JOIN invoice_donation_totals idt ON i.id = idt.invoice_id
-        LEFT JOIN crms_donation_totals cdt ON i.invoice_number = cdt.payout_reference_dfk
+        bank_transactions b
+        LEFT JOIN bank_transaction_donation_totals idt ON b.id = idt.transaction_id
+        LEFT JOIN crms_donation_totals cdt ON b.reference = cdt.payout_reference_dfk
         ,concrete
     WHERE
-        i.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
-        AND idt.invoice_id IS NOT NULL 
+        b.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
         AND
-        i.date >= concrete.DateFrom AND i.date <= concrete.DateTo
+        idt.transaction_id IS NOT NULL 
+        AND
+        b.date >= concrete.DateFrom AND b.date <= concrete.DateTo
 ) x
 ;

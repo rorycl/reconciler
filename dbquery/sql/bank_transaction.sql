@@ -1,7 +1,7 @@
 /*
  Reconciler app: SQL
- invoice.sql
- detail of an invoice with line items and donation total
+ bank_transaction.sql
+ detail of a bank transaction with line items and donation total
  started: 01 January 2026
 */
 
@@ -15,7 +15,7 @@ SELECT
 FROM (
     WITH concrete AS (
         SELECT
-             'INV-2025-101' AS InvoiceNumber
+             'JG-PAYOUT-2025-02-28' AS BankTransactionReference
             ,'^(53|55|57).*' AS AccountCodes
     )
     
@@ -27,22 +27,23 @@ FROM (
             salesforce_opportunities
             ,concrete
         WHERE
-            payout_reference_dfk = concrete.InvoiceNumber
+            payout_reference_dfk = concrete.BankTransactionReference
         GROUP BY
             payout_reference_dfk
     )
+
     SELECT
-        i.id
-        ,i.invoice_number
-        ,date(substring(i.date, 1, 10)) AS date
-        ,i.type
-        ,i.status
-        ,i.reference
-        ,i.contact_name
-        ,i.total
+        b.id
+        ,b.reference
+        ,date(substring(b.date, 1, 10)) AS date
+        ,b.type
+        ,b.status
+        ,b.reference
+        ,b.contact_name
+        ,b.total
         ,sum(li.line_amount) 
             FILTER (WHERE li.account_code REGEXP concrete.AccountCodes)
-            OVER (PARTITION BY i.id) AS donation_total
+            OVER (PARTITION BY b.id) AS donation_total
         ,rds.donation_sum AS crms_total
         ,a.name AS account_name
         ,li.description AS li_description
@@ -56,16 +57,16 @@ FROM (
             0
          END AS li_donation_amount
     FROM
-        invoices i
-        ,concrete
-        JOIN invoice_line_items li ON (li.invoice_id = i.id)
+        bank_transactions b
+        JOIN bank_transaction_line_items li ON (li.transaction_id = b.id)
         LEFT OUTER JOIN accounts a ON (li.account_code = a.code)
-        LEFT OUTER JOIN reconciled_donations_summed rds ON (rds.payout_reference_dfk = i.invoice_number)
+        LEFT OUTER JOIN reconciled_donations_summed rds ON (rds.payout_reference_dfk = b.reference)
+        ,concrete
     WHERE
-        concrete.InvoiceNumber = i.invoice_number
+        b.reference = concrete.BankTransactionReference 
         /*
         AND
-        i.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
+        b.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
         */
 ) x
 ;
