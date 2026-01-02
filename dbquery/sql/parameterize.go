@@ -3,29 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 )
-
-func main() {
-
-	tpl := []byte(`
-    SELECT
-        date('2025-04-01') AS DateFrom             /* @DateFrom */
-        ,date('2026-03-31') AS DateTo              /* @DateTo */
-        -- All | Linked | NotLinked
-        ,'Linked' AS LinkageStatus                 /* @LinkageStatus */
-        ,'JG-PAYOUT-2025-04-15' AS PayoutReference /* @PayoutReference */
-	`)
-
-	p, err := parameterize(tpl)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	fmt.Println(p)
-}
 
 // ParameterizedSQLTemplate is a struct holding a parsed template with
 // parameters extracted and arguments replaced by the '?' symbol.
@@ -45,37 +25,67 @@ Body:   %s
 
 // regexpParam matches lines such as
 //
-//	,date('2026-03-31') AS DateTo    /* @DateTo */
+//	,date('2026-03-31') AS DateTo    /* @param */
 //
 // for extracting the `DateTo` parameter and replacing the provided
 // parameter with a '?', for example:
 //
-//	,date(?) AS DateTo    /* @DateTo */
+//	,date(?) AS DateTo    /* @param */
 //
 // Note that the spacing around the parameter needs to be precise.
-var regexpParam = regexp.MustCompile(`'([^']+)('.*/\* @)(?P<param>\w+) \*/`)
+var (
+	paramAtoms = []string{
+		`(?:date\('[^']+'\))`,        // date('2026-03-31')
+		`(?:[a-zA-Z_]\w*\([^\)]*\))`, // any_func(...)
+		`(?:'[^']*')`,                // 'a string' or ''
+		`(?:-?\d*\.?\d+)`,            // 123 or 1.23 or -5
+		`(?:null)`,                   // null
+	}
 
-func parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
+	// regexParam is made of 4 components where are named for
+	// identification. The 'value' element is built up out of the
+	// non-capturing paramAtoms items.
+	regexpParam = regexp.MustCompile(fmt.Sprintf(
+		`(?P<value>%s)(?P<as>\s+AS\s)(?P<param>[A-Za-z0-9_]+)(?P<end>\s+/\* @param \*/)`,
+		strings.Join(paramAtoms, "|"),
+	))
+)
+
+// Parameterize takes an sql template as a slice of bytes with
+// (potentially) inline field definitions in order to provide the
+// functionality of functional procedural sql with declared variables in
+// sqlite.
+
+// The inline field definitions are defined with an `/* @param */`
+// marker such as:
+//
+//	,date('2026-03-31') AS DateTo    /* @param */
+//
+// which are then replaced with SQL prepared statement '?' symbols and
+// the field name extracted as a parameter, returning
+//
+//	*ParameterizedSQLTemplate{
+//	    Parameters: []string{"DateTo"},
+//	    Body      : string([]byte('    ,? AS DateTo),
+//	}
+//
+// Multiple definitions in a template are handled, as shown in the test.
+func Parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
 
 	matches := regexpParam.FindAllSubmatch(tpl, -1)
-	names := regexpParam.SubexpNames()
-	if len(names) == 0 {
+	if len(matches) == 0 {
 		return nil, errors.New("parameterize: no parameters found")
 	}
 
 	pst := &ParameterizedSQLTemplate{
-		Parameters: make([]string, len(names)),
+		Parameters: make([]string, len(matches)),
 	}
 
-	// There are four matches per parameter line -- the first is the
-	// full match -- the named parameter is the last (third)
-	// match for each line.
-	paramOffset := 3
-	for i := range names {
-		subMatches := matches[i]
-		pst.Parameters[i] = string(subMatches[paramOffset])
+	paramIdx := regexpParam.SubexpIndex("param")
+	for i := range matches {
+		pst.Parameters[i] = string(matches[i][paramIdx])
 	}
 
-	pst.Body = regexpParam.ReplaceAll(tpl, []byte(`'?${2}${3} */`))
+	pst.Body = regexpParam.ReplaceAll(tpl, []byte(`?${as}${param}`))
 	return pst, nil
 }
