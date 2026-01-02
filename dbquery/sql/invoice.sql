@@ -3,6 +3,8 @@
  invoice.sql
  detail of an invoice with line items and donation total
  started: 01 January 2026
+
+ Note: @ prefixed comments declare a template value for middleware replacement
 */
 
 SELECT
@@ -15,8 +17,8 @@ SELECT
 FROM (
     WITH concrete AS (
         SELECT
-             'INV-2025-101' AS InvoiceNumber
-            ,'^(53|55|57).*' AS AccountCodes
+             'INV-2025-101' AS InvoiceNumber /* @InvoiceNumber */
+            ,'^(53|55|57).*' AS AccountCodes /* @AccountCodes */
     )
     
     ,reconciled_donations_summed AS (

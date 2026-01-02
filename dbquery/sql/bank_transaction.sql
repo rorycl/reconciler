@@ -3,6 +3,8 @@
  bank_transaction.sql
  detail of a bank transaction with line items and donation total
  started: 01 January 2026
+
+ Note: @ prefixed comments declare a template value for middleware replacement
 */
 
 SELECT
@@ -15,8 +17,8 @@ SELECT
 FROM (
     WITH concrete AS (
         SELECT
-             'JG-PAYOUT-2025-02-28' AS BankTransactionReference
-            ,'^(53|55|57).*' AS AccountCodes
+             'JG-PAYOUT-2025-02-28' AS BankTransactionReference /* @BankTransactionReference */
+            ,'^(53|55|57).*' AS AccountCodes                    /* @AccountCodes */
     )
     
     ,reconciled_donations_summed AS (

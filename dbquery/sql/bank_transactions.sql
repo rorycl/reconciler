@@ -3,14 +3,17 @@
  bank_transactions.sql
  list of bank transactions with reconciliation status
  started: 01 January 2026
+
+ Note: @ prefixed comments declare a template value for middleware replacement
 */
 
 WITH concrete AS (
     SELECT
-        date('2025-04-01') AS DateFrom
-        ,date('2026-03-31') AS DateTo
-        ,'^(53|55|57).*' AS AccountCodes
-        ,'All' AS ReconciliationStatus -- All | Reconciled | NotReconciled
+        date('2025-04-01') AS DateFrom   /* @DateFrom */
+        ,date('2026-03-31') AS DateTo    /* @DateTo */
+        ,'^(53|55|57).*' AS AccountCodes /* @AccountCodes */
+        -- All | Reconciled | NotReconciled
+        ,'All' AS ReconciliationStatus   /* @ReconciliationStatus */
 )
 
 ,bank_transaction_donation_totals AS (
