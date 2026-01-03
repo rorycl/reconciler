@@ -19,7 +19,7 @@ func TestParameterize(t *testing.T) {
 		{
 			input:        `date('2026-03-31') AS DateFrom   /* @param */`,
 			expectedArgs: []string{"DateFrom"},
-			expectedBody: `$DateFrom AS DateFrom`,
+			expectedBody: `:DateFrom AS DateFrom`,
 		},
 		{
 			input: `nothing`,
@@ -43,13 +43,13 @@ WITH variables AS (
 				"NullExample", "FloatExample"},
 			expectedBody: `
 WITH variables AS (
-	$DateFrom AS DateFrom
-	,$DateTo AS DateTo
-	,$AccountCodes AS AccountCodes
+	:DateFrom AS DateFrom
+	,:DateTo AS DateTo
+	,:AccountCodes AS AccountCodes
 	-- All | Reconciled | NotReconciled
-	,$ReconciliationStatus AS ReconciliationStatus
-	,$NullExample AS NullExample
-	,$FloatExample AS FloatExample
+	,:ReconciliationStatus AS ReconciliationStatus
+	,:NullExample AS NullExample
+	,:FloatExample AS FloatExample
 	,'raw string' AS RawString
 )
 `,

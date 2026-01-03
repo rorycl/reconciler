@@ -87,6 +87,6 @@ func Parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
 	}
 
 	// Use $ quoted parameter names such as `$DateFrom`.
-	pst.Body = regexpParam.ReplaceAll(tpl, []byte(`$$${param}${as}${param}`))
+	pst.Body = regexpParam.ReplaceAll(tpl, []byte(`:${param}${as}${param}`))
 	return pst, nil
 }
