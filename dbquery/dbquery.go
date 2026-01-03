@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx" // helper library
@@ -44,19 +45,19 @@ type Invoice struct {
 	InvoiceNumber string    `db:"invoice_number"`
 	Date          time.Time `db:"date"`
 	ContactName   string    `db:"contact_name"`
+	Total         float64   `db:"total"`
+	DonationTotal float64   `db:"donation_total"`
+	CRMSTotal     float64   `db:"crms_total"`
+	IsReconciled  bool      `db:"is_reconciled"`
 	// UpdatedDateUTC string     `db:"UpdatedDateUTC"`
 	// Status         string     `db:"Status"`
 	// Reference      string     `db:"Reference,omitempty"`
-	Total         float64 `db:"total"`
-	DonationTotal float64 `db:"donation_total"`
-	CRMSTotal     float64 `db:"crms_total"`
 	// AmountPaid     float64    `json:"AmountPaid"`
-	IsReconciled bool `db:"is_reconciled"`
 }
 
 // GetInvoices gets invoices with summed up line item and donation
 // values. It isn't necessary to run this query in a transaction.
-func (db *DB) GetInvoices(ctx context.Context, reconciled *bool, dateFrom, dateTo time.Time, search string) ([]Invoice, error) {
+func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string) ([]Invoice, error) {
 
 	b, err := os.ReadFile("sql/invoices.sql")
 	if err != nil {
@@ -70,15 +71,20 @@ func (db *DB) GetInvoices(ctx context.Context, reconciled *bool, dateFrom, dateT
 	_ = os.WriteFile("/tmp/query.sql", query.Body, 0644)
 
 	// Determine reconciliation status.
-	var reconciliationStatus string
-	switch {
-	case reconciled == nil:
-		reconciliationStatus = "All"
-	case *reconciled:
-		reconciliationStatus = "Reconciled"
+	switch reconciliationStatus {
+	case "All", "Reconciled", "NotReconciled":
 	default:
-		reconciliationStatus = "NotReconciled"
+		return nil, fmt.Errorf(
+			"reconciliation must be one of All, Reconciled or NotReconciled, got %q",
+			reconciliationStatus,
+		)
 	}
+
+	// Date formatting.
+	var (
+		dateFromStr = dateFrom.Format("2006-01-02")
+		dateToStr   = dateTo.Format("2006-01-02")
+	)
 
 	// Parse the query and map the named parameters.
 	stmt, err := db.PrepareNamedContext(ctx, string(query.Body))
@@ -86,12 +92,12 @@ func (db *DB) GetInvoices(ctx context.Context, reconciled *bool, dateFrom, dateT
 		return nil, fmt.Errorf("failed to prepare invoices statement: %w", err)
 	}
 	defer stmt.Close()
+	_ = os.WriteFile("/tmp/parsed_query.sql", []byte(stmt.QueryString+"\n"+strings.Join(stmt.Params, " | ")), 0644) // temporary
 
-	// Args uses sqlx's named query capability. (Keys should not use $
-	// prefix.)
+	// Args uses sqlx's named query capability.
 	namedArgs := map[string]any{
-		"DateFrom":             dateFrom,
-		"DateTo":               dateTo,
+		"DateFrom":             dateFromStr,
+		"DateTo":               dateToStr,
 		"AccountCodes":         db.accountCodes,
 		"ReconciliationStatus": reconciliationStatus,
 	}
