@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS salesforce_opportunities (
     id                      TEXT PRIMARY KEY,
     name                    TEXT,
     amount                  REAL,
-    close_date              TEXT,
+    close_date              DATETIME,
     payout_reference_dfk    TEXT,
     created_date            DATETIME,
     created_by_name         TEXT,

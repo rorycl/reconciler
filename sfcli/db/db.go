@@ -63,9 +63,9 @@ func (db *DB) UpsertOpportunities(records []salesforce.Record) error {
 			rec.ID,
 			rec.Name,
 			rec.Amount,
-			rec.CloseDate,
+			rec.CloseDate.Time, //  Pass the underlying time.Time object
 			rec.PayoutReference,
-			rec.CreatedDate.Time,      // Pass the underlying time.Time object
+			rec.CreatedDate.Time, // Pass the underlying time.Time object
 			rec.CreatedBy.Name,
 			rec.LastModifiedDate.Time, // Pass the underlying time.Time object
 			rec.LastModifiedBy.Name,

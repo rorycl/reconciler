@@ -7,9 +7,28 @@ import (
 	"time"
 )
 
+// SalesforceDate is a custom date type.
+type SalesforceDate struct {
+	time.Time
+}
+
 // SalesforceTime is a custom type to handle Salesforce's specific datetime format.
 type SalesforceTime struct {
 	time.Time
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (sd *SalesforceDate) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "null" || s == "" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return err
+	}
+	sd.Time = t
+	return nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -40,7 +59,7 @@ type CoreFields struct {
 	ID               string         `json:"Id"`
 	Name             string         `json:"Name"`
 	Amount           float64        `json:"Amount"`
-	CloseDate        string         `json:"CloseDate"`
+	CloseDate        SalesforceDate `json:"CloseDate"`
 	CreatedDate      SalesforceTime `json:"CreatedDate"`
 	LastModifiedDate SalesforceTime `json:"LastModifiedDate"`
 	CreatedBy        struct {
