@@ -1,7 +1,9 @@
 package dbquery
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"testing"
 
@@ -58,7 +60,7 @@ WITH variables AS (
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
-			result, err := Parameterize([]byte(tt.input))
+			result, err := parameterize([]byte(tt.input))
 			if err != nil {
 				if tt.isErr {
 					return
@@ -76,5 +78,16 @@ WITH variables AS (
 				t.Error(diff)
 			}
 		})
+	}
+}
+
+func TestParameterizeFile(t *testing.T) {
+	_, err := ParameterizeFile("sql/invoices.sql")
+	if err != nil {
+		t.Fatalf("unexpected file parameterization error: %v", err)
+	}
+	_, err = ParameterizeFile("sql/doesNotExist")
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("expected file parameterization error")
 	}
 }

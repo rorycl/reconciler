@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx" // helper library
@@ -58,16 +57,12 @@ type Invoice struct {
 // values. It isn't necessary to run this query in a transaction.
 func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string) ([]Invoice, error) {
 
-	b, err := os.ReadFile("sql/invoices.sql")
+	// Parameterize the sql query file by replacing the example
+	// variables.
+	query, err := ParameterizeFile("sql/invoices.sql")
 	if err != nil {
-		return nil, fmt.Errorf("get invoices query file load error: %w", err)
+		return nil, fmt.Errorf("invoices query file error: %w", err)
 	}
-
-	query, err := Parameterize(b)
-	if err != nil {
-		return nil, fmt.Errorf("invoices query template error: %w", err)
-	}
-	// _ = os.WriteFile("/tmp/query.sql", query.Body, 0644)
 
 	// Determine reconciliation status.
 	switch reconciliationStatus {
@@ -79,12 +74,6 @@ func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, date
 		)
 	}
 
-	// Date formatting.
-	var (
-		dateFromStr = dateFrom.Format("2006-01-02")
-		dateToStr   = dateTo.Format("2006-01-02")
-	)
-
 	// Parse the query and map the named parameters.
 	stmt, err := db.PrepareNamedContext(ctx, string(query.Body))
 	if err != nil {
@@ -95,8 +84,8 @@ func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, date
 
 	// Args uses sqlx's named query capability.
 	namedArgs := map[string]any{
-		"DateFrom":             dateFromStr,
-		"DateTo":               dateToStr,
+		"DateFrom":             dateFrom.Format("2006-01-02"),
+		"DateTo":               dateTo.Format("2006-01-02"),
 		"AccountCodes":         db.accountCodes,
 		"ReconciliationStatus": reconciliationStatus,
 		"TextSearch":           search,
@@ -135,14 +124,11 @@ type BankTransaction struct {
 // and donation values. It isn't necessary to run this query in a transaction.
 func (db *DB) GetBankTransactions(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string) ([]BankTransaction, error) {
 
-	b, err := os.ReadFile("sql/bank_transactions.sql")
+	// Parameterize the sql query file by replacing the example
+	// variables.
+	query, err := ParameterizeFile("sql/bank_transactions.sql")
 	if err != nil {
-		return nil, fmt.Errorf("bank_transactions query file load error: %w", err)
-	}
-
-	query, err := Parameterize(b)
-	if err != nil {
-		return nil, fmt.Errorf("bank transactions query template error: %w", err)
+		return nil, fmt.Errorf("bank transactions query file error: %w", err)
 	}
 
 	// Determine reconciliation status.
@@ -155,12 +141,6 @@ func (db *DB) GetBankTransactions(ctx context.Context, reconciliationStatus stri
 		)
 	}
 
-	// Date formatting.
-	var (
-		dateFromStr = dateFrom.Format("2006-01-02")
-		dateToStr   = dateTo.Format("2006-01-02")
-	)
-
 	// Parse the query and map the named parameters.
 	stmt, err := db.PrepareNamedContext(ctx, string(query.Body))
 	if err != nil {
@@ -170,8 +150,8 @@ func (db *DB) GetBankTransactions(ctx context.Context, reconciliationStatus stri
 
 	// Args uses sqlx's named query capability.
 	namedArgs := map[string]any{
-		"DateFrom":             dateFromStr,
-		"DateTo":               dateToStr,
+		"DateFrom":             dateFrom.Format("2006-01-02"),
+		"DateTo":               dateTo.Format("2006-01-02"),
 		"AccountCodes":         db.accountCodes,
 		"ReconciliationStatus": reconciliationStatus,
 		"TextSearch":           search,
@@ -207,14 +187,11 @@ type Donation struct {
 // filters.
 func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string) ([]Donation, error) {
 
-	b, err := os.ReadFile("sql/donations.sql")
+	// Parameterize the sql query file by replacing the example
+	// variables.
+	query, err := ParameterizeFile("sql/donations.sql")
 	if err != nil {
-		return nil, fmt.Errorf("donations query file load error: %w", err)
-	}
-
-	query, err := Parameterize(b)
-	if err != nil {
-		return nil, fmt.Errorf("donations query template error: %w", err)
+		return nil, fmt.Errorf("donations query file error: %w", err)
 	}
 
 	// Determine reconciliation status.
@@ -227,12 +204,6 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 		)
 	}
 
-	// Date formatting.
-	var (
-		dateFromStr = dateFrom.Format("2006-01-02")
-		dateToStr   = dateTo.Format("2006-01-02")
-	)
-
 	// Parse the query and map the named parameters.
 	stmt, err := db.PrepareNamedContext(ctx, string(query.Body))
 	if err != nil {
@@ -242,8 +213,8 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 
 	// Args uses sqlx's named query capability.
 	namedArgs := map[string]any{
-		"DateFrom":        dateFromStr,
-		"DateTo":          dateToStr,
+		"DateFrom":        dateFrom.Format("2006-01-02"),
+		"DateTo":          dateTo.Format("2006-01-02"),
 		"LinkageStatus":   linkageStatus,
 		"PayoutReference": payoutReference,
 		"TextSearch":      search,

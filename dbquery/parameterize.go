@@ -3,6 +3,7 @@ package dbquery
 import (
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -51,11 +52,11 @@ var (
 	))
 )
 
-// Parameterize takes an sql template as a slice of bytes with
+// parameterize takes an sql template as a slice of bytes with
 // (potentially) inline field definitions in order to provide the
 // functionality of functional procedural sql with declared variables in
 // sqlite.
-
+//
 // The inline field definitions are defined with an `/* @param */`
 // marker such as:
 //
@@ -70,7 +71,7 @@ var (
 //	}
 //
 // Multiple definitions in a template are handled, as shown in the test.
-func Parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
+func parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
 
 	matches := regexpParam.FindAllSubmatch(tpl, -1)
 	if len(matches) == 0 {
@@ -89,4 +90,21 @@ func Parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
 	// Use $ quoted parameter names such as `$DateFrom`.
 	pst.Body = regexpParam.ReplaceAll(tpl, []byte(`:${param}${as}${param}`))
 	return pst, nil
+}
+
+// ParameterizeFile takes an sql file and returns a
+// ParameterizedSQLTemplate or error.
+func ParameterizeFile(file string) (*ParameterizedSQLTemplate, error) {
+
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("file load error: %w", err)
+	}
+
+	query, err := parameterize(b)
+	if err != nil {
+		return nil, fmt.Errorf("query template error: %w", err)
+	}
+	return query, nil
+
 }
