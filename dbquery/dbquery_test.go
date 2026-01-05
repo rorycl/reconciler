@@ -3,7 +3,9 @@ package dbquery
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -404,4 +406,40 @@ func TestDonationsQuery(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInvoicesWithLineItemsQuery(t *testing.T) {
+	accountCodes := "^(53|55|57)"
+	ctx := context.Background()
+
+	db, err := New("testdata/test.db", accountCodes)
+	if err != nil {
+		t.Fatalf("db opening error: %v", err)
+	}
+
+	invoiceWLI, err := db.GetInvoiceWLI(ctx, "INV-2025-102")
+	if err != nil {
+		t.Fatalf("invoice error: %v", err)
+	}
+
+	fmt.Printf("print output:\n%#v\n", invoiceWLI[1])
+
+	tpl := `template output:
+Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
+	{{- range .IWLI }}
+	Line item: {{ .LiAccountName }} {{ .LiLineAmount }}
+	{{- end }}
+`
+	t1 := template.New("t1")
+	parsedTemplate, err := t1.Parse(tpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := map[string]any{
+		"Invoice": invoiceWLI.Invoice(),
+		"IWLI":    invoiceWLI,
+	}
+	parsedTemplate.Execute(os.Stdout, data)
+
 }

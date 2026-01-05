@@ -231,3 +231,72 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 	}
 	return donations, nil
 }
+
+// InvoiceWithLineItems is the concrete type of each row returned by
+// GetInvoiceWLI.
+type InvoiceWithLineItems struct {
+	ID               string    `db:"id"`
+	InvoiceNumber    string    `db:"invoice_number"`
+	Date             time.Time `db:"date"`
+	Type             *string   `db:"type"`
+	Status           string    `db:"status"`
+	Reference        *string   `db:"reference"`
+	ContactName      string    `db:"contact_name"`
+	Total            float64   `db:"total"`
+	DonationTotal    float64   `db:"donation_total"`
+	CRMSTotal        float64   `db:"crms_total"`
+	IsReconciled     bool      `db:"is_reconciled"`
+	LiAccountCode    *string   `db:"li_account_code"`
+	LiAccountName    *string   `db:"account_name"`
+	LiDescription    *string   `db:"li_description"`
+	LiTaxAmount      *float64  `db:"li_tax_amount"`
+	LiLineAmount     *float64  `db:"li_line_amount"`
+	LiDonationAmount *float64  `db:"li_donation_amount"`
+}
+
+// InvoicesWithLineItems is a slice of InvoiceWithLineItems.
+type InvoicesWithLineItems []InvoiceWithLineItems
+
+// Invoice returns the first invoice in a slice.
+func (iwli InvoicesWithLineItems) Invoice() InvoiceWithLineItems {
+	if len(iwli) == 0 {
+		return InvoiceWithLineItems{}
+	}
+	return iwli[0]
+}
+
+// GetInvoiceWLI retrieves a single invoice from the database with it's
+// constituent line items. This query returns rows for each line item.
+func (db *DB) GetInvoiceWLI(ctx context.Context, invoiceNumber string) (InvoicesWithLineItems, error) {
+
+	// Parameterize the sql query file by replacing the example
+	// variables.
+	query, err := ParameterizeFile("sql/invoice.sql")
+	if err != nil {
+		return nil, fmt.Errorf("invoice query file error: %w", err)
+	}
+
+	// Parse the query and map the named parameters.
+	stmt, err := db.PrepareNamedContext(ctx, string(query.Body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare invoice statement: %w", err)
+	}
+	defer stmt.Close()
+
+	// Args uses sqlx's named query capability.
+	namedArgs := map[string]any{
+		"AccountCodes":  db.accountCodes,
+		"InvoiceNumber": invoiceNumber,
+	}
+	if got, want := len(namedArgs), len(query.Parameters); got != want {
+		return nil, fmt.Errorf("namedArgs has %d arguments, expected %d", got, want)
+	}
+
+	// Use sqlx to scan results into the provided slice.
+	var iwli InvoicesWithLineItems
+	err = stmt.SelectContext(ctx, &iwli, namedArgs)
+	if err != nil {
+		return nil, fmt.Errorf("invoice select error: %v", err)
+	}
+	return iwli, nil
+}
