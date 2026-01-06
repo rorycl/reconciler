@@ -232,42 +232,61 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 	return donations, nil
 }
 
+InvoicesWLI// InvoiceIWL is the invoice component of an InvoiceWithLineItems.
+type InvoiceIWL struct {
+	ID            string    `db:"id"`
+	InvoiceNumber string    `db:"invoice_number"`
+	Date          time.Time `db:"date"`
+	Type          *string   `db:"type"`
+	Status        string    `db:"status"`
+	Reference     *string   `db:"reference"`
+	ContactName   string    `db:"contact_name"`
+	Total         float64   `db:"total"`
+	DonationTotal float64   `db:"donation_total"`
+	CRMSTotal     float64   `db:"crms_total"`
+	IsReconciled  bool      `db:"is_reconciled"`
+}
+
+// LineItemIWL is the line item component of an InvoiceWithLineItems.
+type LineItemIWL struct {
+	LiAccountCode    *string  `db:"li_account_code"`
+	LiAccountName    *string  `db:"account_name"`
+	LiDescription    *string  `db:"li_description"`
+	LiTaxAmount      *float64 `db:"li_tax_amount"`
+	LiLineAmount     *float64 `db:"li_line_amount"`
+	LiDonationAmount *float64 `db:"li_donation_amount"`
+}
+
 // InvoiceWithLineItems is the concrete type of each row returned by
 // GetInvoiceWLI.
 type InvoiceWithLineItems struct {
-	ID               string    `db:"id"`
-	InvoiceNumber    string    `db:"invoice_number"`
-	Date             time.Time `db:"date"`
-	Type             *string   `db:"type"`
-	Status           string    `db:"status"`
-	Reference        *string   `db:"reference"`
-	ContactName      string    `db:"contact_name"`
-	Total            float64   `db:"total"`
-	DonationTotal    float64   `db:"donation_total"`
-	CRMSTotal        float64   `db:"crms_total"`
-	IsReconciled     bool      `db:"is_reconciled"`
-	LiAccountCode    *string   `db:"li_account_code"`
-	LiAccountName    *string   `db:"account_name"`
-	LiDescription    *string   `db:"li_description"`
-	LiTaxAmount      *float64  `db:"li_tax_amount"`
-	LiLineAmount     *float64  `db:"li_line_amount"`
-	LiDonationAmount *float64  `db:"li_donation_amount"`
+	InvoiceIWL
+	LineItemIWL
 }
 
 // InvoicesWithLineItems is a slice of InvoiceWithLineItems.
-type InvoicesWithLineItems []InvoiceWithLineItems
+type InvoicesWLI []InvoiceWithLineItems
 
 // Invoice returns the first invoice in a slice.
-func (iwli InvoicesWithLineItems) Invoice() InvoiceWithLineItems {
+func (iwli InvoicesWLI) Invoice() InvoiceIWL {
 	if len(iwli) == 0 {
-		return InvoiceWithLineItems{}
+		return InvoiceIWL{}
 	}
-	return iwli[0]
+	return iwli[0].InvoiceIWL
+}
+
+// LineItems returns the line items.
+func (iwli InvoicesWLI) LineItems() []LineItemIWL {
+	lis := make([]LineItemIWL, len(iwli))
+	for i, li := range iwli {
+		lis[i] = li.LineItemIWL
+	}
+	return lis
 }
 
 // GetInvoiceWLI retrieves a single invoice from the database with it's
 // constituent line items. This query returns rows for each line item.
-func (db *DB) GetInvoiceWLI(ctx context.Context, invoiceNumber string) (InvoicesWithLineItems, error) {
+func (db *DB) GetInvoiceWLI(ctx context.Context, invoiceNumber string) (InvoicesWLI, error) {
 
 	// Parameterize the sql query file by replacing the example
 	// variables.
@@ -293,7 +312,7 @@ func (db *DB) GetInvoiceWLI(ctx context.Context, invoiceNumber string) (Invoices
 	}
 
 	// Use sqlx to scan results into the provided slice.
-	var iwli InvoicesWithLineItems
+	var iwli InvoicesWLI
 	err = stmt.SelectContext(ctx, &iwli, namedArgs)
 	if err != nil {
 		return nil, fmt.Errorf("invoice select error: %v", err)

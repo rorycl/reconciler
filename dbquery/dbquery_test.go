@@ -426,7 +426,7 @@ func TestInvoicesWithLineItemsQuery(t *testing.T) {
 
 	tpl := `template output:
 Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
-	{{- range .IWLI }}
+	{{- range .LineItems}}
 	Line item: {{ .LiAccountName }} {{ .LiLineAmount }}
 	{{- end }}
 `
@@ -437,8 +437,8 @@ Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
 	}
 
 	data := map[string]any{
-		"Invoice": invoiceWLI.Invoice(),
-		"IWLI":    invoiceWLI,
+		"Invoice":   invoiceWLI.Invoice(),
+		"LineItems": invoiceWLI.LineItems(),
 	}
 	parsedTemplate.Execute(os.Stdout, data)
 
