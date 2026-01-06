@@ -18,8 +18,18 @@ SELECT
 FROM (
     WITH variables AS (
         SELECT
-             'INV-2025-102' AS InvoiceNumber /* @param */
+             'inv-002' AS InvoiceID /* @param */
             ,'^(53|55|57).*' AS AccountCodes /* @param */
+    )
+
+    ,variables_extended AS (
+        SELECT
+             v.InvoiceID AS InvoiceID 
+            ,v.AccountCodes AS AccountCodes 
+            ,i.invoice_number AS InvoiceNumber
+        FROM
+            invoices i
+            JOIN variables v ON (v.InvoiceID = i.id)
     )
     
     ,reconciled_donations_summed AS (
@@ -28,9 +38,9 @@ FROM (
             ,sum(amount) AS donation_sum
         FROM
             salesforce_opportunities
-            ,variables
+            ,variables_extended ve
         WHERE
-            payout_reference_dfk = variables.InvoiceNumber
+            payout_reference_dfk = ve.InvoiceNumber
         GROUP BY
             payout_reference_dfk
     )
@@ -66,6 +76,6 @@ FROM (
         LEFT OUTER JOIN accounts a ON (li.account_code = a.code)
         LEFT OUTER JOIN reconciled_donations_summed rds ON (rds.payout_reference_dfk = i.invoice_number)
     WHERE
-        variables.InvoiceNumber = i.invoice_number
+        variables.InvoiceID = i.id
 ) x
 ;

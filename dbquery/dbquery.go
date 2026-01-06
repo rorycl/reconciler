@@ -232,8 +232,8 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 	return donations, nil
 }
 
-InvoicesWLI// InvoiceIWL is the invoice component of an InvoiceWithLineItems.
-type InvoiceIWL struct {
+// IWLInvoice is the invoice component of an InvoiceWithLineItems.
+type IWLInvoice struct {
 	ID            string    `db:"id"`
 	InvoiceNumber string    `db:"invoice_number"`
 	Date          time.Time `db:"date"`
@@ -247,8 +247,8 @@ type InvoiceIWL struct {
 	IsReconciled  bool      `db:"is_reconciled"`
 }
 
-// LineItemIWL is the line item component of an InvoiceWithLineItems.
-type LineItemIWL struct {
+// IWLLineItem is the line item component of an InvoiceWithLineItems.
+type IWLLineItem struct {
 	LiAccountCode    *string  `db:"li_account_code"`
 	LiAccountName    *string  `db:"account_name"`
 	LiDescription    *string  `db:"li_description"`
@@ -257,65 +257,63 @@ type LineItemIWL struct {
 	LiDonationAmount *float64 `db:"li_donation_amount"`
 }
 
-// InvoiceWithLineItems is the concrete type of each row returned by
-// GetInvoiceWLI.
-type InvoiceWithLineItems struct {
-	InvoiceIWL
-	LineItemIWL
-}
-
-// InvoicesWithLineItems is a slice of InvoiceWithLineItems.
-type InvoicesWLI []InvoiceWithLineItems
-
-// Invoice returns the first invoice in a slice.
-func (iwli InvoicesWLI) Invoice() InvoiceIWL {
-	if len(iwli) == 0 {
-		return InvoiceIWL{}
-	}
-	return iwli[0].InvoiceIWL
-}
-
-// LineItems returns the line items.
-func (iwli InvoicesWLI) LineItems() []LineItemIWL {
-	lis := make([]LineItemIWL, len(iwli))
-	for i, li := range iwli {
-		lis[i] = li.LineItemIWL
-	}
-	return lis
-}
-
 // GetInvoiceWLI retrieves a single invoice from the database with it's
 // constituent line items. This query returns rows for each line item.
-func (db *DB) GetInvoiceWLI(ctx context.Context, invoiceNumber string) (InvoicesWLI, error) {
+func (db *DB) GetInvoiceWLI(ctx context.Context, invoiceID string) (IWLInvoice, []IWLLineItem, error) {
+
+	// invoiceWithLineItems is the concrete type of each row returned by
+	// GetInvoiceWLI.
+	type invoiceWithLineItems struct {
+		IWLInvoice
+		IWLLineItem
+	}
+
+	// invoicesWithLineItems is a slice of InvoiceWithLineItems.
+	type invoicesWLI []invoiceWithLineItems
+
+	// Initialise the invoice return type.
+	var invoice IWLInvoice
 
 	// Parameterize the sql query file by replacing the example
 	// variables.
 	query, err := ParameterizeFile("sql/invoice.sql")
 	if err != nil {
-		return nil, fmt.Errorf("invoice query file error: %w", err)
+		return invoice, nil, fmt.Errorf("invoice query file error: %w", err)
 	}
 
 	// Parse the query and map the named parameters.
 	stmt, err := db.PrepareNamedContext(ctx, string(query.Body))
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare invoice statement: %w", err)
+		return invoice, nil, fmt.Errorf("failed to prepare invoice statement: %w", err)
 	}
 	defer stmt.Close()
 
 	// Args uses sqlx's named query capability.
 	namedArgs := map[string]any{
-		"AccountCodes":  db.accountCodes,
-		"InvoiceNumber": invoiceNumber,
+		"AccountCodes": db.accountCodes,
+		"InvoiceID":    invoiceID,
 	}
 	if got, want := len(namedArgs), len(query.Parameters); got != want {
-		return nil, fmt.Errorf("namedArgs has %d arguments, expected %d", got, want)
+		return invoice, nil, fmt.Errorf("namedArgs has %d arguments, expected %d", got, want)
 	}
 
 	// Use sqlx to scan results into the provided slice.
-	var iwli InvoicesWLI
+	var iwli invoicesWLI
 	err = stmt.SelectContext(ctx, &iwli, namedArgs)
 	if err != nil {
-		return nil, fmt.Errorf("invoice select error: %v", err)
+		return invoice, nil, fmt.Errorf("invoice select error: %v", err)
 	}
-	return iwli, nil
+
+	// Return early if no errors were returned.
+	if len(iwli) == 0 {
+		return invoice, nil, sql.ErrNoRows
+	}
+
+	// Return invoice and child line items.
+	invoice = iwli[0].IWLInvoice
+	lineItems := make([]IWLLineItem, len(iwli))
+	for i, li := range iwli {
+		lineItems[i] = li.IWLLineItem
+	}
+	return invoice, lineItems, nil
 }

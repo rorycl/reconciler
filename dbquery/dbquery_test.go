@@ -2,6 +2,8 @@ package dbquery
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -271,6 +273,10 @@ func ptrStr(s string) *string {
 	return &s
 }
 
+func ptrFloat64(f float64) *float64 {
+	return &f
+}
+
 func TestDonationsQuery(t *testing.T) {
 
 	accountCodes := "^(53|55|57)"
@@ -408,22 +414,9 @@ func TestDonationsQuery(t *testing.T) {
 	}
 }
 
-func TestInvoicesWithLineItemsQuery(t *testing.T) {
-	accountCodes := "^(53|55|57)"
-	ctx := context.Background()
-
-	db, err := New("testdata/test.db", accountCodes)
-	if err != nil {
-		t.Fatalf("db opening error: %v", err)
-	}
-
-	invoiceWLI, err := db.GetInvoiceWLI(ctx, "INV-2025-102")
-	if err != nil {
-		t.Fatalf("invoice error: %v", err)
-	}
-
-	fmt.Printf("print output:\n%#v\n", invoiceWLI[1])
-
+// printInvoiceLineItems is a helper print function.
+func printInvoiceLineItems(t *testing.T, invoice IWLInvoice, lineItems []IWLLineItem) {
+	t.Helper()
 	tpl := `template output:
 Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
 	{{- range .LineItems}}
@@ -437,9 +430,84 @@ Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
 	}
 
 	data := map[string]any{
-		"Invoice":   invoiceWLI.Invoice(),
-		"LineItems": invoiceWLI.LineItems(),
+		"Invoice":   invoice,
+		"LineItems": lineItems,
 	}
 	parsedTemplate.Execute(os.Stdout, data)
+}
 
+func TestInvoiceWithLineItemsQuery(t *testing.T) {
+	accountCodes := "^(53|55|57)"
+	ctx := context.Background()
+
+	db, err := New("testdata/test.db", accountCodes)
+	if err != nil {
+		t.Fatalf("db opening error: %v", err)
+	}
+
+	tests := []struct {
+		invoiceID string
+		err       error
+		invoice   IWLInvoice
+		lineItems []IWLLineItem
+	}{
+		{
+			invoiceID: "inv-002",
+			err:       nil,
+			invoice: IWLInvoice{
+				ID:            "inv-002",
+				InvoiceNumber: "INV-2025-102",
+				Date:          time.Date(2025, 4, 12, 11, 0, 0, 0, time.UTC),
+				Type:          nil,
+				Status:        "PAID",
+				Reference:     nil,
+				ContactName:   "Generous Individual",
+				Total:         196.5,
+				DonationTotal: 200,
+				CRMSTotal:     200,
+				IsReconciled:  true,
+			},
+			lineItems: []IWLLineItem{
+				IWLLineItem{
+					LiAccountCode:    ptrStr("5301"),
+					LiAccountName:    ptrStr("Fundraising Dinners"),
+					LiDescription:    ptrStr("Pledged donation via Stripe"),
+					LiLineAmount:     ptrFloat64(200),
+					LiDonationAmount: ptrFloat64(200),
+				},
+				IWLLineItem{
+					LiAccountCode:    ptrStr("429"),
+					LiAccountName:    ptrStr("Platform Fees"),
+					LiDescription:    ptrStr("Stripe processing fee"),
+					LiLineAmount:     ptrFloat64(-3.5),
+					LiDonationAmount: ptrFloat64(0),
+				},
+			},
+		},
+		{
+			invoiceID: "xxxxxxxxxxxx",
+			err:       sql.ErrNoRows,
+		},
+	}
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
+			// Run query
+			invoice, lineItems, err := db.GetInvoiceWLI(ctx, tt.invoiceID)
+			if err != nil && !errors.Is(tt.err, err) {
+				t.Fatalf("query execute error: %v", err)
+				return
+			}
+			if err == nil && tt.err != nil {
+				t.Fatalf("expected rows error: (rows %d) %v", len(lineItems), tt.err)
+			}
+			if diff := cmp.Diff(invoice, tt.invoice); diff != "" {
+				t.Errorf("invoice diff error: %v", diff)
+			}
+			if diff := cmp.Diff(lineItems, tt.lineItems); diff != "" {
+				t.Errorf("invoice diff error: %v", diff)
+			}
+
+		})
+	}
 }
