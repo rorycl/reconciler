@@ -14,11 +14,12 @@ import (
 	"sync"
 	"time"
 
+	// linked subapp via go.work
+	"dbquery"
+
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
-
-// --- DUMMY DATA STRUCTURES ---
 
 type Invoice struct {
 	UUID            string
@@ -60,8 +61,6 @@ type Donation struct {
 	PayoutRef   string
 }
 
-// --- MAIN APPLICATION ---
-
 func rebuildTailwind() error {
 	log.Println("rebulding tailwind")
 	cmdArgs := strings.Split(`tailwindcss-linux-x64-v4.0.7 -i static/css/input.css -o static/css/output.css`, " ")
@@ -71,9 +70,25 @@ func rebuildTailwind() error {
 	return err
 }
 
+// line item account codes
+var accountCodes = "^(53|55|57)"
+
+// database connection
+var db *dbquery.DB
+
+// pageLen is the number of items listed on a page
+var pageLen = 20
+
 func main() {
 
 	var server *http.Server
+	var err error
+
+	db, err = dbquery.New("../dbquery/testdata/test.db", "../dbquery/sql", accountCodes)
+	if err != nil {
+		fmt.Println("database setup error", err)
+		os.Exit(1)
+	}
 
 	// The filewatcher watches for file changes.
 	filewatcher, err := NewFileChangeNotifier(
@@ -150,7 +165,7 @@ func main() {
 	}
 }
 
-// --- HTTP HANDLERS ---
+// http handlers
 
 // handleRedirectToConnect provides a default route to the start page.
 func handleRedirectToConnect(w http.ResponseWriter, r *http.Request) {
@@ -176,13 +191,40 @@ func handleRefresh(w http.ResponseWriter, r *http.Request) {
 // handleHome serves the main dashboard view, which is the invoice list.
 func handleHome(w http.ResponseWriter, r *http.Request) {
 	// This data would come from a database query based on filters.
+
+	ctx := r.Context()
+
+	type Args struct {
+		ReconciliationStatus string
+		DateFrom, DateTo     time.Time
+		SearchString         string
+		Page, Limit, Offset  int
+	}
+
+	stringRepr := func(a Args) string {
+		return fmt.Sprintf("%#v\n", a)
+	}
+
+	a := validation(r)
+	log.Printf("ARGS: %#v", stringRepr(*a))
+
+	invoices, err := db.GetInvoices(ctx, a.ReconciliationStatus, a.DateFrom, a.DateTo, a.SearchString, a.Limit, a.Offset)
+	if err != nil {
+		log.Printf("invoices get error %v", err)
+	}
+
+	log.Println("invoices len:", len(invoices))
+
 	data := struct {
 		PageTitle string
-		Invoices  []Invoice
+		Invoices  []dbquery.Invoice
+		Args      Args
 	}{
 		PageTitle: "Home",
-		Invoices:  getDummyInvoices(),
+		Invoices:  invoices,
+		Args:      *a,
 	}
+
 	templates := []string{"templates/base.html", "templates/home.html"}
 	renderTemplate(w, "home", templates, data)
 }
@@ -215,7 +257,7 @@ func handleInvoiceDetail(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "invoice", templates, data)
 }
 
-// --- HELPER FUNCTIONS ---
+// helpers
 
 // renderTemplate is a helper to execute templates and handle errors.
 func renderTemplate(w http.ResponseWriter, name string, templates []string, data any) {
@@ -227,7 +269,7 @@ func renderTemplate(w http.ResponseWriter, name string, templates []string, data
 	}
 }
 
-// --- DUMMY DATA PROVIDERS ---
+// Dummy data providers
 // These functions simulate fetching data from a database.
 
 func getDummyInvoices() []Invoice {
