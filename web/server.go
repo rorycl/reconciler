@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"html/template"
@@ -77,7 +78,12 @@ var accountCodes = "^(53|55|57)"
 var db *dbquery.DB
 
 // pageLen is the number of items listed on a page
-var pageLen = 20
+const pageLen = 5
+
+// pageNo calculates the number of pages in a database result set.
+func pageNo(recNo int) int {
+	return ((recNo - 1) / pageLen) + 1
+}
 
 func main() {
 
@@ -115,7 +121,7 @@ func main() {
 
 	for {
 
-		// rebuild tailwind
+		// Rebuild tailwind.
 		err := rebuildTailwind()
 		if err != nil {
 			log.Fatalf("tailwind rebuild failed: %s", err)
@@ -124,7 +130,7 @@ func main() {
 		server = &http.Server{Addr: "127.0.0.1:8080"}
 		r := mux.NewRouter()
 
-		// Serve static files (CSS, JS) from the 'static' directory.
+		// Serve static files (css, js) from the 'static' directory.
 		fs := http.FileServer(http.Dir("./static"))
 		r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
@@ -133,6 +139,7 @@ func main() {
 		r.HandleFunc("/refresh", handleRefresh)
 		r.HandleFunc("/home", handleHome) // will also serve /invoices
 		r.HandleFunc("/invoice", handleInvoiceDetail)
+		r.HandleFunc("/invoices", handleInvoices)
 
 		r.HandleFunc("/", handleRedirectToConnect)
 
@@ -188,45 +195,86 @@ func handleRefresh(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "refresh", templates, nil)
 }
 
-// handleHome serves the main dashboard view, which is the invoice list.
+// handleHome serves the main dashboard view, which by default is the invoice list.
 func handleHome(w http.ResponseWriter, r *http.Request) {
-	// This data would come from a database query based on filters.
+	http.Redirect(w, r, "/invoices", http.StatusFound)
+}
+
+// handleInvoices serves the invoices list.
+func handleInvoices(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
+	templates := []string{"templates/base.html", "templates/invoices.html"}
 
-	type Args struct {
-		ReconciliationStatus string
-		DateFrom, DateTo     time.Time
-		SearchString         string
-		Page, Limit, Offset  int
+	form := NewSearchForm()
+	if err := DecodeURLParams(r, form); err != nil {
+		log.Printf("error: could not decode the url parameters: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 
-	stringRepr := func(a Args) string {
-		return fmt.Sprintf("%#v\n", a)
-	}
+	// Create a validator and validate the form.
+	validator := NewValidator()
+	form.Validate(validator)
 
-	a := validation(r)
-	log.Printf("ARGS: %#v", stringRepr(*a))
+	// Initialise pagination for default state.
+	pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
 
-	invoices, err := db.GetInvoices(ctx, a.ReconciliationStatus, a.DateFrom, a.DateTo, a.SearchString, a.Limit, a.Offset)
-	if err != nil {
-		log.Printf("invoices get error %v", err)
-	}
-
-	log.Println("invoices len:", len(invoices))
-
+	// Prepare data for the template, allowing passing of validation
+	// errors back to the template if necessary.
 	data := struct {
-		PageTitle string
-		Invoices  []dbquery.Invoice
-		Args      Args
+		PageTitle  string
+		Invoices   []dbquery.Invoice
+		Form       *SearchForm
+		Validator  *Validator
+		Pagination *Pagination
 	}{
-		PageTitle: "Home",
-		Invoices:  invoices,
-		Args:      *a,
+		PageTitle:  "Home",
+		Form:       form,
+		Validator:  validator,
+		Pagination: pagination,
 	}
 
-	templates := []string{"templates/base.html", "templates/home.html"}
-	renderTemplate(w, "home", templates, data)
+	// Render template with errors and return if the form is invalid.
+	if !validator.Valid() {
+		renderTemplate(w, "invoices", templates, data)
+		return
+	}
+
+	invoices, err := db.GetInvoices(
+		ctx,
+		form.ReconciliationStatus,
+		form.DateFrom,
+		form.DateTo,
+		form.SearchString,
+		pageLen,
+		form.Offset(),
+	)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("error: database GetInvoices failed: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Set valid data from successful database call.
+	data.Invoices = invoices
+
+	// Set pagination for number of invoices. In case of an error, log
+	// and continue. Each invoice has the search query row count as a
+	// field.
+	var recordsNo int
+	if len(data.Invoices) == 0 {
+		recordsNo = 1
+	} else {
+		recordsNo = data.Invoices[0].RowCount
+	}
+	data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
+	if err != nil {
+		log.Printf("pagination error: %v", err)
+		http.Redirect(w, r, "/invoices", http.StatusFound)
+	}
+
+	renderTemplate(w, "invoices", templates, data)
 }
 
 // handleInvoiceDetail serves the detail page for a single invoice.
