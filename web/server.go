@@ -140,6 +140,7 @@ func main() {
 		r.HandleFunc("/home", handleHome) // will also serve /invoices
 		r.HandleFunc("/invoice", handleInvoiceDetail)
 		r.HandleFunc("/invoices", handleInvoices)
+		r.HandleFunc("/bank-transactions", handleBankTransactions)
 
 		r.HandleFunc("/", handleRedirectToConnect)
 
@@ -230,7 +231,7 @@ func handleInvoices(w http.ResponseWriter, r *http.Request) {
 		Pagination  *Pagination
 		CurrentPage string
 	}{
-		PageTitle:   "Home",
+		PageTitle:   "Invoices",
 		Form:        form,
 		Validator:   validator,
 		Pagination:  pagination,
@@ -277,6 +278,85 @@ func handleInvoices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderTemplate(w, "invoices", templates, data)
+}
+
+// handleBankTransactions serves the transactions list.
+func handleBankTransactions(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	templates := []string{"templates/base.html", "templates/partial-listingTabs.html", "templates/bank_transactions.html"}
+
+	form := NewSearchForm()
+	if err := DecodeURLParams(r, form); err != nil {
+		log.Printf("error: could not decode the url parameters: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Create a validator and validate the form.
+	validator := NewValidator()
+	form.Validate(validator)
+
+	// Initialise pagination for default state.
+	pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
+
+	// Prepare data for the template, allowing passing of validation
+	// errors back to the template if necessary.
+	data := struct {
+		PageTitle        string
+		BankTransactions []dbquery.BankTransaction
+		Form             *SearchForm
+		Validator        *Validator
+		Pagination       *Pagination
+		CurrentPage      string
+	}{
+		PageTitle:   "Bank Transactions",
+		Form:        form,
+		Validator:   validator,
+		Pagination:  pagination,
+		CurrentPage: "bank-transactions",
+	}
+
+	// Render template with errors and return if the form is invalid.
+	if !validator.Valid() {
+		renderTemplate(w, "transactions", templates, data)
+		return
+	}
+
+	transactions, err := db.GetBankTransactions(
+		ctx,
+		form.ReconciliationStatus,
+		form.DateFrom,
+		form.DateTo,
+		form.SearchString,
+		pageLen,
+		form.Offset(),
+	)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("error: database GetBankTransactions failed: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Set valid data from successful database call.
+	data.BankTransactions = transactions
+
+	// Set pagination for number of transactions. In case of an error, log
+	// and continue. Each transaction has the search query row count as a
+	// field.
+	var recordsNo int
+	if len(data.BankTransactions) == 0 {
+		recordsNo = 1
+	} else {
+		recordsNo = data.BankTransactions[0].RowCount
+	}
+	data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
+	if err != nil {
+		log.Printf("pagination error: %v", err)
+		http.Redirect(w, r, "/banktransactions", http.StatusFound)
+	}
+
+	renderTemplate(w, "bank_transactions", templates, data)
 }
 
 // handleInvoiceDetail serves the detail page for a single invoice.
