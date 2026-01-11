@@ -168,6 +168,7 @@ type BankTransaction struct {
 	Reference     string    `db:"reference"`
 	Date          time.Time `db:"date"`
 	ContactName   string    `db:"contact_name"`
+	Status        string    `db:"status"`
 	Total         float64   `db:"total"`
 	DonationTotal float64   `db:"donation_total"`
 	CRMSTotal     float64   `db:"crms_total"`

@@ -57,6 +57,7 @@ crms_donation_totals AS (
         ,b.reference
         ,date
         ,b.contact_name
+        ,b.status
         ,b.total
         ,COALESCE(bdt.total_donation_amount, 0) AS donation_total
         ,COALESCE(cdt.total_crms_amount, 0) AS crms_total
