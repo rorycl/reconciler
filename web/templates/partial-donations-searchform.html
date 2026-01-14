@@ -4,9 +4,9 @@
 <form class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end text-sm p-4 pt-2 bg-indigo-100">
 {{ else }}
 <form hx-get="{{ .GetURL }}"                                             
-      hx-target="#tab-content"                                           
+      hx-target="#donations-zone"                                           
       hx-swap="innerHTML"                                                
-      class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end text-sm p-4 pt-2 bg-indigo-100">
+      class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end text-sm p-4 pt-2">
 {{ end }}
     <div>
         <label for="status" class="block font-semibold text-xs text-slate-700 pb-1 mt-1">Status</label>
@@ -55,7 +55,7 @@
                class="mt-1 block bg-white w-full rounded-md border-1 border-slate-400 shadow-sm p-1.5 focus:border-sky-500 focus:ring-sky-500">
     </div>
     <div class="md:col-span-1 flex space-x-2">
-        <a href="{{ .GetURL }}" class="w-full text-center bg-slate-500 text-white font-bold py-2 px-4 rounded hover:bg-slate-600 transition-colors">Reset</a>
+        <a href="{{ .GetURL }}" class="w-full text-center bg-slate-500 text-white font-bold py-2 px-3 rounded hover:bg-slate-600 transition-colors">Reset</a>
         <button type="submit" class="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">Search</button>
     </div>
 </form>

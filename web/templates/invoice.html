@@ -101,36 +101,15 @@
 
 <!-- donations zone wrapper -->
 <div id="donations-zone" class="mt-6">
-    <nav>
-        <ul class="flex flex-wrap items-end text-sm font-medium text-center gap-2" role="tablist">
-            <li class="me-2">
-                <a href="#"
-                   class="tab-link relative z-10 inline-block px-4 py-2 text-sky-700 font-bold bg-white border border-slate-400 border-b-white rounded-t-md -mb-px"
-                   hx-get="/partials/donations-linked/invoice/{{ .Invoice.InvoiceNumber }}"
-                   hx-target="#tab-content"
-                   hx-swap="innerHTML"
-                   role="tab" aria-selected="true">
-                    Linked Donations
-                </a>
-            </li>
-            <li class="me-2">
-               <!-- probably a good idea to send a from date 1 month before the invoice for the default donations search in the invoice template data -->
-                <a href="#"
-                   class="tab-link inline-block px-4 py-2 text-slate-500 bg-slate-100 border border-slate-400 border-b-slate-100 hover:border-b-slate-200 hover:bg-slate-200 hover:text-sky-800 rounded-t-md"
-                   hx-get="/partials/donations-find?status=NotLinked&date-from=2025-04-01"
-                   hx-target="#tab-content"
-                   hx-swap="innerHTML"
-                   role="tab" aria-selected="false">
-                    Find Donations
-                </a>
-            </li>
-        </ul>
-    </nav>
+
+    {{ template "partial-donations-tabs" . }}
 
     <div id="tab-content"
          class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none"
          hx-get="/partials/donations-linked/invoice/{{ .Invoice.InvoiceNumber }}"
-         hx-trigger="load">
+         hx-trigger="load"
+         hx-target="#donations-zone"                                           
+         hx-swap="innerHTML">
         <!-- Loading spinner could go here -->
         <p class="p-4">Loading linked donations...</p>
     </div>

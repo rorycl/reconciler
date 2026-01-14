@@ -1,4 +1,9 @@
 <!-- start of partial -->
+
+{{ template "partial-donations-tabs" . }}
+<div id="tab-content" 
+     class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none">
+
 <h3 class="text-l text-slate-800 font-semibold px-4 py-3">Linked Salesforce Donations</h3>
 
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
@@ -18,10 +23,10 @@
             {{ range .ViewDonations }}
             <tr>
                 <td class="px-4 py-1 text-center"><input value="{{ .ID }}" type="checkbox"></td>
-                        <td class="px-4 py-1 whitespace-nowrap">{{ .Name }}</td>
-                        <td class="px-4 py-1 whitespace-nowrap">{{ .CloseDateStr }}</td>
-                        <td class="px-4 py-1">{{ .PayoutReference }}</td>
-                        <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .Amount }}</td>
+                <td class="px-4 py-1 whitespace-nowrap">{{ .Name }}</td>
+                <td class="px-4 py-1 whitespace-nowrap">{{ .CloseDateStr }}</td>
+                <td class="px-4 py-1">{{ .PayoutReference }}</td>
+                <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .Amount }}</td>
             </tr>
             {{ else }}
             <tr><td class="px-4 py-4" colspan="5">There are no linked donation records to display</td></tr>
@@ -29,4 +34,5 @@
         </tbody>
     </table>
 </div> 
+</div>  <!-- end tab-content -->
 <!-- end of partial -->
