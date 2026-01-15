@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -9,9 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
-	"strings"
-	"sync"
 	"time"
 
 	// linked subapp via go.work
@@ -20,15 +16,6 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
-
-func rebuildTailwind() error {
-	log.Println("rebulding tailwind")
-	cmdArgs := strings.Split(`tailwindcss-linux-x64-v4.1.18 -i static/css/input.css -o static/css/output.css`, " ")
-	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-	out, err := cmd.CombinedOutput()
-	log.Println(string(out))
-	return err
-}
 
 // line item account codes
 var accountCodes = "^(53|55|57)"
@@ -49,53 +36,41 @@ func pageNo(recNo int) int {
 var defaultStartDate = time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
 var defaultEndDate = time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
 
+const inDevelopment bool = false
+
+// horrible global to remove
+var mounts *fileMounts
+
 func main() {
 
-	var server *http.Server
-	var err error
+	if len(os.Args) != 2 {
+		fmt.Println("database needed as an argument")
+		os.Exit(1)
+	}
+	dbFile := os.Args[1]
 
-	db, err = dbquery.New("../dbquery/testdata/test.db", "../dbquery/sql", accountCodes)
+	var err error
+	mounts, err = makeMounts(inDevelopment)
+	if err != nil {
+		fmt.Printf("mounts err: %v\n", err)
+		os.Exit(1)
+	}
+
+	var server *http.Server
+
+	db, err = dbquery.New(dbFile, mounts.sqlDir, accountCodes)
 	if err != nil {
 		fmt.Println("database setup error", err)
 		os.Exit(1)
 	}
 
-	// The filewatcher watches for file changes.
-	filewatcher, err := NewFileChangeNotifier(
-		[]DirFilesDescriptor{
-			DirFilesDescriptor{"templates", []string{"html"}},
-			DirFilesDescriptor{"static/css", []string{"css"}},
-			DirFilesDescriptor{"static/js", []string{"js"}},
-		},
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		err := filewatcher.Watch(context.Background())
-		if err != nil {
-			log.Fatal("watcher error", err)
-		}
-	})
-	go func() {
-		wg.Wait()
-	}()
-	updater := filewatcher.Update()
-
 	for {
-
-		// Rebuild tailwind.
-		err := rebuildTailwind()
-		if err != nil {
-			log.Fatalf("tailwind rebuild failed: %s", err)
-		}
 
 		server = &http.Server{Addr: "127.0.0.1:8080"}
 		r := mux.NewRouter()
 
 		// Serve static files (css, js) from the 'static' directory.
-		fs := http.FileServer(http.Dir("./static"))
+		fs := http.FileServer(http.FS(mounts.static))
 		r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
 		// Intro pages.
@@ -126,24 +101,15 @@ func main() {
 		// Attach router to server handler.
 		server.Handler = r
 
-		go func() {
-			log.Println("Starting server on 127.0.0.1:8080")
-			err := server.ListenAndServe()
-			if err != nil {
-				if !errors.Is(err, http.ErrServerClosed) {
-					log.Fatalf("server error: %s\n", err)
-				}
-				fmt.Println("shutting down server")
-				return
+		log.Println("Starting server on 127.0.0.1:8080")
+		err = server.ListenAndServe()
+		if err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("server error: %s\n", err)
 			}
-		}()
-		select {
-		case <-updater:
-			log.Println("file update detected")
-			_ = server.Shutdown(context.Background())
-			break
+			fmt.Println("shutting down server")
+			return
 		}
-		log.Println("restarting server")
 	}
 }
 
@@ -755,7 +721,8 @@ func newViewDonations(donations []dbquery.Donation) []viewDonation {
 
 // renderTemplate is a helper to execute templates and handle errors.
 func renderTemplate(w http.ResponseWriter, name string, templates []string, data any) {
-	tpl := template.Must(template.ParseFiles(templates...))
+	templateFS := mounts.templates
+	tpl := template.Must(template.ParseFS(templateFS, templates...))
 	err := tpl.ExecuteTemplate(w, name+".html", data)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error rendering template %s: %v", name, err), http.StatusInternalServerError)

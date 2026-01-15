@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/jmoiron/sqlx" // helper library
@@ -32,14 +31,10 @@ type DB struct {
 }
 
 // New creates a new connection to an SQLite database at the given path.
-func New(dbPath, sqlDir string, accountCodes string) (*DB, error) {
+func New(dbPath string, sqlDir fs.FS, accountCodes string) (*DB, error) {
 	dbDB, err := sql.Open("sqlite", fmt.Sprintf("%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)", dbPath))
 	if err != nil {
 		return nil, err
-	}
-
-	if _, err := os.Stat(sqlDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("sql directory %q not found", sqlDir)
 	}
 
 	// RegisterFunctions registers the custom REXEXP function. This can
@@ -57,23 +52,23 @@ func New(dbPath, sqlDir string, accountCodes string) (*DB, error) {
 	}
 
 	// Prepare all the statements.
-	db.getInvoicesStmt, err = db.prepNamedStatement(filepath.Join(sqlDir, "invoices.sql"))
+	db.getInvoicesStmt, err = db.prepNamedStatement(sqlDir, "invoices.sql")
 	if err != nil {
 		return nil, fmt.Errorf("invoices statement error: %w", err)
 	}
-	db.getBankTransactionsStmt, err = db.prepNamedStatement(filepath.Join(sqlDir, "bank_transactions.sql"))
+	db.getBankTransactionsStmt, err = db.prepNamedStatement(sqlDir, "bank_transactions.sql")
 	if err != nil {
 		return nil, fmt.Errorf("bank_transactions statement error: %w", err)
 	}
-	db.getDonationsStmt, err = db.prepNamedStatement(filepath.Join(sqlDir, "donations.sql"))
+	db.getDonationsStmt, err = db.prepNamedStatement(sqlDir, "donations.sql")
 	if err != nil {
 		return nil, fmt.Errorf("donations statement error: %w", err)
 	}
-	db.getInvoiceWRStmt, err = db.prepNamedStatement(filepath.Join(sqlDir, "invoice.sql"))
+	db.getInvoiceWRStmt, err = db.prepNamedStatement(sqlDir, "invoice.sql")
 	if err != nil {
 		return nil, fmt.Errorf("invoice statement error: %w", err)
 	}
-	db.getBankTransactionWRStmt, err = db.prepNamedStatement(filepath.Join(sqlDir, "bank_transaction.sql"))
+	db.getBankTransactionWRStmt, err = db.prepNamedStatement(sqlDir, "bank_transaction.sql")
 	if err != nil {
 		return nil, fmt.Errorf("bank_transaction statement error: %w", err)
 	}
@@ -82,8 +77,8 @@ func New(dbPath, sqlDir string, accountCodes string) (*DB, error) {
 }
 
 // prepareNamedStatment prepares the SQL queries.
-func (db *DB) prepNamedStatement(filePath string) (*parameterizedStmt, error) {
-	query, err := ParameterizeFile(filePath)
+func (db *DB) prepNamedStatement(fileFS fs.FS, filePath string) (*parameterizedStmt, error) {
+	query, err := ParameterizeFile(fileFS, filePath)
 	if err != nil {
 		return nil, fmt.Errorf("could not parameterize %q: %w", filePath, err)
 	}

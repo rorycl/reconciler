@@ -3,7 +3,7 @@ package dbquery
 import (
 	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"regexp"
 	"strings"
 )
@@ -94,14 +94,13 @@ func parameterize(tpl []byte) (*ParameterizedSQLTemplate, error) {
 
 // ParameterizeFile takes an sql file and returns a
 // ParameterizedSQLTemplate or error.
-func ParameterizeFile(file string) (*ParameterizedSQLTemplate, error) {
+func ParameterizeFile(fileFS fs.FS, filePath string) (*ParameterizedSQLTemplate, error) {
 
-	b, err := os.ReadFile(file)
+	fileBytes, err := fs.ReadFile(fileFS, filePath)
 	if err != nil {
-		return nil, fmt.Errorf("file load error: %w", err)
+		return nil, fmt.Errorf("file read error: %w", err)
 	}
-
-	query, err := parameterize(b)
+	query, err := parameterize(fileBytes)
 	if err != nil {
 		return nil, fmt.Errorf("query template error: %w", err)
 	}

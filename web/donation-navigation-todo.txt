@@ -1,0 +1,74 @@
+Donation navigation todo 
+========================
+
+14 January 2026
+
+Intro
+-----
+
+These are some notes about intended donation navigation under invoices
+and bank-transactions, to fit in when time allows.
+
+The present plan is to improve navigation, possibly with some session
+state in the particular case where a user follows a link that cannot
+easily know the intended page state at the link target without state.
+
+For example on the main listing pages /invoices, /bank-transactions and
+/donations have search state that is saved in the browser history.
+However if the user navigates from /invoices/?search=xyz to /donations,
+and then back to /invoices, they user should return to
+/invoices/?search=xyz if possible.
+
+The approach to this is to save the session by path to a raw url query.
+If a naked path is received by the web handler the user should be
+redirected to either the default "extended" url with default search
+criteria or, if it exists, redirected to the saved "last" url. URLs
+extended with parameters should be saved to the session.
+
+Sessions will be needed anyhow in future for user authorization. I'm
+considering using SCS (https://github.com/alexedwards/scs) with it's
+in-memory store for the time being, while the app will be desktop-based.
+
+Donation tabs
+-------------
+
+For the invoice focus and bank transaction focus views, there are
+donation tabs below these which in many ways are the key area of the
+system.
+
+These are the firstly a "link" tab, showing a listing of "linked"
+donations which use the distributed foreign key in the donation
+(Salesforce Opportunity record)'s custom "payout reference" field
+linking to the currently viewed invoice or bank transaction by number or
+reference respectively. This tab also allows one to de-link a donation.
+
+Secondly there is a "find" tab, that allows one to find salesforce
+records for linking to the invoice or bank-transaction (which then will
+list under the "link" tab). Changing the find criteria refreshes the
+htmx component for "find". Linking a record (not yet implemented) should
+act similarly but update the invoice details since the donation sums
+will change.
+
+At present these two tabs are htmx partials and the default view shows
+the "link" tab, even if there are no linked donations.
+
+These are the list of possible changes using the `/invoice` endpoint as
+an example:
+
+* Implement a default url such as /invoice/<id>?tab=TAB&<search_criteria...>
+
+* When visiting a naked /invoice/<id> and the invoice has been visited
+  before in this session the tab and search criteria will be restored
+  through a redirect.
+
+* When visiting a naked /invoice/<id> when the invoice is unvisited and
+  unreconciled, TAB will be set to "find" otherwise it will be set to
+  "link".
+
+* When updating search criteria in "find" the url will be pushed to
+  browser history and inserted into the hx-get url for "link".
+
+* Visiting urls with parameters for /invoice/<id> or any related partial
+  will save the current tab and search criteria to the session.
+
+
