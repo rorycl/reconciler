@@ -126,13 +126,13 @@ func handleRedirectToConnect(w http.ResponseWriter, r *http.Request) {
 
 // handleConnect serves the initial OAuth connection page.
 func handleConnect(w http.ResponseWriter, r *http.Request) {
-	templates := []string{"templates/base.html", "templates/connect.html"}
+	templates := []string{"base.html", "connect.html"}
 	renderTemplate(w, "connect", templates, nil)
 }
 
 // handleRefresh serves the data refresh page.
 func handleRefresh(w http.ResponseWriter, r *http.Request) {
-	templates := []string{"templates/base.html", "templates/refresh.html"}
+	templates := []string{"base.html", "refresh.html"}
 	renderTemplate(w, "refresh", templates, nil)
 }
 
@@ -145,7 +145,7 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 func handleInvoices(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	templates := []string{"templates/base.html", "templates/partial-listingTabs.html", "templates/invoices.html"}
+	templates := []string{"base.html", "partial-listingTabs.html", "invoices.html"}
 
 	form := NewSearchForm()
 	if err := DecodeURLParams(r, form); err != nil {
@@ -224,7 +224,7 @@ func handleInvoices(w http.ResponseWriter, r *http.Request) {
 func handleBankTransactions(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	templates := []string{"templates/base.html", "templates/partial-listingTabs.html", "templates/bank_transactions.html"}
+	templates := []string{"base.html", "partial-listingTabs.html", "bank_transactions.html"}
 
 	form := NewSearchForm()
 	if err := DecodeURLParams(r, form); err != nil {
@@ -303,7 +303,7 @@ func handleBankTransactions(w http.ResponseWriter, r *http.Request) {
 func handleDonations(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	templates := []string{"templates/base.html", "templates/partial-listingTabs.html", "templates/partial-donations-searchform.html", "templates/partial-donations-searchresults.html", "templates/donations.html"}
+	templates := []string{"base.html", "partial-listingTabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "donations.html"}
 
 	form := NewSearchDonationsForm()
 	if err := DecodeURLParams(r, form); err != nil {
@@ -390,7 +390,7 @@ func handleDonations(w http.ResponseWriter, r *http.Request) {
 func handleInvoiceDetail(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	templates := []string{"templates/base.html", "templates/partial-listingTabs.html", "templates/partial-donations-tabs.html", "templates/invoice.html"}
+	templates := []string{"base.html", "partial-listingTabs.html", "partial-donations-tabs.html", "invoice.html"}
 
 	vars := mux.Vars(r)
 	if vars == nil {
@@ -482,7 +482,7 @@ func handleBankTransactionDetail(w http.ResponseWriter, r *http.Request) {
 func handlePartialDonationsLinked(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	templates := []string{"templates/partial-donations-tabs.html", "templates/partial-donations-linked.html"}
+	templates := []string{"partial-donations-tabs.html", "partial-donations-linked.html"}
 
 	vars := mux.Vars(r)
 	if vars == nil {
@@ -564,7 +564,7 @@ func handlePartialDonationsLinked(w http.ResponseWriter, r *http.Request) {
 func handlePartialDonationsFind(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
-	templates := []string{"templates/partial-donations-tabs.html", "templates/partial-donations-searchform.html", "templates/partial-donations-searchresults.html", "templates/partial-donations.html"}
+	templates := []string{"partial-donations-tabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "partial-donations.html"}
 
 	vars := mux.Vars(r)
 	if vars == nil {
