@@ -79,6 +79,7 @@ func main() {
 		r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
 		// Intro pages.
+		r.HandleFunc("/", handleRedirectToConnect)
 		r.HandleFunc("/connect", handleConnect)
 		r.HandleFunc("/refresh", handleRefresh)
 		r.HandleFunc("/home", handleHome) // will also serve /invoices
@@ -408,42 +409,6 @@ func handleInvoiceDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 
-	// viewLineItems is a view version of the dbquery.WRLineItem with
-	// non-pointer fields.
-	type viewLineItem struct {
-		AccountCode    string
-		AccountName    string
-		Description    string
-		TaxAmount      float64
-		LineAmount     float64
-		DonationAmount float64
-	}
-
-	newViewLineItems := func(lineItems []dbquery.WRLineItem) []viewLineItem {
-		viewItems := make([]viewLineItem, len(lineItems))
-		for i, li := range lineItems {
-			if li.AccountCode != nil {
-				viewItems[i].AccountCode = *li.AccountCode
-			}
-			if li.AccountName != nil {
-				viewItems[i].AccountName = *li.AccountName
-			}
-			if li.Description != nil {
-				viewItems[i].Description = *li.Description
-			}
-			if li.TaxAmount != nil {
-				viewItems[i].TaxAmount = *li.TaxAmount
-			}
-			if li.LineAmount != nil {
-				viewItems[i].LineAmount = *li.LineAmount
-			}
-			if li.DonationAmount != nil {
-				viewItems[i].DonationAmount = *li.DonationAmount
-			}
-		}
-		return viewItems
-	}
-
 	data := struct {
 		PageTitle string
 		Invoice   dbquery.WRInvoice
@@ -476,9 +441,54 @@ func handleInvoiceDetail(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "invoice", templates, data)
 }
 
-// handleBankTransactionDetail serves the detail page for a single invoice.
+// handleBankTransactionDetail serves the detail page for a single bank
+// transaction.
 func handleBankTransactionDetail(w http.ResponseWriter, r *http.Request) {
-	_, _ = fmt.Fprint(w, "not yet implemented")
+
+	ctx := r.Context()
+	templates := []string{"base.html", "partial-listingTabs.html", "partial-donations-tabs.html", "bank-transaction.html"}
+
+	vars := mux.Vars(r)
+	if vars == nil {
+		log.Printf("error: bank transaction capture (vars: %v)", mux.Vars(r))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+	transactionReference, ok := vars["id"]
+	if !ok {
+		log.Printf("error: id not in mux.Vars (vars: %v)", mux.Vars(r))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+
+	data := struct {
+		PageTitle   string
+		Transaction dbquery.WRTransaction
+		LineItems   []viewLineItem
+		ID          string
+		TabType     string
+	}{
+		PageTitle: fmt.Sprintf("Bank Transaction %s", transactionReference),
+		ID:        transactionReference,
+		TabType:   "link", // by default the donations tab type is "link", not "find"
+	}
+
+	var err error
+	var lineItems []dbquery.WRLineItem
+	data.Transaction, lineItems, err = db.GetTransactionWR(ctx, transactionReference)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("error: database GetTransaction failed: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data.LineItems = newViewLineItems(lineItems)
+
+	// Return a 404 if no bank transaction was found.
+	if errors.Is(err, sql.ErrNoRows) {
+		http.Error(w, fmt.Sprintf("Bank Transaction %q not found", transactionReference), http.StatusNotFound)
+		return
+	}
+
+	renderTemplate(w, "bank-transaction", templates, data)
 }
 
 // handlePartialDonationsLinked is the partial htmx endpoint for
@@ -720,6 +730,44 @@ func newViewDonations(donations []dbquery.Donation) []viewDonation {
 		}
 	}
 	return dv
+}
+
+// viewLineItems is a view version of the dbquery.WRLineItem with
+// non-pointer fields.
+type viewLineItem struct {
+	AccountCode    string
+	AccountName    string
+	Description    string
+	TaxAmount      float64
+	LineAmount     float64
+	DonationAmount float64
+}
+
+// newViewLineItems converts a slice of WRLineItem to a slice of
+// viewLineItem.
+func newViewLineItems(lineItems []dbquery.WRLineItem) []viewLineItem {
+	viewItems := make([]viewLineItem, len(lineItems))
+	for i, li := range lineItems {
+		if li.AccountCode != nil {
+			viewItems[i].AccountCode = *li.AccountCode
+		}
+		if li.AccountName != nil {
+			viewItems[i].AccountName = *li.AccountName
+		}
+		if li.Description != nil {
+			viewItems[i].Description = *li.Description
+		}
+		if li.TaxAmount != nil {
+			viewItems[i].TaxAmount = *li.TaxAmount
+		}
+		if li.LineAmount != nil {
+			viewItems[i].LineAmount = *li.LineAmount
+		}
+		if li.DonationAmount != nil {
+			viewItems[i].DonationAmount = *li.DonationAmount
+		}
+	}
+	return viewItems
 }
 
 // helpers
