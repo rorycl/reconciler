@@ -1,0 +1,61 @@
+---
+# reconciler app combined config
+
+################################################################
+# General settings
+
+database_path: "./reconciliation.db"
+
+################################################################
+# Web server settings
+
+web:
+  templates_path: "./web/templates"
+  static_path: "./web/static"
+  listen_address: "127.0.0.1:8080"
+  dev_mode: true
+
+################################################################
+# Data Settings
+
+data_date_start: "2025-04-01"
+
+donation_account_prefixes:
+  - "53"                                                                  
+  - "55"                                                                  
+  - "57"
+
+################################################################
+# Xero and Salesforce API settings
+
+xero:
+  client_id: "XERO_CLIENT_ID"
+  client_secret: "XERO_CLIENT_SECRET"
+  token_file_path: "./xero_token.json"
+
+salesforce:
+  login_domain: "test.salesforce.com"
+  client_id: "SALESFORCE_CONSUMER_KEY"
+  client_secret: "SALESFORCE_CONSUMER_SECRET"
+  token_file_path: "./sf_token.json"
+
+  # The SOQL query to execute.
+  query: >-
+    SELECT
+      Id, Name, Amount, CloseDate, LastModifiedDate, Payout_Reference__c,
+      StageName, RecordType.Name, Account.Name,
+      CreatedBy.Name, CreatedDate, LastModifiedBy.Name
+    FROM Opportunity
+    WHERE {{.WhereClause}}
+
+  # Optional field mappings for the UI
+  field_mappings:
+    StageName: Stage
+    Account.Name: Account
+    CreatedBy.Name: CreatedBy
+    LastModifiedBy.Name: ModifiedBy
+
+  # Target object and field for Distributed Foreign Key (DFK) updates.
+  linking_object: "Opportunity"
+  linking_field_name: "Payout_Reference__c"
+
