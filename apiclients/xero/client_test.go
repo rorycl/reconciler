@@ -75,6 +75,47 @@ func testPagination[T any](
 	return getFunc(client)
 }
 
+// testNoPagination is a generic test helper for verifying non-paginated API calls.
+func testNoPagination[T any](
+	t *testing.T,
+	endpointPath string,
+	jsonFile string,
+	getFunc func(client *APIClient) (T, error),
+) (T, error) {
+
+	t.Helper()
+
+	mux, client, teardown := setup(t)
+	defer teardown()
+
+	jsonContent, err := os.ReadFile(filepath.Join("testdata", jsonFile))
+	if err != nil {
+		t.Fatalf("failed to read json file %s: %v", jsonFile, err)
+	}
+
+	var callCount int
+	mux.HandleFunc(endpointPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("expected method GET, got %s", r.Method)
+		}
+		// It should not have a "page" query parameter.
+		if r.URL.Query().Get("page") != "" {
+			t.Errorf("unexpected 'page' query parameter found for non-paginated endpoint")
+		}
+
+		callCount++
+		if callCount > 1 {
+			t.Fatalf("handler for non-paginated endpoint called more than once")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(jsonContent)
+	})
+
+	return getFunc(client)
+}
+
 // TestGetInvoices_PaginationAndTermination verifies Invoice API pagination
 // and termination.
 func TestGetInvoices_PaginationAndTermination(t *testing.T) {
@@ -132,12 +173,12 @@ func TestGetAccounts_PaginationAndTermination(t *testing.T) {
 		return client.GetAccounts(context.Background(), time.Time{})
 	}
 
-	accounts, err := testPagination(
+	// Note that the Xero Accounts endpoint does not support pagination.
+	accounts, err := testNoPagination(
 		t,
-		"/Accounts",        // endpoint
-		"accounts.json",    // json file to serve
-		`{"Accounts": []}`, // empty response
-		getAccountsFunc,    // the api function to call
+		"/Accounts",     // endpoint
+		"accounts.json", // json file to serve
+		getAccountsFunc, // the api function to call
 	)
 
 	if err != nil {

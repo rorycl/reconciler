@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"reconciler/config"
+
 	"golang.org/x/oauth2"
 )
 
@@ -17,15 +19,15 @@ var connectionsURL = "https://api.xero.com/connections"
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
 // It attempts to use a saved token first and will refresh it if necessary.
 // If no token exists, it will fail, requiring the user to run the `login` command.
-func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*APIClient, error) {
-	tok, err := loadTokenFromFile(tokenPath)
+func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
+	tok, err := loadTokenFromFile(cfg.Xero.TokenFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("no token file found at '%s'. Please run the 'login' command first", tokenPath)
+		return nil, fmt.Errorf("no token file found at '%s'. Please run 'reconciler login xero' first", cfg.Xero.TokenFilePath)
 	}
 
-	tokenSource := cfg.TokenSource(ctx, tok)
+	tokenSource := cfg.Xero.OAuth2Config.TokenSource(ctx, tok)
 
-	// Check if the token was refreshed and save the new one if it was.
+	// Check if the token was refreshed saving the new one if it was.
 	refreshedToken, err := tokenSource.Token()
 	if err != nil {
 		return nil, fmt.Errorf("failed to refresh token: %w", err)
@@ -33,7 +35,7 @@ func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*APIC
 
 	if refreshedToken.AccessToken != tok.AccessToken {
 		log.Println("Access token was refreshed. Saving new token.")
-		if err := saveTokenToFile(refreshedToken, tokenPath); err != nil {
+		if err := saveTokenToFile(refreshedToken, cfg.Xero.TokenFilePath); err != nil {
 			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
 		}
 	}
@@ -50,12 +52,12 @@ func NewClient(ctx context.Context, cfg *oauth2.Config, tokenPath string) (*APIC
 
 // InitiateLogin starts the interactive OAuth2 flow to get a new token from the web.
 // It saves the new token to the specified path upon success.
-func InitiateLogin(ctx context.Context, cfg *oauth2.Config, tokenPath string) error {
+func InitiateLogin(ctx context.Context, cfg *config.Config) error {
 	tok, err := getNewTokenFromWeb(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get new token: %w", err)
 	}
-	if err := saveTokenToFile(tok, tokenPath); err != nil {
+	if err := saveTokenToFile(tok, cfg.Xero.TokenFilePath); err != nil {
 		return fmt.Errorf("failed to save new token: %w", err)
 	}
 	log.Println("Login successful. Token saved.")
@@ -63,12 +65,12 @@ func InitiateLogin(ctx context.Context, cfg *oauth2.Config, tokenPath string) er
 }
 
 // getNewTokenFromWeb starts a temporary web server to handle the OAuth2 callback.
-func getNewTokenFromWeb(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token, error) {
+func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token, error) {
 	codeChan := make(chan string)
 	errChan := make(chan error)
-	server := &http.Server{Addr: ":8080"}
+	server := &http.Server{Addr: cfg.Web.ListenAddress}
 
-	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc(cfg.Web.XeroCallBack, func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code == "" {
 			errChan <- fmt.Errorf("did not receive authorization code in callback")
@@ -84,7 +86,7 @@ func getNewTokenFromWeb(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token,
 		}
 	}()
 
-	authURL := cfg.AuthCodeURL("state-string", oauth2.AccessTypeOffline)
+	authURL := cfg.Xero.OAuth2Config.AuthCodeURL("state-string", oauth2.AccessTypeOffline)
 	fmt.Printf("\nPlease open this URL in your browser to authorize the application:\n%s\n\n", authURL)
 
 	var authCode string
@@ -93,7 +95,7 @@ func getNewTokenFromWeb(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token,
 		authCode = code
 	case err := <-errChan:
 		return nil, err
-	case <-time.After(5 * time.Minute):
+	case <-time.After(2 * time.Minute):
 		return nil, fmt.Errorf("authentication timed out")
 	}
 
@@ -101,7 +103,7 @@ func getNewTokenFromWeb(ctx context.Context, cfg *oauth2.Config) (*oauth2.Token,
 		log.Printf("Failed to shut down server gracefully: %v", err)
 	}
 
-	tok, err := cfg.Exchange(ctx, authCode)
+	tok, err := cfg.Xero.OAuth2Config.Exchange(ctx, authCode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange authorization code for token: %w", err)
 	}

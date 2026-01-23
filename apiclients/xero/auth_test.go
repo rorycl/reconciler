@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"reconciler/config"
+
 	"golang.org/x/oauth2"
 )
 
@@ -95,20 +97,25 @@ func TestToken_ValidToken(t *testing.T) {
 	// Create temporary token and save to file.
 	tokenPath := filepath.Join(t.TempDir(), "token.json")
 	validToken := &oauth2.Token{
-		AccessToken: "valid-token-123",
+		AccessToken: "valid-token-123",             // todo: fixme
 		Expiry:      time.Now().Add(1 * time.Hour), // not expired
 	}
 	if err := saveTokenToFile(validToken, tokenPath); err != nil {
 		t.Fatal(err)
 	}
 
-	cfg := &oauth2.Config{
-		Endpoint: oauth2.Endpoint{
-			TokenURL: server.URL + "/oauth/token",
+	cfg := &config.Config{
+		Xero: config.XeroConfig{
+			TokenFilePath: tokenPath,
+			OAuth2Config: &oauth2.Config{
+				Endpoint: oauth2.Endpoint{
+					TokenURL: server.URL + "/oauth/token",
+				},
+			},
 		},
 	}
 
-	client, err := NewClient(context.Background(), cfg, tokenPath)
+	client, err := NewClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("NewClient returned an error: %v", err)
 	}
@@ -171,23 +178,29 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 
 	// Create temporary token and save to file.
 	tokenPath := filepath.Join(t.TempDir(), "token.json")
+
 	expiredToken := &oauth2.Token{
 		AccessToken:  "expired-token-000",
 		RefreshToken: "my-refresh-token",
 		Expiry:       time.Now().Add(-1 * time.Hour), // expired
 	}
 	if err := saveTokenToFile(expiredToken, tokenPath); err != nil {
-		t.Fatal(err)
+		t.Fatalf("could not save expired token to temp file %q: %v", tokenPath, err)
 	}
 
-	cfg := &oauth2.Config{
-		Endpoint: oauth2.Endpoint{
-			TokenURL: server.URL + "/oauth/token",
+	cfg := &config.Config{
+		Xero: config.XeroConfig{
+			TokenFilePath: tokenPath,
+			OAuth2Config: &oauth2.Config{
+				Endpoint: oauth2.Endpoint{
+					TokenURL: server.URL + "/oauth/token",
+				},
+			},
 		},
 	}
 
 	// Run NewClient.
-	client, err := NewClient(context.Background(), cfg, tokenPath)
+	client, err := NewClient(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("NewClient returned an error: %v", err)
 	}
