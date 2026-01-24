@@ -1,4 +1,4 @@
-package dbquery
+package db
 
 // This functions.go registers a regexpFunc function as set out in the
 // package docs for modernc.org/sqlite.RegisterFunction and

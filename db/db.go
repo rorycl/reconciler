@@ -33,11 +33,29 @@ type DB struct {
 	accountCodes string
 
 	// Prepared statements.
-	getInvoicesStmt          *parameterizedStmt
+	getInvoicesStmt *parameterizedStmt
+
 	getBankTransactionsStmt  *parameterizedStmt
 	getDonationsStmt         *parameterizedStmt
 	getInvoiceWRStmt         *parameterizedStmt
 	getBankTransactionWRStmt *parameterizedStmt
+
+	account_upsert.sql
+
+	invoice_lis_delete.sql
+	invoice_lis_insert.sql
+	invoice.sql
+	invoices.sql
+	invoice_upsert.sql
+
+	bank_transaction_lis_delete.sql
+	bank_transaction_lis_insert.sql
+	bank_transaction.sql
+	bank_transactions.sql
+	bank_transaction_upsert.sql
+
+	donations.sql
+	opportunity_upsert.sql
 }
 
 // New creates a new connection to an SQLite database at the given path.
