@@ -1,3 +1,4 @@
+-- bank transactions holds Xero bank transactions.
 CREATE TABLE bank_transactions (
     id                  TEXT PRIMARY KEY, -- Using TEXT for UUIDs is common in SQLite
     type                TEXT,
@@ -15,6 +16,8 @@ CREATE TABLE bank_transactions (
     /* reconciliation status relating to donations */
     is_reconciled       INTEGER DEFAULT 0 -- INTEGER 0 for false, 1 for true
 );
+
+-- Xero bank transaction line items.
 CREATE TABLE bank_transaction_line_items (
     id              TEXT PRIMARY KEY,
     transaction_id  TEXT,
@@ -26,6 +29,8 @@ CREATE TABLE bank_transaction_line_items (
     tax_amount      REAL,
     FOREIGN KEY(transaction_id) REFERENCES bank_transactions(id) ON DELETE CASCADE
 );
+
+-- Xero invoices.
 CREATE TABLE invoices (
     id                  TEXT PRIMARY KEY,
     type                TEXT,
@@ -41,6 +46,8 @@ CREATE TABLE invoices (
     /* reconciliation status relating to donations */
     is_reconciled       INTEGER DEFAULT 0 -- INTEGER 0 for false, 1 for true
 );
+
+-- Xero invoice line items.
 CREATE TABLE invoice_line_items (
     id              TEXT PRIMARY KEY,
     invoice_id      TEXT,
@@ -52,6 +59,8 @@ CREATE TABLE invoice_line_items (
     tax_amount      REAL,
     FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
+
+-- Xero accounts.
 CREATE TABLE accounts (
    id             TEXT PRIMARY KEY,
    code           TEXT,
@@ -64,7 +73,10 @@ CREATE TABLE accounts (
    currency_code  TEXT,
    updated_at     DATETIME
 );
-CREATE TABLE salesforce_opportunities (
+
+-- Salesforce opportunities are also known as "donations" when a charity
+-- is using the Salesforce non-profit success pack (NPSP).
+CREATE TABLE donations (
     id                      TEXT PRIMARY KEY,
     name                    TEXT,
     amount                  REAL,

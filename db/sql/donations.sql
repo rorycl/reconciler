@@ -93,7 +93,7 @@ WITH variables AS (
          END AS is_linked
         /* see www.sqlitetutorial.net/sqlite-json-functions/sqlite-json_extract-function/ */
         -- s.additional_fields_json  TEXT -- A JSON blob for all other fields
-    FROM salesforce_opportunities s
+    FROM donations s
         LEFT OUTER JOIN linked_invoices_or_transactions lit ON (
             lit.ref = s.payout_reference_dfk
         )
