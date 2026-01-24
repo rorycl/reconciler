@@ -1,0 +1,117 @@
+{
+  "totalSize": 3,
+  "done": true,
+  "records": [
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB97QAF"
+      },
+      "Id": "006gL00000EsB97QAF",
+      "Name": "Dickenson Mobile Generators",
+      "Amount": 15000.0,
+      "CloseDate": "2025-10-04",
+      "LastModifiedDate": "2025-12-20T20:21:32.000+0000",
+      "Payout_Reference__c": "ENTH-20251112",
+      "StageName": "Qualification",
+      "RecordType": null,
+      "MadeUpValue": "123",
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHxQAN"
+        },
+        "Name": "Dickenson plc"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB98QAF"
+      },
+      "Id": "006gL00000EsB98QAF",
+      "Name": "United Oil Office Portable Generators",
+      "Amount": 125000.0,
+      "CloseDate": "2025-09-22",
+      "LastModifiedDate": "2025-12-20T20:21:50.000+0000",
+      "Payout_Reference__c": "ENTH-20251112",
+      "StageName": "Negotiation/Review",
+      "RecordType": null,
+      "MadeUpValue": "456",
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNHzQAN"
+        },
+        "Name": "United Oil & Gas Corp."
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    },
+    {
+      "attributes": {
+        "type": "Opportunity",
+        "url": "/services/data/v65.0/sobjects/Opportunity/006gL00000EsB99QAF"
+      },
+      "Id": "006gL00000EsB99QAF",
+      "Name": "Express Logistics Standby Generator",
+      "Amount": 220000.0,
+      "CloseDate": "2025-08-18",
+      "LastModifiedDate": "2025-12-20T20:21:50.000+0000",
+      "Payout_Reference__c": "ENTH-20251112",
+      "StageName": "Closed Won",
+      "RecordType": null,
+      "MadeUpValue": "789",
+      "Account": {
+        "attributes": {
+          "type": "Account",
+          "url": "/services/data/v65.0/sobjects/Account/001gL00000WwNI0QAN"
+        },
+        "Name": "Express Logistics and Transport"
+      },
+      "CreatedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000B1Y1JQAV"
+        },
+        "Name": "OrgFarm EPIC"
+      },
+      "CreatedDate": "2025-11-27T10:21:45.000+0000",
+      "LastModifiedBy": {
+        "attributes": {
+          "type": "User",
+          "url": "/services/data/v65.0/sobjects/User/005gL00000BOwSkQAL"
+        },
+        "Name": "Rory Campbell-Lange"
+      }
+    }
+  ]
+}

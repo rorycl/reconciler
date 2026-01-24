@@ -3,6 +3,7 @@ package salesforce
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -149,26 +150,52 @@ func (su *SOQLUnmarshaller) unmarshalAndMapRecord(data []byte) (Record, error) {
 	// Key.Subkey format for specifying second-level fields such as
 	// Account.Name, otherwise the fields are expected to be at the top
 	// level.
+	//
+	// All data from the SOQL query is reported as follows:
+	// * CoreFields are recorded in only those fields
+	// * Mapper field names are renamed in AdditionalFields
+	// * Any other fields are stored in AdditionalFields
 	record.AdditionalFields = make(map[string]any)
-	for originalName, newName := range su.Mapper {
-		if strings.Contains(originalName, ".") {
-			parts := strings.SplitN(originalName, ".", 2)
-			parentKey, childKey := parts[0], parts[1]
-
-			if parent, ok := allFields[parentKey].(map[string]any); ok {
-				if val, exists := parent[childKey]; exists {
-					record.AdditionalFields[newName] = val
-					continue
+	for k, v := range allFields {
+		switch k {
+		// Skip CoreFields by field name, other than for CreatedBy and LastModifiedBy
+		case "ID", "Name", "Amount", "CloseDate", "CreatedDate", "LastModifiedDate",
+			"PayoutReference":
+		// Skip CoreFields by struct tag and not specified above.
+		case "Id":
+		// If in mapper, save under new field name in AdditionalFields
+		// else save in AdditionalFields.
+		default:
+			// Determine if v is a map, if so recurse one level and make a compound key
+			// such as "LastModifiedBy.Name".
+			if subMap, ok := v.(map[string]any); ok {
+				for kk, sm := range subMap {
+					newKey := strings.Join([]string{enTitle(k), enTitle(kk)}, ".")
+					if replacementKey, ok := su.Mapper[newKey]; ok {
+						newKey = replacementKey
+					}
+					record.AdditionalFields[newKey] = sm
 				}
-			}
-		} else {
-			if val, exists := allFields[originalName]; exists {
-				record.AdditionalFields[newName] = val
-				continue
+			} else {
+				newKey := enTitle(k)
+				if replacementKey, ok := su.Mapper[newKey]; ok {
+					newKey = replacementKey
+				}
+				record.AdditionalFields[newKey] = v
 			}
 		}
-		return record, &ErrUnmarshallFieldNotFoundError{originalName, newName}
 	}
+
+	// Check all anticipated mapper values exist in record.
+	for k, v := range su.Mapper {
+		if _, ok := record.AdditionalFields[v]; !ok {
+			return record, &ErrUnmarshallFieldNotFoundError{
+				originalField: k,
+				newField:      v,
+			}
+		}
+	}
+
 	return record, nil
 }
 
@@ -197,4 +224,20 @@ type ErrorDetail struct {
 	Message    string   `json:"message"`
 	Fields     []string `json:"fields"`
 	ErrorCode  string   `json:"errorCode"`
+}
+
+var regexpIsTitle *regexp.Regexp = regexp.MustCompile("^[A-Z]")
+
+// enTitle turns a string into title case (e.g. "Title") if the first letter is not
+// already a capital leter. This means fields such as ErrorCode won't be turned into
+// `Errorcode`.
+func enTitle(s string) string {
+	switch {
+	case regexpIsTitle.MatchString(s):
+		return s
+	case len(s) < 2:
+		return strings.ToTitle(s)
+	default:
+		return string(strings.ToTitle(s)[0]) + s[1:]
+	}
 }
