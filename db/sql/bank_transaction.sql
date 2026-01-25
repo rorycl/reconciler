@@ -1,8 +1,7 @@
 /*
  Reconciler app SQL
  bank_transaction.sql
- detail of a bank transaction with line items and donation total
- started 01 January 2026
+ Detail view of a bank transaction with line items and donation total.
 
  Note @param comments declare a template value for middleware replacement.
  Note do _not_ use colons in sql or comments as it breaks the sqlx parser.

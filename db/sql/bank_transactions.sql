@@ -1,8 +1,7 @@
 /*
  Reconciler app SQL
  bank_transactions.sql
- list of bank transactions with reconciliation status
- started 01 January 2026
+ List view of bank transactions with reconciliation status.
 
  Note @param comments declare a template value for middleware replacement.
  Note do _not_ use colons in sql or comments as it breaks the sqlx parser.

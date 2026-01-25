@@ -1,3 +1,8 @@
+/*
+ SQLite Schema file
+ Tables for Xero and Salesforce data.
+*/
+
 -- bank transactions holds Xero bank transactions.
 CREATE TABLE bank_transactions (
     id                  TEXT PRIMARY KEY, -- Using TEXT for UUIDs is common in SQLite
@@ -83,8 +88,8 @@ CREATE TABLE donations (
     close_date              DATETIME,
     payout_reference_dfk    TEXT,
     created_date            DATETIME,
-    created_by_name         TEXT,
+    created_by              TEXT,
     last_modified_date      DATETIME,
-    last_modified_by_name   TEXT,
-    additional_fields_json  TEXT -- A JSON blob for all other fields
+    last_modified_by        TEXT,
+    additional_fields_json  TEXT -- JSON blob for ancillary fields
 );

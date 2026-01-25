@@ -4,10 +4,12 @@
 -- Financial Year Start: April 1st
 -- Fictional "Today": ~ May 15th, 2025
 -- Current Financial Year for testing: 2025/2026 (starts 2025-04-01)
+--
+-- Note that salesforce "opportunities" are referred to as "donations".
 -- =============================================================================
 
--- Make the script re-runnable by clearing existing data
-DELETE FROM salesforce_opportunities;
+-- Make script re-runnable by deleting existing data.
+DELETE FROM donations;
 DELETE FROM invoice_line_items;
 DELETE FROM invoices;
 DELETE FROM bank_transaction_line_items;
@@ -41,7 +43,7 @@ INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) V
 INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, account_code) VALUES
 ('inv-li-001', 'inv-001', 'Donation for Q1 2025', 500.00, '5501');
 
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-001', 'Example Corp Q1 Donation', 500.00, datetime('2025-04-08'), 'INV-2025-101');
 
 -- -----------------------------------------------------------------------------
@@ -57,7 +59,7 @@ INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, acco
 ('inv-li-002a', 'inv-002', 'Pledged donation via Stripe', 200.00, '5301'),
 ('inv-li-002b', 'inv-002', 'Stripe processing fee', -3.50, '429');
 
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-002', 'Generous Individual Pledge', 200.00, datetime('2025-04-11'), 'INV-2025-102');
 
 -- -----------------------------------------------------------------------------
@@ -106,7 +108,7 @@ INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, acco
 -- Bank Transaction scenario 1
 -- A fully reconciled bank transaction for pagination testing.
 -- represents a weekly payout from a platform like JustGiving.
--- * linked to > 10 sf opportunities.
+-- * linked to > 10 sf donations.
 -- * income split across multiple donation accounts.
 -- * platform fee deducted.
 -- gross donations: 12 donations totaling 355.00
@@ -146,12 +148,12 @@ INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line
 ('bt-li-002b', 'bt-002', 'Stripe Platform Fee', -10.00, '429');
 
 -- reconciled
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-015', 'Online Donation', 100.00, datetime('2025-04-18'), 'STRIPE-PAYOUT-2025-04-20'),
 ('sf-opp-016', 'Social Media Donation', 150.00, datetime('2025-04-19'), 'STRIPE-PAYOUT-2025-04-20');
 
 -- not reconciled
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-017', 'Online Donation 2', 150.00, datetime('2025-04-16'), null),
 ('sf-opp-018', 'Online Donation 3', 50.00, datetime('2025-04-17'), null),
 ('sf-opp-019', 'Social Media Donation 2', 50.00, datetime('2025-04-15'), null);
@@ -186,19 +188,19 @@ INSERT INTO "bank_transactions" (id, reference, status, total, date, contact_nam
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-prev-fy-01a', 'bt-prev-fy-01', 'Donation Payout', 200.00, '5501'),
 ('bt-li-prev-fy-01b', 'bt-prev-fy-01', 'Fee', -10.00, '429');
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-prev-fy-01', 'Old Donation', 200.00, datetime('2025-02-26'), 'JG-PAYOUT-2025-02-28');
 
 -- -----------------------------------------------------------------------------
 -- Salesforce scenario 1
 -- data oddities
 -- -----------------------------------------------------------------------------
--- An opportunity with a "bad" date (date after the payout date)
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+-- An donation with a "bad" date (date after the payout date)
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-odd-01', 'Data Entry Error Donation', 50.00, datetime('2025-06-10'), 'INV-2025-101');
 
--- An unlinked opportunity 
-INSERT INTO "salesforce_opportunities" (id, name, amount, close_date, payout_reference_dfk) VALUES
+-- An unlinked donation 
+INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-odd-02', 'Unlinked Donation', 75.00, datetime('2025-04-30'), null);
 
 COMMIT;

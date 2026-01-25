@@ -1,7 +1,7 @@
 /*
  Reconciler app SQL
  account_upsert.sql
- Insert a Xero Account into the database.
+ Upsert a Xero Account into the database.
 
  Note @param comments declare a template value for middleware replacement.
  Note do _not_ use colons in sql or comments as it breaks the sqlx parser.

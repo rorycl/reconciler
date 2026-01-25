@@ -1,4 +1,4 @@
-package dbquery
+package db
 
 import (
 	"context"
@@ -7,14 +7,32 @@ import (
 	"io/fs"
 	"log"
 	"time"
+	"xerocli/app/xero"
 
 	"github.com/jmoiron/sqlx" // helper library
 	_ "modernc.org/sqlite"    // pure go sqlite driver
 )
 
+// parameterizedStmt describes an sqlFile parsed into an sqlx NamedStmt expecting the
+// provided args.
 type parameterizedStmt struct {
-	namedStatement *sqlx.NamedStmt
-	args           []string
+	sqlFile string
+	args    []string
+	*sqlx.NamedStmt
+}
+
+// verifyArgs determines if the number of arguments provided to a parameterizedStmt is
+// as expected. This check could be more thorough.
+func (p *parameterizedStmt) verifyArgs(args map[string]any) error {
+	if got, want := len(args), len(p.args); got != want {
+		return fmt.Errorf(
+			"argument length to named statement from %q incorrect: got %d want %d",
+			p.sqlFile,
+			got,
+			want,
+		)
+	}
+	return nil
 }
 
 const debug = false
@@ -27,35 +45,28 @@ func logQuery(name, query string, args map[string]any, err error) {
 	log.Printf("sql %s\n: query: %q\nargs: %v\nerror: %v\n", name, query, args, err)
 }
 
-// DB provides a wrapper around the sql.DB connection for application-specific database operations.
+// DB provides a wrapper around the sql.DB connection for application-specific db operations.
 type DB struct {
 	*sqlx.DB
 	accountCodes string
 
 	// Prepared statements.
-	getInvoicesStmt *parameterizedStmt
+	accountUpsertStmt *parameterizedStmt
 
-	getBankTransactionsStmt  *parameterizedStmt
-	getDonationsStmt         *parameterizedStmt
-	getInvoiceWRStmt         *parameterizedStmt
-	getBankTransactionWRStmt *parameterizedStmt
+	invoicesGetStmt     *parameterizedStmt
+	invoiceGetStmt      *parameterizedStmt
+	invoiceUpsertStmt   *parameterizedStmt
+	invoiceLIDeleteStmt *parameterizedStmt
+	invoiceLIInsertStmt *parameterizedStmt
 
-	account_upsert.sql
+	bankTransactionsGetStmt     *parameterizedStmt
+	bankTransactionGetStmt      *parameterizedStmt
+	bankTransactionUpsertStmt   *parameterizedStmt
+	bankTransactionLIDeleteStmt *parameterizedStmt
+	bankTransactionLIInsertStmt *parameterizedStmt
 
-	invoice_lis_delete.sql
-	invoice_lis_insert.sql
-	invoice.sql
-	invoices.sql
-	invoice_upsert.sql
-
-	bank_transaction_lis_delete.sql
-	bank_transaction_lis_insert.sql
-	bank_transaction.sql
-	bank_transactions.sql
-	bank_transaction_upsert.sql
-
-	donations.sql
-	opportunity_upsert.sql
+	donationsGetStmt   *parameterizedStmt
+	donationUpsertStmt *parameterizedStmt
 }
 
 // New creates a new connection to an SQLite database at the given path.
@@ -80,25 +91,65 @@ func New(dbPath string, sqlDir fs.FS, accountCodes string) (*DB, error) {
 	}
 
 	// Prepare all the statements.
-	db.getInvoicesStmt, err = db.prepNamedStatement(sqlDir, "invoices.sql")
+	//
+	// Accounts.
+	db.accountUpsertStmt, err = db.prepNamedStatement(sqlDir, "account_upsert.sql")
 	if err != nil {
-		return nil, fmt.Errorf("invoices statement error: %w", err)
+		return nil, fmt.Errorf("account upsert statement error: %w", err)
 	}
-	db.getBankTransactionsStmt, err = db.prepNamedStatement(sqlDir, "bank_transactions.sql")
+
+	// Invoices.
+	db.invoicesGetStmt, err = db.prepNamedStatement(sqlDir, "invoices.sql")
 	if err != nil {
-		return nil, fmt.Errorf("bank_transactions statement error: %w", err)
+		return nil, fmt.Errorf("get invoices statement error: %w", err)
 	}
-	db.getDonationsStmt, err = db.prepNamedStatement(sqlDir, "donations.sql")
+	db.invoiceGetStmt, err = db.prepNamedStatement(sqlDir, "invoice.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get invoice statement error: %w", err)
+	}
+	db.invoiceUpsertStmt, err = db.prepNamedStatement(sqlDir, "invoice_upsert.sql")
+	if err != nil {
+		return nil, fmt.Errorf("invoice upsert statement error: %w", err)
+	}
+	db.invoiceLIDeleteStmt, err = db.prepNamedStatement(sqlDir, "invoice_lis_delete.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get invoice line item delete statement error: %w", err)
+	}
+	db.invoiceLIInsertStmt, err = db.prepNamedStatement(sqlDir, "invoice_lis_insert.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get invoice line item insert statement error: %w", err)
+	}
+
+	// Bank Transactions.
+	db.bankTransactionsGetStmt, err = db.prepNamedStatement(sqlDir, "bank_transactions.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get bank transactions statement error: %w", err)
+	}
+	db.bankTransactionGetStmt, err = db.prepNamedStatement(sqlDir, "bank_transaction.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get bank transaction statement error: %w", err)
+	}
+	db.bankTransactionUpsertStmt, err = db.prepNamedStatement(sqlDir, "bank_transaction_upsert.sql")
+	if err != nil {
+		return nil, fmt.Errorf("bank transaction upsert statement error: %w", err)
+	}
+	db.bankTransactionLIDeleteStmt, err = db.prepNamedStatement(sqlDir, "bank_transaction_lis_delete.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get bankTransaction line item delete statement error: %w", err)
+	}
+	db.bankTransactionLIInsertStmt, err = db.prepNamedStatement(sqlDir, "bank_transaction_lis_insert.sql")
+	if err != nil {
+		return nil, fmt.Errorf("get bankTransaction line item insert statement error: %w", err)
+	}
+
+	// Donations.
+	db.donationsGetStmt, err = db.prepNamedStatement(sqlDir, "donations.sql")
 	if err != nil {
 		return nil, fmt.Errorf("donations statement error: %w", err)
 	}
-	db.getInvoiceWRStmt, err = db.prepNamedStatement(sqlDir, "invoice.sql")
+	db.donationUpsertStmt, err = db.prepNamedStatement(sqlDir, "donation_upsert.sql")
 	if err != nil {
-		return nil, fmt.Errorf("invoice statement error: %w", err)
-	}
-	db.getBankTransactionWRStmt, err = db.prepNamedStatement(sqlDir, "bank_transaction.sql")
-	if err != nil {
-		return nil, fmt.Errorf("bank_transaction statement error: %w", err)
+		return nil, fmt.Errorf("donation upsert statement error: %w", err)
 	}
 
 	return db, nil
@@ -116,6 +167,7 @@ func (db *DB) prepNamedStatement(fileFS fs.FS, filePath string) (*parameterizedS
 		return nil, fmt.Errorf("could not prepare statement %q: %w", filePath, err)
 	}
 	return &parameterizedStmt{
+		filePath,
 		pQuery,
 		query.Parameters,
 	}, nil
@@ -142,8 +194,7 @@ type Invoice struct {
 func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error) {
 
 	// Set named statement and parameter list.
-	stmt := db.getInvoicesStmt.namedStatement
-	params := db.getInvoicesStmt.args
+	stmt := db.invoicesGetStmt
 
 	// Determine reconciliation status.
 	switch reconciliationStatus {
@@ -155,7 +206,7 @@ func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, date
 		)
 	}
 
-	// Args uses sqlx's named query capability.
+	// namedArgs uses sqlx's named query capability.
 	namedArgs := map[string]any{
 		"DateFrom":             dateFrom.Format("2006-01-02"),
 		"DateTo":               dateTo.Format("2006-01-02"),
@@ -165,12 +216,11 @@ func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, date
 		"HereLimit":            limit,
 		"HereOffset":           offset,
 	}
-	if got, want := len(namedArgs), len(params); got != want {
-		fmt.Println(params)
-		return nil, fmt.Errorf("namedArgs has %d arguments, expected %d", got, want)
+	if err := stmt.verifyArgs(namedArgs); err != nil {
+		return nil
 	}
 
-	// Use sqlx to scan results into the provided slice.
+	// Scan results into the provided slice.
 	var invoices []Invoice
 	err := stmt.SelectContext(ctx, &invoices, namedArgs)
 	logQuery("invoices", stmt.QueryString, namedArgs, err)
@@ -183,6 +233,81 @@ func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, date
 		return nil, sql.ErrNoRows
 	}
 	return invoices, nil
+}
+
+// UpsertInvoices performs a upserts for a slice of Invoices. It replaces all line items
+// for each invoice in the set to ensure consistency.
+func (db *DB) UpsertInvoices(ctx context.Context, invoices []xero.Invoice) error {
+	if len(invoices) == 0 {
+		return nil
+	}
+
+	// Start transaction.
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // no-op after a commit.
+
+	for _, inv := range invoices {
+
+		// Delete any existing line items for this invoice.
+		stmt := db.invoiceLIDeleteStmt
+		namedArgs := map[string]any{
+			"InvoiceID": inv.InvoiceID,
+		}
+		if err := stm.verifyArgs(namedArgs); err != nil {
+			return nil, err
+		}
+		if err := stmt.ExecContext(ctx, namedArgs); err != nil {
+			return fmt.Errorf("failed to delete old line items for invoice %s: %w", inv.InvoiceID, err)
+		}
+
+		// Upsert the invoice record.
+		stmt = db.invoiceUpsertStmt
+		namedArgs := map[string]any{
+			"InvoiceID":     inv.InvoiceID,
+			"Type":          inv.Type,
+			"Status":        inv.Status,
+			"InvoiceNumber": inv.InvoiceNumber,
+			"Reference":     inv.Reference,
+			"Total":         inv.Total,
+			"AmountPaid":    inv.AmountPaid,
+			"Date":          inv.Date.Format("2006-01-02"),
+			"Updated":       inv.Updated.Format("2006-01-02T15:04:05Z"),
+			"ContactID":     inv.Contact.ContactID,
+			"ContactName":   inv.Contact.Name,
+		}
+		if err := stm.verifyArgs(namedArgs); err != nil {
+			return nil, err
+		}
+		if err := stmt.ExecContext(ctx, namedArgs); err != nil {
+			return fmt.Errorf("failed to upsert invoice %s: %w", inv.InvoiceID, err)
+		}
+
+		// Add the related line items for this invoice.
+		for _, line := range inv.LineItems {
+			stmt := db.invoiceLIInsertStmt
+			namedArgs := map[string]any{
+				"LineItemID":  line.LineItemID,
+				"InvoiceID":   inv.InvoiceID,
+				"Description": line.Description,
+				"Quantity":    line.Quantity,
+				"UnitAmount":  line.UnitAmount,
+				"LineAmount":  line.LineAmount,
+				"AccountCode": line.AccountCode,
+				"TaxAmount":   line.TaxAmount,
+			}
+			if err := stm.verifyArgs(namedArgs); err != nil {
+				return nil, err
+			}
+			if err := stmt.ExecContext(ctx, namedArgs); err != nil {
+				return fmt.Errorf("failed to upsert line item %s invoice %s: %w", line.LineItemID, inv.InvoiceID, err)
+			}
+		}
+	}
+
+	return tx.Commit()
 }
 
 // BankTransaction is the concrete type of each row returned by
@@ -206,8 +331,8 @@ type BankTransaction struct {
 func (db *DB) GetBankTransactions(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error) {
 
 	// Set named statement and parameter list.
-	stmt := db.getBankTransactionsStmt.namedStatement
-	params := db.getBankTransactionsStmt.args
+	stmt := db.bankTransactionsGetStmt.namedStatement
+	params := db.bankTransactionsGetStmt.args
 
 	// Determine reconciliation status.
 	switch reconciliationStatus {
@@ -271,8 +396,8 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 	log.Printf("GetDonations %s %s linkage %s <%s> %q", dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02"), linkageStatus, payoutReference, search)
 
 	// Set named statement and parameter list.
-	stmt := db.getDonationsStmt.namedStatement
-	params := db.getDonationsStmt.args
+	stmt := db.donationsGetStmt.namedStatement
+	params := db.donationsGetStmt.args
 
 	// Determine reconciliation status.
 	switch linkageStatus {
@@ -346,8 +471,8 @@ type WRLineItem struct {
 func (db *DB) GetInvoiceWR(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error) {
 
 	// Set named statement and parameter list.
-	stmt := db.getInvoiceWRStmt.namedStatement
-	params := db.getInvoiceWRStmt.args
+	stmt := db.invoiceGetStmt.namedStatement
+	params := db.invoiceGetStmt.args
 
 	// invoiceWithLineItems is the concrete type of each row returned by
 	// GetInvoiceWR.
@@ -415,8 +540,8 @@ type WRTransaction struct {
 func (db *DB) GetTransactionWR(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error) {
 
 	// Set named statement and parameter list.
-	stmt := db.getBankTransactionWRStmt.namedStatement
-	params := db.getBankTransactionWRStmt.args
+	stmt := db.bankTransactionGetStmt.namedStatement
+	params := db.bankTransactionGetStmt.args
 
 	// transactionWithLineItems is the concrete type of each row returned by
 	// GetTransactionWR.

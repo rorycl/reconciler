@@ -1,7 +1,7 @@
 /*
  Reconciler app SQL
- bank_transaction_lis_insert.sql
- Insert a bank transaction line item
+ donation_upsert.sql 
+ Upsert a donation (salesforce opportunity) record.
 
  Note @param comments declare a template value for middleware replacement.
  Note do _not_ use colons in sql or comments as it breaks the sqlx parser.
@@ -27,9 +27,9 @@ INSERT INTO donations (
     ,close_date
     ,payout_reference_dfk
     ,created_date
-    ,created_by_name
+    ,created_by
     ,last_modified_date
-    ,last_modified_by_name
+    ,last_modified_by
     ,additional_fields_json
 )
 SELECT
@@ -54,8 +54,8 @@ ON CONFLICT (id) DO UPDATE SET
     ,close_date             = excluded.close_date
     ,payout_reference_dfk   = excluded.payout_reference_dfk
     ,created_date           = excluded.created_date
-    ,created_by_name        = excluded.created_by_name
+    ,created_by             = excluded.created_by
     ,last_modified_date     = excluded.last_modified_date
-    ,last_modified_by_name  = excluded.last_modified_by_name
+    ,last_modified_by       = excluded.last_modified_by
     ,additional_fields_json = excluded.additional_fields_json
 ;

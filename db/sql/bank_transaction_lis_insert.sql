@@ -1,7 +1,7 @@
 /*
  Reconciler app SQL
  bank_transaction_lis_insert.sql
- Insert a bank transaction line item
+ Insert a bank transaction line item.
 
  Note @param comments declare a template value for middleware replacement.
  Note do _not_ use colons in sql or comments as it breaks the sqlx parser.
@@ -39,7 +39,4 @@ SELECT
     ,v.TaxAmount         
 FROM
     variables v
--- https://sqlite.org/lang_upsert.html PARSING AMBIGUITY
-WHERE
-    true
 ;

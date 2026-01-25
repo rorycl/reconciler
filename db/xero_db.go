@@ -115,63 +115,6 @@ func (db *DB) UpsertBankTransactions(transactions []xero.BankTransaction) error 
 	return tx.Commit()
 }
 
-// UpsertInvoices performs a transactional upsert for a slice of Invoices.
-// It replaces all line items for a given invoice to ensure consistency.
-func (db *DB) UpsertInvoices(invoices []xero.Invoice) error {
-	if len(invoices) == 0 {
-		return nil
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	invStmt, err := tx.PrepareContext(context.Background(), invUpsertSQL)
-	if err != nil {
-		return fmt.Errorf("failed to prepare invoices upsert statement: %w", err)
-	}
-	defer invStmt.Close()
-
-	lineDeleteStmt, err := tx.PrepareContext(context.Background(), invLineDeleteSQL)
-	if err != nil {
-		return fmt.Errorf("failed to prepare line item delete statement: %w", err)
-	}
-	defer lineDeleteStmt.Close()
-
-	lineInsertStmt, err := tx.PrepareContext(context.Background(), invLineInsertSQL)
-	if err != nil {
-		return fmt.Errorf("failed to prepare line item insert statement: %w", err)
-	}
-	defer lineInsertStmt.Close()
-
-	for _, inv := range invoices {
-		if _, err := lineDeleteStmt.ExecContext(context.Background(), inv.InvoiceID); err != nil {
-			return fmt.Errorf("failed to delete old line items for invoice %s: %w", inv.InvoiceID, err)
-		}
-
-		_, err := invStmt.ExecContext(context.Background(),
-			inv.InvoiceID, inv.Type, inv.Status, inv.InvoiceNumber, inv.Reference,
-			inv.Total, inv.AmountPaid, inv.Date, inv.Updated, inv.Contact.ContactID, inv.Contact.Name,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to upsert invoice %s: %w", inv.InvoiceID, err)
-		}
-
-		for _, line := range inv.LineItems {
-			_, err := lineInsertStmt.ExecContext(context.Background(),
-				line.LineItemID, inv.InvoiceID, line.Description, line.Quantity,
-				line.UnitAmount, line.LineAmount, line.AccountCode, line.TaxAmount,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to insert line item %s for invoice %s: %w", line.LineItemID, inv.InvoiceID, err)
-			}
-		}
-	}
-
-	return tx.Commit()
-}
-
 // UpsertAccounts performs a transactional upsert for a slice of Account.
 func (db *DB) UpsertAccounts(accounts []xero.Account) error {
 	if len(accounts) == 0 {

@@ -1,11 +1,10 @@
 /*
  Reconciler app SQL
  donations.sql
- list of donations with linkage status linkage status in this case only
+ List of donations with linkage status linkage status in this case only
  relates to whether the distributed foreign key (DFK) is in both Xero
  invoices or bank transactions, and not just if the payout_reference_dfk
  has a value.
- started 02 January 2026
 
  Note @param comments declare a template value for middleware replacement.
  Note do _not_ use colons in sql or comments as it breaks the sqlx parser.
@@ -81,9 +80,9 @@ WITH variables AS (
         ,s.close_date
         ,s.payout_reference_dfk
         ,s.created_date
-        ,s.created_by_name
+        ,s.created_by
         ,s.last_modified_date
-        ,s.last_modified_by_name 
+        ,s.last_modified_by
         ,COUNT(*) OVER () AS row_count
         ,CASE
             WHEN lit.ref IS NOT NULL THEN
