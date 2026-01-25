@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reconciler/apiclients/xero"
 	"testing"
 	"text/template"
 	"time"
@@ -21,18 +22,95 @@ func ptrBool(b bool) *bool { return &b }
 
 func ptrFloat64(f float64) *float64 { return &f }
 
-// TestInvoicesQuery test the database invoice records.
-func TestInvoicesQuery(t *testing.T) {
-
+// setupTestDB sets up a test database connection.
+func setupTestDB(t *testing.T) *DB {
+	t.Helper()
 	accountCodes := "^(53|55|57)"
-	ctx := context.Background()
-
 	sqlDir := os.DirFS("sql")
 
-	db, err := New("testdata/test.db", sqlDir, accountCodes)
+	testDB, err := New("testdata/test.db", sqlDir, accountCodes)
 	if err != nil {
-		t.Fatalf("db opening error: %v", err)
+		t.Fatalf("testDB opening error: %v", err)
 	}
+	return testDB
+}
+
+// Index:
+// These tests test each testDB.go database funcion.
+//
+// Test01 UpsertAccounts(ctx context.Context, accounts []xero.Account) error
+// Test02 GetInvoices(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error)
+// Test03 UpsertInvoices(ctx context.Context, invoices []xero.Invoice) error
+// Test04 GetBankTransactions(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error)
+// Test05 UpsertBankTransactions(ctx context.Context, transactions []xero.BankTransaction) error
+// Test06 GetDonations(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string, limit, offset int) ([]Donation, error)
+// Test07 GetInvoiceWR(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error)
+// Test08 GetTransactionWR(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error)
+// Test09 UpsertOpportunities(ctx context.Context, donations []salesforce.Donation) error
+
+func Test01_UpsertAccounts(t *testing.T) {
+
+	testDB := setupTestDB(t)
+	ctx := context.Background()
+
+	now := time.Now()
+
+	accounts := []xero.Account{
+		{
+			AccountID:     "7404f143aa1c",
+			Code:          "9987",
+			Name:          "Test Account",
+			Description:   "Go test description",
+			Type:          "AUTHORISED",
+			TaxType:       "Unknown",
+			Status:        "PAID",
+			SystemAccount: "No",
+			CurrencyCode:  "GBP",
+			Updated:       now,
+		},
+		{
+			AccountID:     "7404f143aa1d",
+			Code:          "9986",
+			Name:          "Test Account",
+			Description:   "Go test description",
+			Type:          "AUTHORISED",
+			TaxType:       "Unknown",
+			Status:        "PAID",
+			SystemAccount: "No",
+			CurrencyCode:  "GBP",
+			Updated:       now.Add(1 * time.Hour),
+		},
+	}
+
+	err := testDB.UpsertAccounts(ctx, accounts)
+	if err != nil {
+		t.Errorf("unexpected accounts error: %v", err)
+	}
+
+	var count int
+	err = testDB.GetContext(ctx, &count, "SELECT COUNT(*) FROM accounts WHERE id IN (?, ?)", accounts[0].AccountID, accounts[1].AccountID)
+	if err != nil || count != 2 {
+		t.Errorf("Expected to find 2 accounts after upsert, but got count %d, err: %v", count, err)
+	}
+
+	result, err := testDB.ExecContext(ctx, "DELETE FROM accounts WHERE id IN (?, ?)", accounts[0].AccountID, accounts[1].AccountID)
+	if err != nil {
+		t.Errorf("unexpected error in accounts deletion: %v", err)
+	}
+	rowNo, err := result.RowsAffected()
+	if err != nil {
+		t.Fatalf("could not get rows affected: %v", err)
+	}
+	if got, want := int(rowNo), 2; got != want {
+		t.Errorf("Deleted count got %d want %d", got, want)
+	}
+}
+
+// Test02_InvoicesQuery tests searching the database invoice records.
+func Test02_InvoicesQuery(t *testing.T) {
+
+	testDB := setupTestDB(t)
+	ctx := context.Background()
 
 	tests := []struct {
 		name                 string
@@ -197,7 +275,7 @@ func TestInvoicesQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-			invoices, err := db.GetInvoices(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
+			invoices, err := testDB.GetInvoices(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
 				if err != tt.err {
 					t.Fatalf("got invoices error: %v", err)
@@ -217,18 +295,81 @@ func TestInvoicesQuery(t *testing.T) {
 	}
 }
 
-// TestBankTransactionsQuery tests the database bank transactions.
-func TestBankTransactionsQuery(t *testing.T) {
+// Test03_UpsertInvoices tests upserting invoices.
+func Test03_UpsertInvoices(t *testing.T) {
 
-	accountCodes := "^(53|55|57)"
+	testDB := setupTestDB(t)
 	ctx := context.Background()
 
-	sqlDir := os.DirFS("sql")
-
-	db, err := New("testdata/test.db", sqlDir, accountCodes)
-	if err != nil {
-		t.Fatalf("db opening error: %v", err)
+	invoices := []xero.Invoice{
+		xero.Invoice{
+			Type:          "ACCREC",
+			InvoiceID:     "9fe6d963-fa41",
+			InvoiceNumber: "INV-TEST-01",
+			Contact:       xero.Contact{"c1", "Contact Name"},
+			Date:          time.Now().Add(-2 * time.Hour),
+			Updated:       time.Now(),
+			Status:        "PAID",
+			Reference:     "A reference",
+			Total:         212.20,
+			AmountPaid:    212.20,
+			LineItems: []xero.LineItem{
+				xero.LineItem{
+					Description: "A line item",
+					UnitAmount:  210.20,
+					AccountCode: "5501", // general giving
+					LineItemID:  "9fe6d963-fa41-a",
+					Quantity:    1,
+					TaxAmount:   0,
+					LineAmount:  210.20,
+				},
+				xero.LineItem{
+					Description: "Second line item",
+					UnitAmount:  2.0,
+					AccountCode: "429", // fees
+					LineItemID:  "9fe6d963-fa41-b",
+					Quantity:    1,
+					TaxAmount:   0,
+					LineAmount:  2.0,
+				},
+			},
+		},
 	}
+
+	err := testDB.UpsertInvoices(ctx, invoices)
+	if err != nil {
+		t.Errorf("unexpected invoices error: %v", err)
+	}
+
+	// run a second time.
+	err = testDB.UpsertInvoices(ctx, invoices)
+	if err != nil {
+		t.Errorf("unexpected invoices error: %v", err)
+	}
+
+	var count int
+	err = testDB.GetContext(ctx, &count, "SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = ?", "9fe6d963-fa41")
+	if err != nil || count != 2 {
+		t.Errorf("Expected to find 2 line items after invoice upsert, but got count %d, err: %v", count, err)
+	}
+
+	_, err = testDB.ExecContext(ctx, "DELETE FROM invoices WHERE id = ?", "9fe6d963-fa41")
+	if err != nil {
+		t.Errorf("unexpected error in invoice deletion: %v", err)
+	}
+	count = 0
+	err = testDB.GetContext(ctx, &count, "SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = ?", "9fe6d963-fa41")
+	if err != nil || count != 0 {
+		t.Errorf("Expected to find 0 line items after invoice deletion, but got count %d, err: %v", count, err)
+	}
+
+}
+
+// Test04_BankTransactionsQuery tests searching the database bank transactions.
+func Test04_BankTransactionsQuery(t *testing.T) {
+
+	testDB := setupTestDB(t)
+	ctx := context.Background()
 
 	tests := []struct {
 		name                 string
@@ -370,7 +511,7 @@ func TestBankTransactionsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-			transactions, err := db.GetBankTransactions(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
+			transactions, err := testDB.GetBankTransactions(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
 				if err != tt.err {
 					t.Fatalf("got bank transactions error: %v", err)
@@ -390,18 +531,11 @@ func TestBankTransactionsQuery(t *testing.T) {
 	}
 }
 
-// TestDonationsQuery tests the donation SQL records.
-func TestDonationsQuery(t *testing.T) {
+// Test06_DonationsQuery tests searching the donation SQL records.
+func Test06_DonationsQuery(t *testing.T) {
 
-	accountCodes := "^(53|55|57)"
+	testDB := setupTestDB(t)
 	ctx := context.Background()
-
-	sqlDir := os.DirFS("sql")
-
-	db, err := New("testdata/test.db", sqlDir, accountCodes)
-	if err != nil {
-		t.Fatalf("db opening error: %v", err)
-	}
 
 	tests := []struct {
 		name            string
@@ -577,7 +711,7 @@ func TestDonationsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-			donations, err := db.GetDonations(ctx, tt.dateFrom, tt.dateTo, tt.linkageStatus, tt.payoutReference, tt.searchString, tt.limit, tt.offset)
+			donations, err := testDB.GetDonations(ctx, tt.dateFrom, tt.dateTo, tt.linkageStatus, tt.payoutReference, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
 				if err != tt.err {
 					t.Fatalf("get donations error: %v", err)
@@ -622,16 +756,11 @@ Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
 	parsedTemplate.Execute(os.Stdout, data)
 }
 
-func TestInvoiceWithLineItemsQuery(t *testing.T) {
-	accountCodes := "^(53|55|57)"
+// Test07_InvoiceWithLineItemsQuery tests retrieving an invoice with line items.
+func Test07_InvoiceWithLineItemsQuery(t *testing.T) {
+
+	testDB := setupTestDB(t)
 	ctx := context.Background()
-
-	sqlDir := os.DirFS("sql")
-
-	db, err := New("testdata/test.db", sqlDir, accountCodes)
-	if err != nil {
-		t.Fatalf("db opening error: %v", err)
-	}
 
 	tests := []struct {
 		invoiceID string
@@ -709,7 +838,7 @@ func TestInvoiceWithLineItemsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
 			// Run query
-			invoice, lineItems, err := db.GetInvoiceWR(ctx, tt.invoiceID)
+			invoice, lineItems, err := testDB.GetInvoiceWR(ctx, tt.invoiceID)
 			if err != nil && !errors.Is(tt.err, err) {
 				t.Fatalf("query execute error: %v", err)
 				return
@@ -728,16 +857,12 @@ func TestInvoiceWithLineItemsQuery(t *testing.T) {
 	}
 }
 
-func TestBankTransactionsWithLineItemsQuery(t *testing.T) {
-	accountCodes := "^(53|55|57)"
+// Test08_BankTransactionsWithLineItemsQuery tests retrieving a bank transactions with
+// line items.
+func Test08_BankTransactionsWithLineItemsQuery(t *testing.T) {
+
+	testDB := setupTestDB(t)
 	ctx := context.Background()
-
-	sqlDir := os.DirFS("sql")
-
-	db, err := New("testdata/test.db", sqlDir, accountCodes)
-	if err != nil {
-		t.Fatalf("db opening error: %v", err)
-	}
 
 	tests := []struct {
 		transactionID string
@@ -784,7 +909,7 @@ func TestBankTransactionsWithLineItemsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
 			// Run query
-			transaction, lineItems, err := db.GetTransactionWR(ctx, tt.transactionID)
+			transaction, lineItems, err := testDB.GetTransactionWR(ctx, tt.transactionID)
 			if err != nil && !errors.Is(tt.err, err) {
 				t.Fatalf("query execute error: %v", err)
 				return

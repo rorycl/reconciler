@@ -53,7 +53,7 @@ SELECT
     ,v.BankAccountCode     
 FROM
     variables v
--- https://sqlite.org/lang_upsert.html PARSING AMBIGUITY
+-- sqlite.org/lang_upsert.html PARSING AMBIGUITY
 WHERE
     true
 ON CONFLICT (id) DO UPDATE SET

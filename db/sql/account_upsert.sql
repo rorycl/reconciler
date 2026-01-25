@@ -14,7 +14,7 @@ WITH variables AS (
          ,'Arbitrary Too'             AS Name          /* @param */
          ,'Another Arbitrary Account' AS Description   /* @param */
          ,'LIABILITY'                 AS Type          /* @param */
-         , null                       AS TaxType       /* @param */
+         ,''                          AS TaxType       /* @param */
          ,'ACTIvE'                    AS Status        /* @param */
          ,'false'                     AS SystemAccount /* @param */
          ,'GBP'                       AS CurrencyCode  /* @param */
@@ -46,7 +46,7 @@ SELECT
     ,v.Updated      
 FROM
     variables v
--- https://sqlite.org/lang_upsert.html PARSING AMBIGUITY
+-- sqlite.org/lang_upsert.html PARSING AMBIGUITY
 WHERE
     true
 ON CONFLICT (id) DO UPDATE SET

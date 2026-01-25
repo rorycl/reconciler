@@ -90,7 +90,7 @@ type Contact struct {
 	Name      string `json:"Name"`
 }
 
-// LineItem represents a single line in a transaction, crucial for splits.
+// LineItem represents a single line in a transaction or invoice, crucial for splits.
 type LineItem struct {
 	Description string  `json:"Description"`
 	UnitAmount  float64 `json:"UnitAmount"`
