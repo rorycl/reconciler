@@ -50,7 +50,9 @@ func (st *SalesforceTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// UnmarshalJSON implements the json.Unmarshaler interface.
+// UnmarshalJSON implements the json.Unmarshaler interface for a FlattenedName,
+// extracting the "Name" field of the object pointed to by the struct tag into the
+// string field.
 func (fn *FlattenedName) UnmarshalJSON(data []byte) error {
 	// Handle the case of a JSON null value.
 	if string(data) == "null" {
