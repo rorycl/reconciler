@@ -103,9 +103,7 @@ type LineItem struct {
 
 // BankAccount represents the bank account for the transaction.
 type BankAccount struct {
-	AccountID string `json:"AccountID"`
-	Code      string `json:"Code,omitempty"`
-	Name      string `json:"Name"`
+	Name string `json:"Name"`
 }
 
 // InvoiceResponse is the top-level structure of the /Invoices API response.
