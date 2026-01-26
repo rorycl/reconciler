@@ -5,15 +5,13 @@ package db
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"reconciler/apiclients/salesforce"
 	"reconciler/apiclients/xero"
 	"time"
 )
 
-// UpsertAccounts upserts Xero account records.
-func (db *DB) UpsertAccounts(ctx context.Context, accounts []xero.Account) error {
+// AccountsUpsert upserts Xero account records.
+func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error {
 	if len(accounts) == 0 {
 		return nil
 	}
@@ -50,7 +48,7 @@ func (db *DB) UpsertAccounts(ctx context.Context, accounts []xero.Account) error
 	return tx.Commit()
 }
 
-// Invoice is the concrete type of each row returned by GetInvoices.
+// Invoice is the concrete type of each row returned by InvoicesGet.
 type Invoice struct {
 	InvoiceID     string    `db:"id"`
 	InvoiceNumber string    `db:"invoice_number"`
@@ -66,9 +64,9 @@ type Invoice struct {
 	// AmountPaid     float64    `json:"AmountPaid"`
 }
 
-// GetInvoices gets invoices with summed up line item and donation
+// InvoicesGet gets invoices with summed up line item and donation
 // values. It isn't necessary to run this query in a transaction.
-func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error) {
+func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error) {
 
 	// Set named statement and parameter list.
 	stmt := db.invoicesGetStmt
@@ -112,9 +110,9 @@ func (db *DB) GetInvoices(ctx context.Context, reconciliationStatus string, date
 	return invoices, nil
 }
 
-// UpsertInvoices performs a upserts for a slice of Invoices. It replaces all line items
+// InvoicesUpsert performs a upserts for a slice of Invoices. It replaces all line items
 // for each invoice in the set to ensure consistency.
-func (db *DB) UpsertInvoices(ctx context.Context, invoices []xero.Invoice) error {
+func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error {
 	if len(invoices) == 0 {
 		return nil
 	}
@@ -190,7 +188,7 @@ func (db *DB) UpsertInvoices(ctx context.Context, invoices []xero.Invoice) error
 }
 
 // BankTransaction is the concrete type of each row returned by
-// GetBankTransactions.
+// BankTransactionsGet.
 type BankTransaction struct {
 	ID            string    `db:"id"`
 	Reference     string    `db:"reference"`
@@ -205,9 +203,9 @@ type BankTransaction struct {
 	// AmountPaid     float64    `json:"AmountPaid"`
 }
 
-// GetBankTransactions gets bank transactions with summed up line item
+// BankTransactionsGet gets bank transactions with summed up line item
 // and donation values. It isn't necessary to run this query in a transaction.
-func (db *DB) GetBankTransactions(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error) {
+func (db *DB) BankTransactionsGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error) {
 
 	// Set named statement and parameter list.
 	stmt := db.bankTransactionsGetStmt
@@ -251,10 +249,10 @@ func (db *DB) GetBankTransactions(ctx context.Context, reconciliationStatus stri
 	return transactions, nil
 }
 
-// UpsertBankTransactions performs upserts for a slice of BankTransactions. It replaces
+// BankTransactionsUpsert performs upserts for a slice of BankTransactions. It replaces
 // all line items for each Bank Transaction (transaction) in the set to ensure
 // consistency.
-func (db *DB) UpsertBankTransactions(ctx context.Context, transactions []xero.BankTransaction) error {
+func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error {
 	if len(transactions) == 0 {
 		return nil
 	}
@@ -356,16 +354,16 @@ type WRLineItem struct {
 	DonationAmount *float64 `db:"li_donation_amount"`
 }
 
-// GetInvoiceWR (a wide rows query) retrieves a single invoice from
+// InvoiceWRGet (a wide rows query) retrieves a single invoice from
 // the database with it's constituent line items. This query returns
 // rows for each line item.
-func (db *DB) GetInvoiceWR(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error) {
+func (db *DB) InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error) {
 
 	// Set named statement and parameter list.
 	stmt := db.invoiceGetStmt
 
 	// invoiceWithLineItems is the concrete type of each row returned by
-	// GetInvoiceWR.
+	// InvoiceWRGet.
 	type invoiceWithLineItems struct {
 		WRInvoice
 		WRLineItem
@@ -424,16 +422,16 @@ type WRTransaction struct {
 	IsReconciled     bool      `db:"is_reconciled"`
 }
 
-// GetTransactionWR (a wide rows query) retrieves a single bank transaction
+// BankTransactionWRGet (a wide rows query) retrieves a single bank transaction
 // (transaction) from the database with it's constituent line items. This query returns
 // rows for each line item.
-func (db *DB) GetTransactionWR(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error) {
+func (db *DB) BankTransactionWRGet(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error) {
 
 	// Set named statement and parameter list.
 	stmt := db.bankTransactionGetStmt
 
 	// transactionWithLineItems is the concrete type of each row returned by
-	// GetTransactionWR.
+	// BankTransactionWRGet.
 	type transactionWithLineItems struct {
 		WRTransaction
 		WRLineItem
@@ -474,52 +472,4 @@ func (db *DB) GetTransactionWR(ctx context.Context, transactionID string) (WRTra
 		lineItems[i] = li.WRLineItem
 	}
 	return transaction, lineItems, nil
-}
-
-// UpsertOpportunities performs a transactional upsert for a slice of Salesforce Records
-// into the donations table.
-func (db *DB) UpsertOpportunities(ctx context.Context, donations []salesforce.Donation) error {
-	if len(donations) == 0 {
-		return nil
-	}
-
-	// Begin Transaction.
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback() // no-op if commit succeeds.
-
-	stmt := db.donationUpsertStmt
-
-	for _, dnt := range donations {
-		additionalFieldsJSON, err := json.Marshal(dnt.AdditionalFields)
-		if err != nil {
-			return fmt.Errorf("failed to marshal additional fields for donation %s: %w", dnt.ID, err)
-		}
-
-		// namedArgs uses sqlx's named query capability.
-		namedArgs := map[string]any{
-			"ID":                   dnt.ID,
-			"Name":                 dnt.Name,
-			"Amount":               dnt.Amount,
-			"CloseDate":            dnt.CloseDate.Time,
-			"PayoutReference":      dnt.PayoutReference,
-			"CreatedDate":          dnt.CreatedDate.Time,
-			"CreatedBy":            dnt.CreatedBy,
-			"LastModifiedDate":     dnt.LastModifiedDate.Time,
-			"LastModifiedBy":       dnt.LastModifiedBy,
-			"AdditionalFieldsJSON": string(additionalFieldsJSON),
-		}
-		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return err
-		}
-
-		_, err = stmt.ExecContext(ctx, namedArgs)
-		if err != nil {
-			return fmt.Errorf("failed to upsert donation %s: %w", dnt.ID, err)
-		}
-	}
-
-	return tx.Commit()
 }

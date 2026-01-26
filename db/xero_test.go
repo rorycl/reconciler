@@ -19,15 +19,15 @@ import (
 // Index:
 // These tests test each testDB.go database funcion.
 //
-// Test01 UpsertAccounts(ctx context.Context, accounts []xero.Account) error
-// Test02 GetInvoices(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error)
-// Test03 UpsertInvoices(ctx context.Context, invoices []xero.Invoice) error
-// Test04 GetBankTransactions(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error)
-// Test05 UpsertBankTransactions(ctx context.Context, transactions []xero.BankTransaction) error
-// Test07 GetInvoiceWR(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error)
-// Test08 GetTransactionWR(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error)
+// Test01 AccountsUpsert(ctx context.Context, accounts []xero.Account) error
+// Test02 InvoicesGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error)
+// Test03 InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
+// Test04 BankTransactionsGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error)
+// Test05 BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error
+// Test07 InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error)
+// Test08 BankTransactionWRGet(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error)
 
-func Test01_UpsertAccounts(t *testing.T) {
+func Test01_AccountsUpsert(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -62,7 +62,7 @@ func Test01_UpsertAccounts(t *testing.T) {
 		},
 	}
 
-	err := testDB.UpsertAccounts(ctx, accounts)
+	err := testDB.AccountsUpsert(ctx, accounts)
 	if err != nil {
 		t.Errorf("unexpected accounts error: %v", err)
 	}
@@ -256,7 +256,7 @@ func Test02_InvoicesQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-			invoices, err := testDB.GetInvoices(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
+			invoices, err := testDB.InvoicesGet(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
 				if err != tt.err {
 					t.Fatalf("got invoices error: %v", err)
@@ -276,8 +276,8 @@ func Test02_InvoicesQuery(t *testing.T) {
 	}
 }
 
-// Test03_UpsertInvoices tests upserting invoices.
-func Test03_UpsertInvoices(t *testing.T) {
+// Test03_InvoicesUpsert tests upserting invoices.
+func Test03_InvoicesUpsert(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -318,13 +318,13 @@ func Test03_UpsertInvoices(t *testing.T) {
 		},
 	}
 
-	err := testDB.UpsertInvoices(ctx, invoices)
+	err := testDB.InvoicesUpsert(ctx, invoices)
 	if err != nil {
 		t.Errorf("unexpected invoices error: %v", err)
 	}
 
 	// run a second time.
-	err = testDB.UpsertInvoices(ctx, invoices)
+	err = testDB.InvoicesUpsert(ctx, invoices)
 	if err != nil {
 		t.Errorf("unexpected invoices error: %v", err)
 	}
@@ -494,7 +494,7 @@ func Test04_BankTransactionsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-			transactions, err := testDB.GetBankTransactions(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
+			transactions, err := testDB.BankTransactionsGet(ctx, tt.reconciliationStatus, tt.dateFrom, tt.dateTo, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
 				if err != tt.err {
 					t.Fatalf("got bank transactions error: %v", err)
@@ -514,9 +514,9 @@ func Test04_BankTransactionsQuery(t *testing.T) {
 	}
 }
 
-// Test05 UpsertBankTransactions(ctx context.Context, transactions []xero.BankTransaction) error
+// Test05 BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error
 // Todo: remove bank account data except for name.
-func Test05_UpsertBankTransactions(t *testing.T) {
+func Test05_BankTransactionsUpsert(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -548,13 +548,13 @@ func Test05_UpsertBankTransactions(t *testing.T) {
 		},
 	}
 
-	err := testDB.UpsertBankTransactions(ctx, transactions)
+	err := testDB.BankTransactionsUpsert(ctx, transactions)
 	if err != nil {
 		t.Fatalf("could not upsert bank transactions: %v", err)
 	}
 
 	// run again
-	err = testDB.UpsertBankTransactions(ctx, transactions)
+	err = testDB.BankTransactionsUpsert(ctx, transactions)
 	if err != nil {
 		t.Fatalf("could not upsert bank transactions for the second time: %v", err)
 	}
@@ -660,7 +660,7 @@ func Test07_InvoiceWithLineItemsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
 			// Run query
-			invoice, lineItems, err := testDB.GetInvoiceWR(ctx, tt.invoiceID)
+			invoice, lineItems, err := testDB.InvoiceWRGet(ctx, tt.invoiceID)
 			if err != nil && !errors.Is(tt.err, err) {
 				t.Fatalf("query execute error: %v", err)
 				return
@@ -732,7 +732,7 @@ func Test08_BankTransactionsWithLineItemsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
 			// Run query
-			transaction, lineItems, err := testDB.GetTransactionWR(ctx, tt.transactionID)
+			transaction, lineItems, err := testDB.BankTransactionWRGet(ctx, tt.transactionID)
 			if err != nil && !errors.Is(tt.err, err) {
 				t.Fatalf("query execute error: %v", err)
 				return

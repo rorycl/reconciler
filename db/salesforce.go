@@ -16,7 +16,7 @@ import (
 )
 
 // Donation is the concrete type of each row returned by
-// GetDonations
+// DonationsGet
 type Donation struct {
 	ID              string     `db:"id"`
 	Name            string     `db:"name"`
@@ -31,11 +31,11 @@ type Donation struct {
 	RowCount        int        `db:"row_count"`
 }
 
-// GetDonations retrieves donations from the database with the specified
+// DonationsGet retrieves donations from the database with the specified
 // filters.
-func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string, limit, offset int) ([]Donation, error) {
+func (db *DB) DonationsGet(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string, limit, offset int) ([]Donation, error) {
 
-	log.Printf("GetDonations %s %s linkage %s <%s> %q", dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02"), linkageStatus, payoutReference, search)
+	log.Printf("DonationsGet %s %s linkage %s <%s> %q", dateFrom.Format("2006-01-02"), dateTo.Format("2006-01-02"), linkageStatus, payoutReference, search)
 
 	// Set named statement and parameter list.
 	stmt := db.donationsGetStmt

@@ -13,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// Test06 GetDonations(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string, limit, offset int) ([]Donation, error)
+// Test06 DonationsGet(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string, limit, offset int) ([]Donation, error)
 // Test09 UpsertDonations(ctx context.Context, donations []salesforce.Donation) error
 
 // Test06_DonationsQuery tests searching the donation SQL records.
@@ -197,7 +197,7 @@ func Test06_DonationsQuery(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-			donations, err := testDB.GetDonations(ctx, tt.dateFrom, tt.dateTo, tt.linkageStatus, tt.payoutReference, tt.searchString, tt.limit, tt.offset)
+			donations, err := testDB.DonationsGet(ctx, tt.dateFrom, tt.dateTo, tt.linkageStatus, tt.payoutReference, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
 				if err != tt.err {
 					t.Fatalf("get donations error: %v", err)
