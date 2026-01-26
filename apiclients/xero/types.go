@@ -41,17 +41,17 @@ type BankTransactionsResponse struct {
 
 // BankTransaction represents a single bank transaction record.
 type BankTransaction struct {
-	Type              string      `json:"Type"`
-	Contact           Contact     `json:"Contact"`
-	LineItems         []LineItem  `json:"LineItems"`
-	BankAccount       BankAccount `json:"BankAccount"`
 	BankTransactionID string      `json:"BankTransactionID"`
-	IsReconciled      bool        `json:"IsReconciled"`
-	DateString        string      `json:"DateString"`
+	Type              string      `json:"Type"`
 	Reference         string      `json:"Reference"`
+	Contact           Contact     `json:"Contact"`
+	BankAccount       BankAccount `json:"BankAccount"`
+	UpdatedDateUTC    string      `json:"UpdatedDateUTC"`
+	DateString        string      `json:"DateString"`
+	IsReconciled      bool        `json:"IsReconciled"`
 	Status            string      `json:"Status"`
 	Total             float64     `json:"Total"`
-	UpdatedDateUTC    string      `json:"UpdatedDateUTC"`
+	LineItems         []LineItem  `json:"LineItems"`
 
 	Date    time.Time `json:"-"`
 	Updated time.Time `json:"-"`
@@ -115,8 +115,8 @@ type InvoiceResponse struct {
 
 // Invoice represents a single invoice record.
 type Invoice struct {
-	Type           string     `json:"Type"`
 	InvoiceID      string     `json:"InvoiceID"`
+	Type           string     `json:"Type"`
 	InvoiceNumber  string     `json:"InvoiceNumber"`
 	Contact        Contact    `json:"Contact"`
 	LineItems      []LineItem `json:"LineItems"`

@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"reconciler/apiclients/salesforce"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // Test06 GetDonations(ctx context.Context, dateFrom, dateTo time.Time, linkageStatus, payoutReference, search string, limit, offset int) ([]Donation, error)
-// Test09 UpsertOpportunities(ctx context.Context, donations []salesforce.Donation) error
+// Test09 UpsertDonations(ctx context.Context, donations []salesforce.Donation) error
 
 // Test06_DonationsQuery tests searching the donation SQL records.
 func Test06_DonationsQuery(t *testing.T) {
@@ -217,4 +218,76 @@ func Test06_DonationsQuery(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test09_UpsertDonations tests upserting donations into the database.
+func Test09_UpsertDonations(t *testing.T) {
+
+	testDB, closeDB := setupTestDB(t)
+	t.Cleanup(closeDB)
+	ctx := context.Background()
+
+	donations := []salesforce.Donation{
+		salesforce.Donation{
+			CoreFields: salesforce.CoreFields{
+				ID:               "fb8b156f",
+				Name:             "A test donation",
+				Amount:           0.99,
+				CloseDate:        salesforce.SalesforceDate{time.Now().Add(48 * time.Hour)},
+				CreatedDate:      salesforce.SalesforceTime{time.Now()},
+				LastModifiedDate: salesforce.SalesforceTime{time.Now()},
+				CreatedBy:        "An Admin User",
+				LastModifiedBy:   "Another Admin User",
+				PayoutReference:  ptrStr("TEST-123"),
+			},
+			AdditionalFields: map[string]any{
+				"label":         "one",
+				"another label": 2,
+			},
+		},
+		salesforce.Donation{
+			CoreFields: salesforce.CoreFields{
+				ID:               "57144a9d",
+				Name:             "Another test donation",
+				Amount:           0.98,
+				CloseDate:        salesforce.SalesforceDate{time.Now().Add(12 * time.Hour)},
+				CreatedDate:      salesforce.SalesforceTime{time.Now()},
+				LastModifiedDate: salesforce.SalesforceTime{time.Now()},
+				CreatedBy:        "Another Admin User",
+				LastModifiedBy:   "A Admin User",
+				PayoutReference:  ptrStr("TEST-345"),
+			},
+			AdditionalFields: map[string]any{
+				"label":         "one",
+				"another label": 2,
+			},
+		},
+	}
+
+	err := testDB.UpsertDonations(ctx, donations)
+	if err != nil {
+		t.Fatalf("was unable to upsert donations: %v", err)
+	}
+
+	err = testDB.UpsertDonations(ctx, donations)
+	if err != nil {
+		t.Fatalf("was unable to upsert donations for a second time: %v", err)
+	}
+
+	result, err := testDB.ExecContext(
+		ctx,
+		"DELETE FROM donations WHERE id IN (?, ?);",
+		"fb8b156f", "57144a9d",
+	)
+	if err != nil {
+		t.Fatalf("unable to delete donation records: %v", err)
+	}
+	rowNo, err := result.RowsAffected()
+	if err != nil {
+		t.Fatalf("could not get rows affected: %v", err)
+	}
+	if got, want := int(rowNo), 2; got != want {
+		t.Errorf("got %d deleted rows, want %d", got, want)
+	}
+
 }

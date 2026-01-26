@@ -514,26 +514,71 @@ func Test04_BankTransactionsQuery(t *testing.T) {
 	}
 }
 
-// printInvoiceLineItems is an invoice helper template print function.
-func printInvoiceLineItems(t *testing.T, invoice WRInvoice, lineItems []WRLineItem) {
-	t.Helper()
-	tpl := `template output:
-Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
-	{{- range .LineItems}}
-	Line item: {{ .AccountName }} {{ .LineAmount }}
-	{{- end }}
-`
-	t1 := template.New("t1")
-	parsedTemplate, err := t1.Parse(tpl)
-	if err != nil {
-		t.Fatal(err)
+// Test05 UpsertBankTransactions(ctx context.Context, transactions []xero.BankTransaction) error
+// Todo: remove bank account data except for name.
+func Test05_UpsertBankTransactions(t *testing.T) {
+
+	testDB, closeDB := setupTestDB(t)
+	t.Cleanup(closeDB)
+	ctx := context.Background()
+
+	transactions := []xero.BankTransaction{
+		xero.BankTransaction{
+			BankTransactionID: "27104cb7-fac4",
+			Type:              "RECEIVE",
+			Contact:           xero.Contact{"c2", "Contact Name2"},
+			IsReconciled:      true, // most transactions will be
+			Reference:         "TEST-REF-20251101",
+			Status:            "AUTHORISED", // or DELETED
+			Date:              time.Now(),
+			Updated:           time.Now(),
+			Total:             20.00,
+			BankAccount: xero.BankAccount{
+				AccountID: "123456789",
+				Code:      "code",
+				Name:      "current",
+			},
+			LineItems: []xero.LineItem{
+				xero.LineItem{
+					Description: "bank transaction line item",
+					AccountCode: "9999",
+					LineItemID:  "5f117b7b",
+					UnitAmount:  20.00,
+					Quantity:    1,
+					TaxAmount:   0,
+					LineAmount:  20.00,
+				},
+			},
+		},
 	}
 
-	data := map[string]any{
-		"Invoice":   invoice,
-		"LineItems": lineItems,
+	err := testDB.UpsertBankTransactions(ctx, transactions)
+	if err != nil {
+		t.Fatalf("could not upsert bank transactions: %v", err)
 	}
-	parsedTemplate.Execute(os.Stdout, data)
+
+	// run again
+	err = testDB.UpsertBankTransactions(ctx, transactions)
+	if err != nil {
+		t.Fatalf("could not upsert bank transactions for the second time: %v", err)
+	}
+
+	var count int
+	err = testDB.GetContext(ctx, &count, "SELECT COUNT(*) FROM bank_transaction_line_items WHERE transaction_id = ?", "27104cb7-fac4")
+	if err != nil || count != 1 {
+		t.Errorf("Expected to find 1 line items after bank transaction upsert, but got count %d, err: %v", count, err)
+	}
+
+	_, err = testDB.ExecContext(ctx, "DELETE FROM bank_transactions WHERE id = ?", "9fe6d963-fa41")
+	if err != nil {
+		t.Errorf("unexpected error in invoice deletion: %v", err)
+	}
+	count = 0
+	err = testDB.GetContext(ctx, &count, "SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = ?", "27104cb7-fac4")
+	if err != nil || count != 0 {
+		t.Errorf("Expected to find 0 line items after bank transaction cascade deletion, but got count %d, err: %v", count, err)
+	}
+
 }
 
 // Test07_InvoiceWithLineItemsQuery tests retrieving an invoice with line items.
@@ -708,4 +753,26 @@ func Test08_BankTransactionsWithLineItemsQuery(t *testing.T) {
 
 		})
 	}
+}
+
+// printInvoiceLineItems is an invoice helper template print function.
+func printInvoiceLineItems(t *testing.T, invoice WRInvoice, lineItems []WRLineItem) {
+	t.Helper()
+	tpl := `template output:
+Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
+	{{- range .LineItems}}
+	Line item: {{ .AccountName }} {{ .LineAmount }}
+	{{- end }}
+`
+	t1 := template.New("t1")
+	parsedTemplate, err := t1.Parse(tpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data := map[string]any{
+		"Invoice":   invoice,
+		"LineItems": lineItems,
+	}
+	parsedTemplate.Execute(os.Stdout, data)
 }

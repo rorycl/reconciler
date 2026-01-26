@@ -8,8 +8,10 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"reconciler/apiclients/salesforce"
 	"time"
 )
 
@@ -74,4 +76,53 @@ func (db *DB) GetDonations(ctx context.Context, dateFrom, dateTo time.Time, link
 		return nil, sql.ErrNoRows
 	}
 	return donations, nil
+}
+
+// UpsertDonations upserts donations records into the database.
+func (db *DB) UpsertDonations(ctx context.Context, donations []salesforce.Donation) error {
+	if len(donations) == 0 {
+		return nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // no-op after commit.
+
+	stmt := db.donationUpsertStmt
+
+	for _, dnt := range donations {
+		additionalFieldsJSON, err := json.Marshal(dnt.AdditionalFields)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to marshal additional fields for donation %s: %w",
+				dnt.ID,
+				err,
+			)
+		}
+
+		namedArgs := map[string]any{
+			"ID":                   dnt.ID,
+			"Name":                 dnt.Name,
+			"Amount":               dnt.Amount,
+			"CloseDate":            dnt.CloseDate.Time,
+			"PayoutReference":      dnt.PayoutReference,
+			"CreatedDate":          dnt.CreatedDate.Time,
+			"CreatedBy":            dnt.CreatedBy,
+			"LastModifiedDate":     dnt.LastModifiedDate.Time,
+			"LastModifiedBy":       dnt.LastModifiedBy,
+			"AdditionalFieldsJSON": string(additionalFieldsJSON),
+		}
+
+		if err := stmt.verifyArgs(namedArgs); err != nil {
+			return err
+		}
+		_, err = stmt.ExecContext(ctx, namedArgs)
+		if err != nil {
+			logQuery("upsert donations", stmt, namedArgs, err)
+			return fmt.Errorf("failed to upsert donation %s: %w", dnt.ID, err)
+		}
+	}
+	return tx.Commit()
 }
