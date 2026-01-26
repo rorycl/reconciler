@@ -55,7 +55,7 @@ type Invoice struct {
 	InvoiceID     string    `db:"id"`
 	InvoiceNumber string    `db:"invoice_number"`
 	Date          time.Time `db:"date"`
-	ContactName   string    `db:"contact_name"`
+	Contact       string    `db:"contact"`
 	Status        string    `db:"status"`
 	Total         float64   `db:"total"`
 	DonationTotal float64   `db:"donation_total"`
@@ -153,8 +153,7 @@ func (db *DB) UpsertInvoices(ctx context.Context, invoices []xero.Invoice) error
 			"AmountPaid":    inv.AmountPaid,
 			"Date":          inv.Date.Format("2006-01-02"),
 			"Updated":       inv.Updated.Format("2006-01-02T15:04:05Z"),
-			"ContactID":     inv.Contact.ContactID,
-			"ContactName":   inv.Contact.Name,
+			"Contact":       inv.Contact,
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
 			return err
@@ -196,7 +195,7 @@ type BankTransaction struct {
 	ID            string    `db:"id"`
 	Reference     string    `db:"reference"`
 	Date          time.Time `db:"date"`
-	ContactName   string    `db:"contact_name"`
+	Contact       string    `db:"contact"`
 	Status        string    `db:"status"`
 	Total         float64   `db:"total"`
 	DonationTotal float64   `db:"donation_total"`
@@ -285,19 +284,16 @@ func (db *DB) UpsertBankTransactions(ctx context.Context, transactions []xero.Ba
 		// Upsert the new bank transaction.
 		stmt = db.bankTransactionUpsertStmt
 		namedArgs = map[string]any{
-			"BankTransactionID":    tr.BankTransactionID,
-			"Type":                 tr.Type,
-			"Status":               tr.Status,
-			"Reference":            tr.Reference,
-			"Total":                tr.Total,
-			"IsReconciled":         tr.IsReconciled,
-			"Date":                 tr.Date.Format("2006-01-02"),
-			"Updated":              tr.Updated.Format("2006-01-02T15:04:05Z"),
-			"ContactID":            tr.Contact.ContactID,
-			"ContactName":          tr.Contact.Name,
-			"BankAccountAccountID": tr.BankAccount.AccountID,
-			"BankAccountName":      tr.BankAccount.Name,
-			"BankAccountCode":      tr.BankAccount.Code,
+			"BankTransactionID": tr.BankTransactionID,
+			"Type":              tr.Type,
+			"Status":            tr.Status,
+			"Reference":         tr.Reference,
+			"Total":             tr.Total,
+			"IsReconciled":      tr.IsReconciled,
+			"Date":              tr.Date.Format("2006-01-02"),
+			"Updated":           tr.Updated.Format("2006-01-02T15:04:05Z"),
+			"Contact":           tr.Contact,
+			"BankAccount":       tr.BankAccount,
 		}
 
 		_, err = stmt.ExecContext(ctx, namedArgs)
@@ -341,7 +337,7 @@ type WRInvoice struct {
 	Type             *string   `db:"type"`
 	Status           string    `db:"status"`
 	Reference        *string   `db:"reference"`
-	ContactName      string    `db:"contact_name"`
+	Contact          string    `db:"contact"`
 	Total            float64   `db:"total"`
 	DonationTotal    float64   `db:"donation_total"`
 	CRMSTotal        float64   `db:"crms_total"`
@@ -420,7 +416,7 @@ type WRTransaction struct {
 	Date             time.Time `db:"date"`
 	Type             *string   `db:"type"`
 	Status           string    `db:"status"`
-	ContactName      string    `db:"contact_name"`
+	Contact          string    `db:"contact"`
 	Total            float64   `db:"total"`
 	DonationTotal    float64   `db:"donation_total"`
 	CRMSTotal        float64   `db:"crms_total"`

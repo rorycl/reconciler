@@ -38,7 +38,7 @@ INSERT INTO "accounts" (id, code, name, description, type, status) VALUES
 -- * a single invoice line item (no platform fees) 
 -- * a single salesforce donation
 -- -----------------------------------------------------------------------------
-INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) VALUES
+INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
 ('inv-001', 'INV-2025-101', 'PAID', 500.00, '2025-04-10T10:00:00Z', 'Example Corp Ltd');
 INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, account_code) VALUES
 ('inv-li-001', 'inv-001', 'Donation for Q1 2025', 500.00, '5501');
@@ -53,7 +53,7 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 -- * one SF Opportunity.
 -- the SF donation amount should match the gross donation, not the invoice total.
 -- -----------------------------------------------------------------------------
-INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) VALUES
+INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
 ('inv-002', 'INV-2025-102', 'PAID', 196.50, '2025-04-12T11:00:00Z', 'Generous Individual');
 INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, account_code) VALUES
 ('inv-li-002a', 'inv-002', 'Pledged donation via Stripe', 200.00, '5301'),
@@ -66,7 +66,7 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 -- Invoice scenario 3
 -- Unreconciled items in the current financial year
 -- -----------------------------------------------------------------------------
-INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) VALUES
+INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
 ('inv-unrec-01', 'INV-2025-103', 'PAID', 1000.00, '2025-04-16T10:00:00Z', 'Another Corp'),
 ('inv-unrec-02', 'INV-2025-104', 'PAID', 250.00, '2025-04-18T11:00:00Z', 'Local Business Ltd'),
 ('inv-unrec-03', 'INV-2025-105', 'PAID', 750.00, '2025-04-21T12:00:00Z', 'Community Fund'),
@@ -85,7 +85,7 @@ INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, acco
 -- Invoice scenario 4
 -- Items from the previous financial year to test data filtering
 -- -----------------------------------------------------------------------------
-INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) VALUES
+INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
 ('inv-prev-fy-01', 'INV-2024-950', 'PAID', 150.00, '2025-03-25T10:00:00Z', 'Old Pledge Inc.');
 INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, account_code) VALUES
 ('inv-li-prev-fy-01', 'inv-prev-fy-01', 'End of Year Donation', 150.00, '5501');
@@ -94,12 +94,12 @@ INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, acco
 -- Invoice scenario 5
 -- Arbitrary invoices that have nothing to do with donations
 -- -----------------------------------------------------------------------------
-INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) VALUES
+INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
 ('inv-arb-01', 'INV-2025-110', 'DRAFT', 1.00, '2025-07-01T00:00:00Z', 'Future Invoices Inc.');
 INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, account_code) VALUES
 ('inv-li-arb-01-01', 'inv-arb-01', 'An arbitrary entry', 1.00, '9999');
 
-INSERT INTO "invoices" (id, invoice_number, status, total, date, contact_name) VALUES
+INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
 ('inv-arb-02', 'INV-2025-111', 'AUTHORISED', 2.00, '2025-07-02T00:00:00Z', 'Future Invoices Inc.');
 INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, account_code) VALUES
 ('inv-li-arb-02-01', 'inv-arb-02', 'Another arbitrary entry', 2.00, '9999');
@@ -115,7 +115,7 @@ INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, acco
 -- platform fee: 5% of gross = 17.75
 -- net payout (bank transaction total): 337.25
 -- -----------------------------------------------------------------------------
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact_name) VALUES
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
 ('bt-001', 'JG-PAYOUT-2025-04-15', 'RECONCILED', 337.25, '2025-04-15T14:00:00Z', 'JustGiving');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-001a', 'bt-001', 'JustGiving Payout - General Giving', 200.00, '5501'),
@@ -141,7 +141,7 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 -- A partially reconciled bank transaction.
 -- donation income is 500, but only 250 is accounted for in linked sf opps.
 -- -----------------------------------------------------------------------------
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact_name) VALUES
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
 ('bt-002', 'STRIPE-PAYOUT-2025-04-20', 'RECONCILED', 490.00, '2025-04-20T09:00:00Z', 'Stripe');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-002a', 'bt-002', 'Stripe Payout', 500.00, '5501'),
@@ -163,7 +163,7 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 -- Unreconciled items in the current financial year
 -- -----------------------------------------------------------------------------
 -- 6 Unreconciled Bank Transactions
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact_name) VALUES
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
 ('bt-unrec-01', 'JG-PAYOUT-2025-04-22', 'RECONCILED', 97.50, '2025-04-22T14:00:00Z', 'JustGiving'),
 ('bt-unrec-02', 'STRIPE-PAYOUT-2025-04-27', 'RECONCILED', 245.00, '2025-04-27T09:00:00Z', 'Stripe'),
 ('bt-unrec-03', 'ENTHUSE-PAYOUT-2025-04-28', 'RECONCILED', 112.00, '2025-04-28T10:00:00Z', 'Enthuse'),
@@ -183,7 +183,7 @@ INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line
 -- Items from the previous financial year
 -- -----------------------------------------------------------------------------
 -- A reconciled bank transaction from Feb 2025
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact_name) VALUES
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
 ('bt-prev-fy-01', 'JG-PAYOUT-2025-02-28', 'RECONCILED', 190.00, '2025-02-28T14:00:00Z', 'JustGiving');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-prev-fy-01a', 'bt-prev-fy-01', 'Donation Payout', 200.00, '5501'),

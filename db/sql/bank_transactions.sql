@@ -55,7 +55,7 @@ crms_donation_totals AS (
         b.id
         ,b.reference
         ,date
-        ,b.contact_name
+        ,b.contact
         ,b.status
         ,b.total
         ,COALESCE(bdt.total_donation_amount, 0) AS donation_total
@@ -88,7 +88,7 @@ crms_donation_totals AS (
         bdt.transaction_id IS NOT NULL 
         AND CASE
             WHEN v.TextSearch = '' THEN true
-            ELSE LOWER(CONCAT(b.reference, ' ', b.contact_name)) REGEXP LOWER(v.TextSearch)
+            ELSE LOWER(CONCAT(b.reference, ' ', b.contact)) REGEXP LOWER(v.TextSearch)
             END
     ORDER BY
         b.date ASC

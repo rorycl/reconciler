@@ -18,8 +18,7 @@ WITH variables AS (
          ,498.98             AS AmountPaid    /* @param */
          ,date('2025-09-01') AS Date          /* @param */
          ,date('2026-01-01') AS Updated       /* @param */
-         ,'7404f143aa1c'     AS ContactID     /* @param */
-         ,'Test User'        AS ContactName   /* @param */
+         ,'Test User'        AS Contact /* @param */
 )
 INSERT INTO invoices (
 	id
@@ -31,8 +30,7 @@ INSERT INTO invoices (
     ,amount_paid
     ,date
     ,updated_at
-    ,contact_id
-    ,contact_name
+    ,contact
 )
 SELECT
     v.InvoiceID    
@@ -44,8 +42,7 @@ SELECT
     ,v.AmountPaid   
     ,v.Date         
     ,v.Updated      
-    ,v.ContactID    
-    ,v.ContactName  
+    ,v.Contact
 FROM
     variables v
 -- sqlite.org/lang_upsert.html PARSING AMBIGUITY
@@ -60,6 +57,5 @@ ON CONFLICT (id) DO UPDATE SET
     ,amount_paid    = excluded.amount_paid
     ,date           = excluded.date
     ,updated_at     = excluded.updated_at
-    ,contact_id     = excluded.contact_id
-    ,contact_name   = excluded.contact_name
+    ,contact        = excluded.contact
 ;

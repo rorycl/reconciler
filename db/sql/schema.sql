@@ -12,12 +12,8 @@ CREATE TABLE bank_transactions (
     total               REAL,
     date                DATETIME,
     updated_at          DATETIME,
-    contact_id          TEXT,
-    contact_name        TEXT,
-    /* bank account details for info only */
-    bank_account_id     TEXT,
-    bank_account_name   TEXT,
-    bank_account_code   TEXT,
+    contact             TEXT,
+    bank_account        TEXT,
     /* reconciliation status relating to donations */
     is_reconciled       INTEGER DEFAULT 0 -- INTEGER 0 for false, 1 for true
 );
@@ -46,8 +42,7 @@ CREATE TABLE invoices (
     amount_paid         REAL,
     date                DATETIME,
     updated_at          DATETIME,
-    contact_id          TEXT,
-    contact_name        TEXT,
+    contact             TEXT,
     /* reconciliation status relating to donations */
     is_reconciled       INTEGER DEFAULT 0 -- INTEGER 0 for false, 1 for true
 );

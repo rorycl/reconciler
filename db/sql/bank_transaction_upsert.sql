@@ -16,11 +16,8 @@ WITH variables AS (
          ,false                        AS IsReconciled         /* @param */
          ,date('2025-04-15T14:00:01Z') AS Date                 /* @param */
          ,date('2026-01-01')           AS Updated              /* @param */
-         ,'7404f143aa1c'               AS ContactID            /* @param */
-         ,'Admin User'                 AS ContactName          /* @param */
-         ,'4c37c386'                   AS BankAccountAccountID /* @param */
-         ,'Current Account'            AS BankAccountName      /* @param */
-         ,'00333332'                   AS BankAccountCode      /* @param */
+         ,'Admin User'                 AS Contact              /* @param */
+         ,'Current Account'            AS BankAccount          /* @param */
 )
 INSERT INTO bank_transactions (
     id
@@ -31,11 +28,8 @@ INSERT INTO bank_transactions (
     ,is_reconciled
     ,date
     ,updated_at
-    ,contact_id
-    ,contact_name
-    ,bank_account_id
-    ,bank_account_name
-    ,bank_account_code
+    ,contact
+    ,bank_account
 )
 SELECT
     v.BankTransactionID   
@@ -46,27 +40,21 @@ SELECT
     ,v.IsReconciled        
     ,v.Date                
     ,v.Updated             
-    ,v.ContactID           
-    ,v.ContactName         
-    ,v.BankAccountAccountID
-    ,v.BankAccountName     
-    ,v.BankAccountCode     
+    ,v.Contact
+    ,v.BankAccount         
 FROM
     variables v
 -- sqlite.org/lang_upsert.html PARSING AMBIGUITY
 WHERE
     true
 ON CONFLICT (id) DO UPDATE SET
-    type               = excluded.type
-    ,status            = excluded.status
-    ,reference         = excluded.reference
-    ,total             = excluded.total
-    ,is_reconciled     = excluded.is_reconciled
-    ,date              = excluded.date
-    ,updated_at        = excluded.updated_at
-    ,contact_id        = excluded.contact_id
-    ,contact_name      = excluded.contact_name
-    ,bank_account_id   = excluded.bank_account_id
-    ,bank_account_name = excluded.bank_account_name
-    ,bank_account_code = excluded.bank_account_code
+    type           = excluded.type
+    ,status        = excluded.status
+    ,reference     = excluded.reference
+    ,total         = excluded.total
+    ,is_reconciled = excluded.is_reconciled
+    ,date          = excluded.date
+    ,updated_at    = excluded.updated_at
+    ,contact       = excluded.contact
+    ,bank_account  = excluded.bank_account
 ;

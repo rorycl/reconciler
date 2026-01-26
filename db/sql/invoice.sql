@@ -28,7 +28,7 @@ FROM (
         ,i.type
         ,i.status
         ,i.reference
-        ,i.contact_name
+        ,i.contact
         ,i.total
         ,COALESCE(
             SUM(li.line_amount) 
