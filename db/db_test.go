@@ -2,7 +2,6 @@ package db
 
 import (
 	"io/fs"
-	"os"
 	"testing"
 	"time"
 )
@@ -25,7 +24,7 @@ func setupTestDB(t *testing.T) (*DB, func()) {
 	}()
 
 	accountCodes := "^(53|55|57)"
-	sqlDir := os.DirFS("sql")
+	sqlDir := "sql"
 
 	var err error
 	testDB, err := NewConnection("file::memory:?cache=shared", sqlDir, accountCodes)
@@ -34,13 +33,13 @@ func setupTestDB(t *testing.T) (*DB, func()) {
 	}
 
 	// Load the schema definitions.
-	if err := testDB.InitSchema(sqlDir, "schema.sql"); err != nil {
+	if err := testDB.InitSchema(testDB.sqlFS, "schema.sql"); err != nil {
 		_ = testDB.Close()
 		t.Fatalf("Failed to initialize schema for test database: %v", err)
 	}
 
 	// Load the test data.
-	data, err := fs.ReadFile(sqlDir, "load_data.sql")
+	data, err := fs.ReadFile(testDB.sqlFS, "load_data.sql")
 	if err != nil {
 		t.Fatalf("Failed to read file for loading data for test DB: %v", err)
 	}

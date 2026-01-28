@@ -13,14 +13,19 @@ package db
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
 	"io/fs"
 	"log"
+	"reconciler/internal"
 	"strings"
 
 	"github.com/jmoiron/sqlx" // helper library
 	_ "modernc.org/sqlite"    // pure go sqlite driver
 )
+
+//go:embed sql
+var sqlEmbeddedFS embed.FS
 
 // parameterizedStmt describes an sql file parsed into an sqlx NamedStmt expecting the
 // provided args.
@@ -72,7 +77,15 @@ type DB struct {
 var prepareNamedStatementsOnStartup bool = true
 
 // NewConnection creates a new connection to an SQLite database at the given path.
-func NewConnection(dbPath string, sqlDir fs.FS, accountCodes string) (*DB, error) {
+func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, error) {
+
+	// mount the sql fs either using the embedded fs or via the provided path.
+	// The path is likely to need to be relative to "here" as ".." type paths are not
+	// accepted by fs mounting.
+	sqlFS, err := internal.NewFileMount("sql", sqlEmbeddedFS, sqlDir)
+	if err != nil {
+		return nil, fmt.Errorf("mount error: %v", err)
+	}
 
 	// dataSource is the default setting for file-based databases.
 	dataSource := fmt.Sprintf("%s?_dataSource=foreign_keys(1)&_dataSource=journal_mode(WAL)", dbPath)
@@ -101,7 +114,7 @@ func NewConnection(dbPath string, sqlDir fs.FS, accountCodes string) (*DB, error
 	db := &DB{
 		DB:           sqlx.NewDb(dbDB, "sqlite"),
 		accountCodes: accountCodes,
-		sqlFS:        sqlDir,
+		sqlFS:        sqlFS,
 	}
 
 	// Normally prepared statements are run on startup, but need to be deferred for
