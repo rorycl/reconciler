@@ -1,7 +1,7 @@
 package web
 
 import (
-	"log/slog"
+	"log"
 	"reconciler/config"
 	"reconciler/db"
 	"reconciler/internal"
@@ -10,7 +10,8 @@ import (
 
 func TestWebApp(t *testing.T) {
 
-	logger := slog.Default()
+	logger := log.Default()
+
 	cfg := &config.Config{
 		Web: config.WebConfig{
 			ListenAddress: "127.0.0.1:8000",

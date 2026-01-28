@@ -108,7 +108,7 @@
                         <!-- {{ .InvoiceID }} -->
                         <td class="px-4 py-1"><a href="/invoice/{{ .InvoiceID }}" class="text-sky-700 font-semibold hover:underline">{{ .InvoiceNumber }}</a></td>
                         <td class="px-4 py-1 whitespace-nowrap">{{ .Date.Format "02/01/2006" }}</td>
-                        <td class="px-4 py-1">{{ .ContactName }}</td>
+                        <td class="px-4 py-1">{{ .Contact }}</td>
                         <td class="px-4 py-1">{{ .Status }}</td>
                         <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .Total }}</td>
                         <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .DonationTotal }}</td>
