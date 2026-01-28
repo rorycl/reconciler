@@ -27,7 +27,7 @@ func TestMounts(t *testing.T) {
 		embeddedFS fs.FS
 		dirPath    string
 		dirToStat  string
-		err        error
+		wantErr    error
 	}{
 		{
 			name:       "embedded fs mount",
@@ -48,7 +48,7 @@ func TestMounts(t *testing.T) {
 			mountName:  "testdata",
 			embeddedFS: testdata,
 			dirPath:    "./doesNotExist",
-			err:        errors.New(`new mount at "./doesNotExist"`),
+			wantErr:    errors.New(`new mount at "./doesNotExist"`),
 		},
 		{
 			name:       "embedded fs mount for dirA",
@@ -64,6 +64,34 @@ func TestMounts(t *testing.T) {
 			dirPath:    "testdata/dirA",
 			dirToStat:  "dirB",
 		},
+		// fs.ValidPath docs
+		//
+		// Path names passed to open are UTF-8-encoded, unrooted, slash-separated sequences
+		// of path elements, like “x/y/z”. Path names must not contain an element that is
+		// “.” or “..” or the empty string, except for the special case that the name "."
+		// may be used for the root directory. Paths must not start or end with a slash:
+		// “/x” and “x/” are invalid.
+		//
+		// Note that paths are slash-separated on all systems, even Windows. Paths
+		// containing other characters such as backslash and colon are accepted as valid,
+		// but those characters must never be interpreted by an FS implementation as path
+		// element separators.
+		{
+			name:       "invalid mount name",
+			mountName:  `/dev/null`,
+			embeddedFS: testdata,
+			dirPath:    "testdata",
+			dirToStat:  "",
+			wantErr:    ErrInvalidPath{`/dev/null`},
+		},
+		{
+			name:       "another invalid mount name",
+			mountName:  `testdata/`,
+			embeddedFS: testdata,
+			dirPath:    "",
+			dirToStat:  "",
+			wantErr:    ErrInvalidPath{`testdata/`},
+		},
 	}
 
 	for ii, tt := range tests {
@@ -77,14 +105,27 @@ func TestMounts(t *testing.T) {
 			// }
 
 			fm, err := NewFileMount(tt.mountName, tt.embeddedFS, tt.dirPath)
-			if err != nil {
-				if tt.err != nil {
-					if got, want := err.Error(), tt.err.Error(); !strings.Contains(got, want) {
-						fmt.Errorf("error got %q want substring %q", got, want)
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("expected error %v, got none (mount %s)", tt.wantErr, fm.MountName)
+				}
+
+				// Check if the error is of the ErrInvalidPath type.
+				var eip ErrInvalidPath
+				if errors.As(tt.wantErr, &eip) {
+					if !errors.As(err, &eip) {
+						t.Errorf("expected ErrInvalidPath error, got %v", err)
 					}
 					return
 				}
-				t.Fatalf("unexpected New error %v", err)
+				// Otherwise check the error string.
+				if got, want := err.Error(), tt.wantErr.Error(); !strings.Contains(got, want) {
+					fmt.Errorf("error got %q want substring %q", got, want)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error %v", err)
 			}
 
 			stat, err := fs.Stat(fm.FS, tt.dirToStat)

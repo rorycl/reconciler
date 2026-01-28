@@ -23,6 +23,20 @@ func (fm FileMount) String() string {
 	return o + s
 }
 
+// ErrInvalidPath reports an invalid mount name.
+type ErrInvalidPath struct {
+	mountName string
+}
+
+// Error fulfills the Error interface requirement for ErrInvalidPath.
+func (e ErrInvalidPath) Error() string {
+	tpl := strings.Join([]string{
+		"mount name %q is not a valid fs.ValidPath path",
+		"see https://pkg.go.dev/io/fs#ValidPath for more information.",
+	}, "\n")
+	return fmt.Sprintf(tpl, e.mountName)
+}
+
 // NewFileMount takes an embedded fs.FS or a path to a directory. If the path to the
 // directory is "", the embedded fs is used, otherwise the directory is used. Note that
 // the MountName parameter is used to name the mount of an fs.FS to make it work like an
@@ -46,21 +60,24 @@ func (fm FileMount) String() string {
 //	NewFileMount("path/templates", templatesFS, "path/templates")
 //
 // will mount the filesystem location "templates" to "templates/".
-func NewFileMount(MountName string, embeddedFS fs.FS, dirPath string) (*FileMount, error) {
+func NewFileMount(mountName string, embeddedFS fs.FS, dirPath string) (*FileMount, error) {
 
-	if MountName == "" {
-		return nil, errors.New("no MountName provided for new file mount")
+	if mountName == "" {
+		return nil, errors.New("no mount name provided for new file mount")
+	}
+	if !fs.ValidPath(mountName) {
+		return nil, ErrInvalidPath{mountName}
 	}
 
 	// If a directory is not provided, use the embedded fs, but mounted at the
 	// subdirectory provided at MountName.
 	if dirPath == "" {
-		subFS, err := fs.Sub(embeddedFS, MountName)
+		subFS, err := fs.Sub(embeddedFS, mountName)
 		if err != nil {
-			return nil, fmt.Errorf("could not sub-mount embedded fs at %q: %v", MountName, err)
+			return nil, fmt.Errorf("could not sub-mount embedded fs at %q: %v", mountName, err)
 		}
 		return &FileMount{
-			MountName,
+			mountName,
 			subFS,
 		}, nil
 	}
@@ -75,19 +92,19 @@ func NewFileMount(MountName string, embeddedFS fs.FS, dirPath string) (*FileMoun
 
 	dirFS := os.DirFS(dirPath)
 	return &FileMount{
-		MountName,
+		mountName,
 		dirFS,
 	}, nil
 }
 
 // Materialize outputs the data in fm.FS recursively to the filesystem starting at
-// root. For example running:
+// root plus mount name. For example running:
 //
-//	nf, _ := NewFileMount("templates", templatesFS, "")
+//	nf, _ := NewFileMount("path/templates", templatesFS, "")
 //	_ = nf.Materialize("/tmp/")
 //
-// will create the contents of templatesFS in "/tmp/templates". Root must be a
-// directory.
+// will create the contents of templatesFS in "/tmp/path/templates/". Root must be a
+// directory and the constructed output path must not exist on the system.
 func (fm *FileMount) Materialize(root string) error {
 
 	checkIsDir := func(path string) error {
@@ -110,7 +127,8 @@ func (fm *FileMount) Materialize(root string) error {
 		return fmt.Errorf("materialize root %q invalid: %v", root, err)
 	}
 
-	// Make a dir named fm.MountName at the top of root.
+	// Make a dir named fm.MountName at root. Since fm.MountName may be a composite
+	// path, MkdirAll is used to create it.
 	mountRoot := filepath.Join(root, fm.MountName)
 	if _, err := os.Stat(mountRoot); !os.IsNotExist(err) {
 		return fmt.Errorf("materialization path %q already exists", mountRoot)
@@ -161,7 +179,7 @@ func PrintFS(thisFS fs.FS) (string, error) {
 		if err != nil {
 			return err // propogate
 		}
-		if !topSeen { // some special formatting for the top level
+		if !topSeen { // verbatim root as "[d] ./ (./)"
 			_, err = printOutput.WriteString(fmt.Sprintf(tpl, "\n", "d", ".", "/", "."))
 			topSeen = true
 			return nil
