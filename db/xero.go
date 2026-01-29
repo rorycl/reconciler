@@ -37,7 +37,7 @@ func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error
 			"Updated":       acc.Updated.Format("2006-01-02T15:04:05Z"),
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return err
+			return fmt.Errorf("accounts upsert verify arguments error: %v", err)
 		}
 		_, err := stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
@@ -93,7 +93,7 @@ func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, date
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
 		db.logger.Warn(fmt.Sprintf("invoices verify args error: %v", err))
-		return nil, err
+		return nil, fmt.Errorf("invoices verify args error: %v", err)
 	}
 
 	// Scan results into the provided slice.
@@ -135,7 +135,7 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 			"InvoiceID": inv.InvoiceID,
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return err
+			fmt.Errorf("invoices upsert verify arguments error: %v", err)
 		}
 		_, err := stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
@@ -157,7 +157,7 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 			"Contact":       inv.Contact,
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return err
+			return fmt.Errorf("invoices upsert verify arguments error: %v", err)
 		}
 		_, err = stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
@@ -234,7 +234,7 @@ func (db *DB) BankTransactionsGet(ctx context.Context, reconciliationStatus stri
 		"HereOffset":           offset,
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bank transactions verify arguments error: %v", err)
 	}
 
 	// Use sqlx to scan results into the provided slice.
@@ -317,7 +317,7 @@ func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.Ba
 				"TaxAmount":         line.TaxAmount,
 			}
 			if err := stmt.verifyArgs(namedArgs); err != nil {
-				return err
+				return fmt.Errorf("bank transaction upsert verify arguments error: %v", err)
 			}
 			_, err = stmt.ExecContext(ctx, namedArgs)
 			if err != nil {

@@ -61,7 +61,7 @@ func (db *DB) DonationsGet(ctx context.Context, dateFrom, dateTo time.Time, link
 		"HereOffset":      offset,
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("donations get verify arguments error: %v", err)
 	}
 
 	// Use sqlx to scan results into the provided slice.
@@ -86,7 +86,7 @@ func (db *DB) UpsertDonations(ctx context.Context, donations []salesforce.Donati
 
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not begin donation upsert transaction: %v", err)
 	}
 	defer tx.Rollback() // no-op after commit.
 
@@ -116,7 +116,7 @@ func (db *DB) UpsertDonations(ctx context.Context, donations []salesforce.Donati
 		}
 
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return err
+			return fmt.Errorf("upsert donations verify arguments err: %v", err)
 		}
 		_, err = stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
