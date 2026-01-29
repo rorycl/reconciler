@@ -6,6 +6,7 @@ import (
 	"reconciler/db"
 	"reconciler/internal"
 	"testing"
+	"time"
 )
 
 func TestWebApp(t *testing.T) {
@@ -32,7 +33,11 @@ func TestWebApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
+	// testing data start and end dates
+	startDate := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
+
+	webApp, err := New(logger, cfg, db, staticFS, templatesFS, startDate, endDate)
 	if err != nil {
 		t.Fatal(err)
 	}
