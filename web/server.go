@@ -34,9 +34,9 @@ type WebApp struct {
 	db               *db.DB
 	staticFS         fs.FS // the fs holding the static web resources.
 	templateFS       fs.FS // the fs holding the web templates.
-	templates        map[string]*template.Template
 	defaultStartDate time.Time
 	defaultEndDate   time.Time
+	server           *http.Server
 }
 
 // New initialises a WebApp. An error type is returned for future use.
@@ -44,6 +44,15 @@ func New(logger *log.Logger, cfg *config.Config, db *db.DB, staticFS, templateFS
 	if start.After(end) {
 		return nil, fmt.Errorf("start date %s after end %s", start.Format("2006-01-2"), end.Format("2006-01-02"))
 	}
+
+	// Add settings for the http server. Consider adding logging here.
+	server := &http.Server{
+		Addr:              cfg.Web.ListenAddress,
+		ReadHeaderTimeout: time.Duration(30 * time.Second),
+		WriteTimeout:      time.Duration(30 * time.Second),
+		MaxHeaderBytes:    1 << 19, // 100k ish
+	}
+
 	webApp := &WebApp{
 		log:              logger, // this conflicts with the gorilla logging middleware; also how about slog?
 		cfg:              cfg,
@@ -52,18 +61,16 @@ func New(logger *log.Logger, cfg *config.Config, db *db.DB, staticFS, templateFS
 		templateFS:       templateFS,
 		defaultStartDate: start,
 		defaultEndDate:   end,
+		server:           server,
 	}
 	return webApp, nil
 }
 
 // StartServer starts a WebApp.
 func (web *WebApp) StartServer() error {
-	srv := &http.Server{
-		Addr:    web.cfg.Web.ListenAddress,
-		Handler: web.routes(),
-	}
-	web.log.Println(fmt.Sprintf("Starting server on %s", web.cfg.Web.ListenAddress))
-	return srv.ListenAndServe()
+	web.server.Handler = web.routes()
+	web.log.Printf("Starting server on %s", web.cfg.Web.ListenAddress)
+	return web.server.ListenAndServe()
 }
 
 // routes connects all of the endpoints and provides middleware.
@@ -77,6 +84,7 @@ func (web *WebApp) routes() http.Handler {
 	r.Handle("/", web.handleRoot())
 	r.Handle("/connect", web.handleConnect())
 	r.Handle("/refresh", web.handleRefresh())
+	r.Handle("/home", web.handleHome()) // redirect to handleInvoices.
 
 	// Main listing pages.
 	r.Handle("/invoices", web.handleInvoices())
@@ -86,16 +94,12 @@ func (web *WebApp) routes() http.Handler {
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
 	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", web.handleInvoiceDetail())
-	/*
+	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", web.handleBankTransactionDetail())
 
-		r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", web.handleBankTransactionDetail)
-
-	*/
-
+	// Partial pages.
+	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
 	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsLinked())
-	/*
-		r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsFind)
-	*/
+	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsFind())
 
 	logging := handlers.LoggingHandler(os.Stdout, r)
 	return logging
@@ -141,6 +145,13 @@ func (web *WebApp) handleRefresh() http.Handler {
 			web.log.Printf("Error rendering template %s: %v", name, err)
 			http.Error(w, fmt.Sprintf("Error rendering template %s: %v", name, err), http.StatusInternalServerError)
 		}
+	})
+}
+
+// handleHome redirects from /home.
+func (web *WebApp) handleHome() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/invoices", http.StatusFound)
 	})
 }
 
@@ -491,6 +502,67 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 	})
 }
 
+// handleBankTransactionDetail serves the page at /bank-transaction/<id>, showing
+// details for a single bank transaction.
+func (web *WebApp) handleBankTransactionDetail() http.Handler {
+
+	name := "bank-transaction.html"
+	tpls := []string{"base.html", "partial-listingTabs.html", "partial-donations-tabs.html", "bank-transaction.html"}
+	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+
+		vars := mux.Vars(r)
+		if vars == nil {
+			web.log.Printf("error: bank transaction capture (vars: %v)", mux.Vars(r))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		transactionReference, ok := vars["id"]
+		if !ok {
+			web.log.Printf("error: id not in mux.Vars (vars: %v)", mux.Vars(r))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+
+		data := struct {
+			PageTitle   string
+			Transaction db.WRTransaction
+			LineItems   []viewLineItem
+			ID          string
+			TabType     string
+		}{
+			PageTitle: fmt.Sprintf("Bank Transaction %s", transactionReference),
+			ID:        transactionReference,
+			TabType:   "link", // by default the donations tab type is "link", not "find"
+		}
+
+		var err error
+		var lineItems []db.WRLineItem
+		data.Transaction, lineItems, err = web.db.BankTransactionWRGet(ctx, transactionReference)
+		if err != nil && err != sql.ErrNoRows {
+			web.log.Printf("error: database GetTransaction failed: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		data.LineItems = newViewLineItems(lineItems)
+
+		// Return a 404 if no bank transaction was found.
+		if errors.Is(err, sql.ErrNoRows) {
+			web.log.Printf("Bank Transaction: %q not found", transactionReference)
+			http.Error(w, fmt.Sprintf("Bank Transaction %q not found", transactionReference), http.StatusNotFound)
+			return
+		}
+
+		err = templates.ExecuteTemplate(w, name, data)
+		if err != nil {
+			web.log.Printf("Error rendering template %s: %v", name, err)
+			http.Error(w, fmt.Sprintf("Error rendering template %s: %v", name, err), http.StatusInternalServerError)
+		}
+	})
+}
+
 // handlePartialDonationsLinked is the partial htmx endpoint for rendering the list of
 // donations linked to an Invoice or Bank Transaction.
 func (web *WebApp) handlePartialDonationsLinked() http.Handler {
@@ -573,6 +645,128 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		data.Pagination, err = NewPagination(pageLen, recordsNo, 1, r.URL.Query())
 		if err != nil {
 			web.log.Printf("pagination error: %v", err)
+		}
+
+		err = templates.ExecuteTemplate(w, name, data)
+		if err != nil {
+			web.log.Printf("Error rendering template %s: %v", name, err)
+			http.Error(w, fmt.Sprintf("Error rendering template %s: %v", name, err), http.StatusInternalServerError)
+		}
+	})
+}
+
+// handlePartialDonationsFind is the partial htmx endpoint for finding
+// donations to link to an Invoice or Bank Transaction.
+func (web *WebApp) handlePartialDonationsFind() http.Handler {
+
+	name := "partial-donations.html"
+	tpls := []string{"partial-donations-tabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "partial-donations.html"}
+	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+
+		vars := mux.Vars(r)
+		if vars == nil {
+			web.log.Printf("error: linked donations vars capture (vars: %v)", mux.Vars(r))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		typer, ok := vars["type"]
+		if !ok {
+			web.log.Printf("error: type not in mux.Vars (vars: %v)", mux.Vars(r))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		id, ok := vars["id"]
+		if !ok {
+			web.log.Printf("error: id not in mux.Vars (vars: %v)", mux.Vars(r))
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+
+		form := NewSearchDonationsForm()
+		if err := DecodeURLParams(r, form); err != nil {
+			web.log.Printf("error: could not decode the url parameters: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Create a validator and validate the form.
+		validator := NewValidator()
+		form.Validate(validator)
+
+		// Initialise pagination for default state.
+		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
+
+		// Prepare data for the template, allowing passing of validation
+		// errors back to the template if necessary.
+		data := struct {
+			PageTitle     string
+			ID            string
+			Typer         string
+			ViewDonations []viewDonation
+			Form          *SearchDonationsForm
+			Validator     *Validator
+			Pagination    *Pagination
+
+			PageType string
+			GetURL   string
+			TabType  string
+		}{
+			PageTitle:  "Donations",
+			ID:         id,
+			Typer:      typer,
+			Form:       form,
+			Validator:  validator,
+			Pagination: pagination,
+			PageType:   "indirect", // indirect pages are htmx pages that have an hx target
+			GetURL:     fmt.Sprintf("/partials/donations-find/%s/%s", typer, id),
+			TabType:    "find",
+		}
+
+		// Render template with errors and return if the form is invalid.
+		if !validator.Valid() {
+			err := templates.ExecuteTemplate(w, name, data)
+			if err != nil {
+				web.log.Printf("Error rendering template %s: %v", name, err)
+				http.Error(w, fmt.Sprintf("Error rendering template %s: %v", name, err), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		donations, err := web.db.DonationsGet(
+			ctx,
+			form.DateFrom,
+			form.DateTo,
+			form.LinkageStatus,
+			form.PayoutReference,
+			form.SearchString,
+			pageLen,
+			form.Offset(),
+		)
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("error: database GetDonations failed: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Process donations into donationView type
+		viewDonations := newViewDonations(donations)
+
+		// Set valid data from successful database call.
+		data.ViewDonations = viewDonations
+
+		// Set pagination for number of donations. In case of an error, log
+		// and continue. Each donation has the search query row count as a
+		// field.
+		var recordsNo int
+		if len(data.ViewDonations) == 0 {
+			recordsNo = 1
+		} else {
+			recordsNo = data.ViewDonations[0].RowCount
+		}
+		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
+		if err != nil {
+			log.Printf("pagination error: %v", err)
 		}
 
 		err = templates.ExecuteTemplate(w, name, data)

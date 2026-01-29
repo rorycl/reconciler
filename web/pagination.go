@@ -18,11 +18,6 @@ type Pagination struct {
 	Previous int // 0 means no previous page
 }
 
-// pageCount determines the number of pages in a total record set.
-func (p *Pagination) pageCount(recNo int) int {
-	return ((recNo - 1) / p.pageLen) + 1
-}
-
 var ErrInvalidPageLen error = errors.New("pageLen cannot be below 1")
 
 type ErrInvalidPageNo struct {

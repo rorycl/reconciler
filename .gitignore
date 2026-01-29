@@ -4,29 +4,21 @@ xerocli/xerocli
 sfcli/config.yaml
 sfcli/sfcli
 
+# config
+config/config.yaml
+
 # storage
-reconciliation.db
 xero_token.json
 sf_token.json
 
-# web
-web/playground/
-web/sql
-
 # db
-db/testdata/test.db-*
+db/sql/test.db
+db/sql/test.db-*
 
 # backups
 reconciliation.db.*
 
 # bin files
 bin
-
-# testdata
-dbquery/testdata/test.db-*
-
-# sqlite history files
-dbquery/history*
-
 
 
