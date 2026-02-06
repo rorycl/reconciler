@@ -6,6 +6,8 @@
 
 <h3 class="text-l text-slate-800 font-semibold px-4 py-3">Linked Salesforce Donations</h3>
 
+{{- /* the unlink form targets: Typer: invoice or bank-transaction .ID: the invoice number or bank-transaction reference */ -}}
+<form method="POST" action="/donations/unlink/{{ .Typer }}/{{ .ID }}">
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
     <table class="min-w-full divide-y divide-slate-300 text-xs">
         <thead class="bg-indigo-100">
@@ -13,16 +15,16 @@
                 <th class="px-4 py-0 w-8">
                 <button class="text-xs bg-sky-600 text-white font-bold py-1 px-1 mr-2 rounded hover:bg-sky-700">Unlink</button>
                 </th>
-                        <th class="min-w-3/10 px-4 py-2 text-left font-semibold">Name</th>
-                        <th class="px-4 py-2 text-left font-semibold">Close Date</th>
-                        <th class="min-w-3/10 px-4 py-2 text-left font-semibold">Payout Reference</th>
-                        <th class="px-4 py-2 text-right font-semibold">Amount</th>
+                <th class="min-w-3/10 px-4 py-2 text-left font-semibold">Name</th>
+                <th class="px-4 py-2 text-left font-semibold">Close Date</th>
+                <th class="min-w-3/10 px-4 py-2 text-left font-semibold">Payout Reference</th>
+                <th class="px-4 py-2 text-right font-semibold">Amount</th>
             </tr>
         </thead>
         <tbody class="bg-white divide-y divide-slate-300">
             {{ range .ViewDonations }}
             <tr>
-                <td class="px-4 py-1 text-center"><input value="{{ .ID }}" type="checkbox"></td>
+                <td class="px-4 py-1 text-center"><input name="donation-ids" value="{{ .ID }}" type="checkbox"></td>
                 <td class="px-4 py-1 whitespace-nowrap">{{ .Name }}</td>
                 <td class="px-4 py-1 whitespace-nowrap">{{ .CloseDateStr }}</td>
                 <td class="px-4 py-1">{{ .PayoutReference }}</td>
@@ -34,5 +36,7 @@
         </tbody>
     </table>
 </div> 
+</form>
+
 </div>  <!-- end tab-content -->
 <!-- end of partial -->

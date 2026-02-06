@@ -30,11 +30,11 @@ func TestWebAppToRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staticFS, err := internal.NewFileMount("static", staticEmbeddedFS, "")
+	staticFS, err := internal.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatesFS, err := internal.NewFileMount("templates", templatesEmbeddedFS, "")
+	templatesFS, err := internal.NewFileMount("templates", TemplatesEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,11 +69,11 @@ func TestWebAppAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staticFS, err := internal.NewFileMount("static", staticEmbeddedFS, "")
+	staticFS, err := internal.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatesFS, err := internal.NewFileMount("templates", templatesEmbeddedFS, "")
+	templatesFS, err := internal.NewFileMount("templates", TemplatesEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}

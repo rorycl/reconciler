@@ -29,6 +29,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reconciler/apiclients/salesforce"
 	"reconciler/config"
 	"reconciler/db"
 	"time"
@@ -41,10 +42,10 @@ import (
 const pageLen = 15
 
 //go:embed static
-var staticEmbeddedFS embed.FS
+var StaticEmbeddedFS embed.FS
 
 //go:embed templates
-var templatesEmbeddedFS embed.FS
+var TemplatesEmbeddedFS embed.FS
 
 // WebApp is the configuration object for the web server.
 type WebApp struct {
@@ -121,6 +122,10 @@ func (web *WebApp) routes() http.Handler {
 	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
 	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsLinked())
 	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsFind())
+
+	// Donation linking/unlinking.
+	r.Handle("/donations/link/{type:(?:invoice|bank-transaction)}/{id}", web.handleDonationsLink())
+	// r.Handle("/donations/unlink/{type:(?:invoice|bank-transaction)}/{id}", web.handleDonationsUnLink())
 
 	logging := handlers.LoggingHandler(os.Stdout, r)
 	return logging
@@ -434,7 +439,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 
 		ctx := r.Context()
 
-		// Extract url parameters.
+		// Extract route parameters.
 		vars, err := validMuxVars(mux.Vars(r), "id")
 		if err != nil {
 			web.clientError(w, err.Error(), http.StatusBadRequest)
@@ -485,7 +490,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 
 		ctx := r.Context()
 
-		// Extract url parameters.
+		// Extract route parameters.
 		vars, err := validMuxVars(mux.Vars(r), "id")
 		if err != nil {
 			web.clientError(w, err.Error(), http.StatusBadRequest)
@@ -618,21 +623,14 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 
 		ctx := r.Context()
 
-		vars := mux.Vars(r)
-		if vars == nil {
-			web.serverError(w, r, errors.New("no vars received"))
+		// Extract route parameters.
+		vars, err := validMuxVars(mux.Vars(r), "type", "id")
+		if err != nil {
+			web.clientError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		typer, ok := vars["type"]
-		if !ok {
-			web.serverError(w, r, fmt.Errorf("type not in mux.Vars (vars: %v)", mux.Vars(r)))
-			return
-		}
-		id, ok := vars["id"]
-		if !ok {
-			web.serverError(w, r, fmt.Errorf("id not in mux.Vars (vars: %v)", mux.Vars(r)))
-			return
-		}
+		typer := vars["type"]
+		id := vars["id"]
 
 		form := NewSearchDonationsForm()
 		if err := DecodeURLParams(r, form); err != nil {
@@ -715,6 +713,69 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 		}
 
 		web.render(w, r, templates, name, data)
+
+	})
+}
+
+// handleDonationsLink links donations from the /donations/link... POST
+func (web *WebApp) handleDonationsLink() http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+		if r.Method != "POST" {
+			web.clientError(w, "only POST requests allowed", http.StatusBadRequest)
+			return
+		}
+
+		// Extract url parameters.
+		vars, err := validMuxVars(mux.Vars(r), "type", "id")
+		if err != nil {
+			web.clientError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		vars["action"] = "link"
+
+		// Extract the form data.
+		err = r.ParseForm()
+		if err != nil {
+			web.clientError(w, fmt.Sprintf("invalid POST request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate the form data
+		form, err := CheckLinkOrUnlinkForm(r.PostForm, vars)
+		if err != nil {
+			web.clientError(w, fmt.Sprintf("invalid form data: %v", err), http.StatusBadRequest)
+			return
+		}
+		validator := NewValidator()
+		form.Validate(validator)
+		if !validator.Valid() {
+			// Consider reporting the errors better here.
+			web.clientError(w, fmt.Sprintf("invalid data was received: %v", validator.Errors), http.StatusBadRequest)
+			return
+		}
+
+		// Create the salesforce client and run a batch update.
+		sfClient, err := salesforce.NewClient(ctx, web.cfg)
+		if err != nil {
+			web.serverError(w, r, fmt.Errorf("failed to create salesforce client for linking: %w", err))
+			return
+		}
+		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.ID, form.DonationIDs, false)
+		if err != nil {
+			web.serverError(w, r, fmt.Errorf("failed to batch update salesforce records: %w", err))
+			return
+		}
+
+		log.Printf("Successfully linked %d donations.", len(form.DonationIDs))
+
+		// Todo: target
+		// /partials/donations-find/{type:(?:invoice|bank-transaction)}/{id} and do a
+		// partial refresh.
+		redirectURL := fmt.Sprintf("/%s/%s", form.Typer, form.ID)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 
 	})
 }

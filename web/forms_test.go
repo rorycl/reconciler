@@ -11,6 +11,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+var pageLen = 15
+
 func newRequest(t *testing.T, urlString string) *http.Request {
 	t.Helper()
 	r, err := http.NewRequest("GET", urlString, nil)
@@ -271,6 +273,74 @@ func TestValidMuxVars(t *testing.T) {
 				}
 				return
 			}
+		})
+	}
+}
+
+// TestFormLinkOrUnlink tests the LinkOrUnlinkForm.
+func TestFormLinkOrUnlink(t *testing.T) {
+	tests := []struct {
+		name        string
+		formData    map[string][]string
+		routeParams map[string]string
+		isErr       bool
+	}{
+		{
+			name: "form ok",
+			formData: map[string][]string{
+				"donation-ids": []string{"1", "3", "5"},
+			},
+			routeParams: map[string]string{
+				"type":   "invoice",
+				"id":     "INV-12345",
+				"action": "link",
+			},
+			isErr: false,
+		},
+		{
+			name: "form error with empty donation ids",
+			formData: map[string][]string{
+				"donation-ids": []string{},
+			},
+			routeParams: map[string]string{
+				"type":   "invoice",
+				"id":     "INV-12345",
+				"action": "link",
+			},
+			isErr: true,
+		},
+		{
+			name: "form error with incorrect action",
+			formData: map[string][]string{
+				"donation-ids": []string{"1", "3", "5"},
+			},
+			routeParams: map[string]string{
+				"type":   "invoice",
+				"id":     "INV-12345",
+				"action": "some-action",
+			},
+			isErr: true,
+		},
+	}
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
+			form, err := CheckLinkOrUnlinkForm(tt.formData, tt.routeParams)
+			if err != nil {
+				t.Fatal(err)
+			}
+			validator := NewValidator()
+			form.Validate(validator)
+			if !validator.Valid() {
+				if tt.isErr == false {
+					t.Errorf("unexpected validation errors: %v", validator.Errors)
+				}
+				return
+			}
+			if tt.isErr {
+				t.Error("expected validation error")
+			}
+
+			fmt.Printf("form:\n%#v\n", form)
 		})
 	}
 }

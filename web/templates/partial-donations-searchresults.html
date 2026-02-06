@@ -1,11 +1,19 @@
 {{- /* partial-donations-searchresults.html is a template for the donation search results */ -}}
 
 {{ define "partial-donations-searchresults" }}
+{{ $pageType := .PageType }}
 <!-- start of partial -->
+{{- /* the link form targets: Typer: invoice or bank-transaction .ID: the invoice number or bank-transaction reference */ -}}
+<form method="POST" action="/donations/link/{{ .Typer }}/{{ .ID }}">
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
     <table class="min-w-full divide-y divide-slate-300 text-xs">
         <thead class="bg-slate-100 text-slate-700">
             <tr>
+                {{ if eq $pageType "indirect" }}
+                <th class="px-4 py-0 w-8">
+                <button class="text-xs bg-sky-600 text-white font-bold py-1 px-1 mr-2 rounded hover:bg-sky-700">Link</button>
+                {{ end }}
+                </th>
                 <th class="min-w-3/10 px-4 py-2 text-left font-semibold">Name</th>
                 <th class="px-4 py-2 text-left font-semibold">Close Date</th>
                 <th class="min-w-3/10 px-4 py-2 text-left font-semibold">Payout Reference</th>
@@ -16,6 +24,9 @@
         <tbody class="bg-white divide-y divide-slate-300">
             {{ range .ViewDonations }}
             <tr class="hover:bg-slate-50">
+                {{ if eq $pageType "indirect" }}
+                <td class="px-4 py-1 text-center"><input name="donation-ids" value="{{ .ID }}" type="checkbox"></td>
+                {{ end }}
                 <td class="px-4 py-1"><a href="/donation/{{ .ID }}" class="text-sky-700 font-semibold hover:underline">{{ .Name }}</a></td>
                 <td class="px-4 py-1 whitespace-nowrap">{{ .CloseDateStr }}</td>
                 <td class="px-4 py-1">{{ .PayoutReference }}</td>
@@ -36,6 +47,7 @@
         </tbody>
     </table>
 </div>
+</form>
 <!-- end of partial -->
 
 <!-- Pagination -->

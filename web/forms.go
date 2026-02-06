@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -191,6 +192,52 @@ func (f *SearchDonationsForm) Validate(v *Validator) {
 // Offset calculates the database offset for (1-based) pagination.
 func (f *SearchDonationsForm) Offset() int {
 	return (f.Page - 1) * pageLen
+}
+
+// LinkOrUnlinkForm is a form for linking or unlinking donations in Salesforce to a Xero
+// Invoice or BankTransaction.
+type LinkOrUnlinkForm struct {
+	Typer       string   `schema:"type"`
+	ID          string   `schema:"id"`     // the invoice id or bank-transaction reference
+	Action      string   `schema:"action"` // "link" or "unlink"
+	DonationIDs []string `schema:"donation-ids"`
+}
+
+// CheckLinkOrUnlinkForm coleects the postData and routeVars into a map for schema
+// decoding.
+func CheckLinkOrUnlinkForm(postData map[string][]string, routeVars map[string]string) (*LinkOrUnlinkForm, error) {
+	// collapse the routeVars into to the postData
+	for k, v := range routeVars {
+		postData[k] = []string{v}
+	}
+
+	// decode the form
+	var loul LinkOrUnlinkForm
+	decoder := newSchemaDecoder()
+	if err := decoder.Decode(&loul, postData); err != nil {
+		return nil, fmt.Errorf("post data decoding error: %v", err)
+	}
+	return &loul, nil
+
+}
+
+// Validate valides the link or unlink form.
+func (f *LinkOrUnlinkForm) Validate(v *Validator) {
+	if f == nil {
+		log.Println("no LinkOrUnlinkForm received")
+		return
+	}
+
+	allowedTyper := map[string]bool{"invoice": true, "bank-transaction": true}
+	v.Check(allowedTyper[f.Typer], "status", "Invalid type value provided.")
+
+	v.Check(f.ID != "", "id", "An empty ID was provided")
+
+	allowedActions := map[string]bool{"link": true, "unlink": true}
+	v.Check(allowedActions[f.Action], "action", "Invalid action provided.")
+
+	v.Check(len(f.DonationIDs) > 0, "donation-ids", "No donation ids found.")
+
 }
 
 // ------------------------------------------------------------------------------
