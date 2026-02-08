@@ -170,3 +170,12 @@ func getTenantID(ctx context.Context, client *http.Client) (string, error) {
 
 	return connections[0].TenantID, nil
 }
+
+// TokenIsValid loads a token from file and checks if it is valid.
+func TokenIsValid(path string) bool {
+	token, err := loadTokenFromFile(path)
+	if err != nil {
+		return false
+	}
+	return token.Valid()
+}

@@ -125,6 +125,10 @@ func TestTokenCache_ValidToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !TokenIsValid(tokenPath) {
+		t.Fatalf("token in %q should be valid", tokenPath)
+	}
+
 	cfg := &config.Config{
 		Salesforce: createSFConfig(t, "/callback/sf", server.URL, tokenPath),
 	}
@@ -199,6 +203,10 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 	}
 	if err := saveTokenCacheToFile(expiredTokenCache, tokenPath); err != nil {
 		t.Fatalf("could not save expired token cache to temp file %q: %v", tokenPath, err)
+	}
+
+	if TokenIsValid(tokenPath) {
+		t.Fatalf("token in %q should be invalid", tokenPath)
 	}
 
 	cfg := &config.Config{

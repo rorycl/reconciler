@@ -104,6 +104,10 @@ func TestToken_ValidToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !TokenIsValid(tokenPath) {
+		t.Fatalf("token in %q should be valid", tokenPath)
+	}
+
 	cfg := &config.Config{
 		Xero: config.XeroConfig{
 			TokenFilePath: tokenPath,
@@ -186,6 +190,10 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 	}
 	if err := saveTokenToFile(expiredToken, tokenPath); err != nil {
 		t.Fatalf("could not save expired token to temp file %q: %v", tokenPath, err)
+	}
+
+	if TokenIsValid(tokenPath) {
+		t.Fatalf("token in %q should be invalid", tokenPath)
 	}
 
 	cfg := &config.Config{

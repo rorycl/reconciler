@@ -158,3 +158,12 @@ func DeleteToken(path string) error {
 	}
 	return nil
 }
+
+// TokenIsValid loads a token from file and checks if it is valid.
+func TokenIsValid(path string) bool {
+	token, err := loadTokenCacheFromFile(path)
+	if err != nil {
+		return false
+	}
+	return token.Token.Valid()
+}
