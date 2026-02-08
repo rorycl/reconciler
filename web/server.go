@@ -124,8 +124,7 @@ func (web *WebApp) routes() http.Handler {
 	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsFind())
 
 	// Donation linking/unlinking.
-	r.Handle("/donations/link/{type:(?:invoice|bank-transaction)}/{id}", web.handleDonationsLink())
-	// r.Handle("/donations/unlink/{type:(?:invoice|bank-transaction)}/{id}", web.handleDonationsUnLink())
+	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", web.handleDonationsLinkUnlink())
 
 	logging := handlers.LoggingHandler(os.Stdout, r)
 	return logging
@@ -717,65 +716,82 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 	})
 }
 
-// handleDonationsLink links donations from the /donations/link... POST
-func (web *WebApp) handleDonationsLink() http.Handler {
+// handleDonationsLinkUnlink links or unlinks donations to either Xero invoices or bank
+// transactions.
+func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		ctx := r.Context()
 		if r.Method != "POST" {
-			web.clientError(w, "only POST requests allowed", http.StatusBadRequest)
+			web.htmxClientError(w, "only POST requests allowed")
 			return
 		}
 
 		// Extract url parameters.
-		vars, err := validMuxVars(mux.Vars(r), "type", "id")
+		vars, err := validMuxVars(mux.Vars(r), "type", "id", "action")
 		if err != nil {
-			web.clientError(w, err.Error(), http.StatusBadRequest)
+			fmt.Printf("link/unlink error: invalid mux vars: %v", err)
+			web.htmxClientError(w, err.Error())
 			return
 		}
-		vars["action"] = "link"
 
 		// Extract the form data.
 		err = r.ParseForm()
 		if err != nil {
-			web.clientError(w, fmt.Sprintf("invalid POST request: %v", err), http.StatusBadRequest)
+			fmt.Printf("invalid POST request: %v", err)
+			web.htmxClientError(
+				w,
+				fmt.Sprintf("%s form error: invalid POST request: %v", vars["action"], err),
+			)
 			return
 		}
 
 		// Validate the form data
 		form, err := CheckLinkOrUnlinkForm(r.PostForm, vars)
 		if err != nil {
-			web.clientError(w, fmt.Sprintf("invalid form data: %v", err), http.StatusBadRequest)
+			fmt.Printf("invalid form data: %v", err)
+			web.htmxClientError(
+				w,
+				fmt.Sprintf("%s form error: invalid form data: %v", vars["action"], err),
+			)
 			return
 		}
 		validator := NewValidator()
 		form.Validate(validator)
 		if !validator.Valid() {
 			// Consider reporting the errors better here.
-			web.clientError(w, fmt.Sprintf("invalid data was received: %v", validator.Errors), http.StatusBadRequest)
+			fmt.Printf("invalid data was received: %v", validator.Errors)
+			web.htmxClientError(
+				w,
+				fmt.Sprintf("%s form error: invalid data was received: %v", vars["action"], validator.Errors))
 			return
 		}
 
 		// Create the salesforce client and run a batch update.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg)
 		if err != nil {
-			web.serverError(w, r, fmt.Errorf("failed to create salesforce client for linking: %w", err))
+			fmt.Printf("failed to create salesforce client for linking/unlinking: %v", err)
+			web.serverError(w, r, fmt.Errorf("failed to create salesforce client for linking/unlinking: %w", err))
 			return
 		}
 		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.ID, form.DonationIDs, false)
 		if err != nil {
-			web.serverError(w, r, fmt.Errorf("failed to batch update salesforce records: %w", err))
+			log.Printf("failed to batch update salesforce records for linking/unlinking: %v", err)
+			web.serverError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
 			return
 		}
 
 		log.Printf("Successfully linked %d donations.", len(form.DonationIDs))
 
-		// Todo: target
-		// /partials/donations-find/{type:(?:invoice|bank-transaction)}/{id} and do a
-		// partial refresh.
+		web.htmxClientError(w, fmt.Sprintf("Successfully linked %d donations.", len(form.DonationIDs)))
+		return
+
+		// Redirect to the originator.
+		// Todo: set focus to either the "find" or "linked" donations tab.
 		redirectURL := fmt.Sprintf("/%s/%s", form.Typer, form.ID)
-		http.Redirect(w, r, redirectURL, http.StatusFound)
+		w.Header().Set("HX-Redirect", redirectURL)
+		w.WriteHeader(http.StatusOK)
 
 	})
 }
@@ -811,6 +827,18 @@ func (web *WebApp) clientError(w http.ResponseWriter, message string, status int
 		message = http.StatusText(status)
 	}
 	http.Error(w, message, status)
+}
+
+// htmxClientError returns an htmx client error.
+func (web *WebApp) htmxClientError(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// htmx won't normally process a non-200 response.
+	w.WriteHeader(http.StatusOK)
+	errorString := fmt.Sprintf(
+		`<div class="text-sm text-red px-4 pb-2">%s</div>`,
+		message,
+	)
+	w.Write([]byte(errorString))
 }
 
 // notfound raises a 404 clientError.

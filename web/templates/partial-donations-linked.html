@@ -6,8 +6,12 @@
 
 <h3 class="text-l text-slate-800 font-semibold px-4 py-3">Linked Salesforce Donations</h3>
 
+<div id="donations-unlink-error"></div>
+
 {{- /* the unlink form targets: Typer: invoice or bank-transaction .ID: the invoice number or bank-transaction reference */ -}}
-<form method="POST" action="/donations/unlink/{{ .Typer }}/{{ .ID }}">
+<form hx-post="/donations/{{ .Typer }}/{{ .ID }}/unlink"
+      hx-target="#donations-unlink-error"
+      hx-swap="innerHTML">
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
     <table class="min-w-full divide-y divide-slate-300 text-xs">
         <thead class="bg-indigo-100">

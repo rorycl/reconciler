@@ -11,8 +11,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var pageLen = 15
-
 func newRequest(t *testing.T, urlString string) *http.Request {
 	t.Helper()
 	r, err := http.NewRequest("GET", urlString, nil)
