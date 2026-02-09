@@ -42,17 +42,17 @@ func TestTokenCacheFileFuncs(t *testing.T) {
 	filePath := filepath.Join(dir, fileName)
 
 	// Save a token.
-	tc := &tokenCache{
+	tc := &TokenCache{
 		InstanceURL: "https://instance-url-example",
 		Token:       &oauth2.Token{AccessToken: "xyz-123-abc"},
 	}
-	err := saveTokenCacheToFile(tc, filePath)
+	err := SaveTokenCacheToFile(tc, filePath)
 	if err != nil {
 		t.Fatalf("save token failed: %v", err)
 	}
 
 	// Load the token from file.
-	tc2, err := loadTokenCacheFromFile(filePath)
+	tc2, err := LoadTokenCacheFromFile(filePath)
 	if err != nil {
 		t.Fatalf("load token failed %v", err)
 	}
@@ -114,14 +114,14 @@ func TestTokenCache_ValidToken(t *testing.T) {
 
 	// Create temporary token and save to file.
 	tokenPath := filepath.Join(t.TempDir(), "token.json")
-	validTokenCache := &tokenCache{
+	validTokenCache := &TokenCache{
 		InstanceURL: instanceURL,
 		Token: &oauth2.Token{
 			AccessToken: "valid-token-123",
 			Expiry:      time.Now().Add(1 * time.Hour), // not expired
 		},
 	}
-	if err := saveTokenCacheToFile(validTokenCache, tokenPath); err != nil {
+	if err := SaveTokenCacheToFile(validTokenCache, tokenPath); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,7 +193,7 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 	// Create temporary token and save to file.
 	tokenPath := filepath.Join(t.TempDir(), "token.json")
 
-	expiredTokenCache := &tokenCache{
+	expiredTokenCache := &TokenCache{
 		InstanceURL: instanceURL,
 		Token: &oauth2.Token{
 			AccessToken:  "expired-token-000",
@@ -201,7 +201,7 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 			Expiry:       time.Now().Add(-1 * time.Hour), // expired
 		},
 	}
-	if err := saveTokenCacheToFile(expiredTokenCache, tokenPath); err != nil {
+	if err := SaveTokenCacheToFile(expiredTokenCache, tokenPath); err != nil {
 		t.Fatalf("could not save expired token cache to temp file %q: %v", tokenPath, err)
 	}
 
@@ -225,13 +225,62 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 		t.Errorf("got instanceURL %q want %q", got, want)
 	}
 
-	// Save the tokenCache.
-	savedTokenCache, err := loadTokenCacheFromFile(tokenPath)
+	// Save the TokenCache.
+	savedTokenCache, err := LoadTokenCacheFromFile(tokenPath)
 	if err != nil {
 		t.Fatalf("failed to load token from disk: %v", err)
 	}
 	if got, want := savedTokenCache.Token.AccessToken, newAccessToken; got != want {
 		t.Errorf("token file was not updated: got %q, want %q", got, want)
 	}
+
+}
+
+func FuncTestAuthWebLoginAndCallback(t *testing.T) {
+
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	// Mocked Salesforce API authorization endpoint.
+	mux.HandleFunc("/oauth2/authorize", func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if got, want := authHeader, "Bearer "+newAccessToken; got != want {
+			t.Errorf("Incorrect Authorization header got %q want %q", got, want)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprintf(w, `[{"instance_url": "%s"}]`, instanceURL)
+	})
+
+	// Mocked Salesforce API /oauth2/token refresh endpoint
+	var refreshCalled bool
+	mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		refreshCalled = true
+
+		// Check that the oauth2 library is requesting a refresh correctly
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("Failed to parse form: %v", err)
+		}
+		if got := r.FormValue("grant_type"); got != "refresh_token" {
+			t.Errorf("expected grant_type refresh_token, got %s", got)
+		}
+		if got := r.FormValue("refresh_token"); got != "my-refresh-token" {
+			t.Errorf("expected refresh_token my-refresh-token, got %s", got)
+		}
+
+		// Respond with a new, valid token as JSON
+		w.Header().Set("Content-Type", "application/json")
+		newToken := &oauth2.Token{
+			AccessToken: newAccessToken,
+			TokenType:   "Bearer",
+			Expiry:      time.Now().Add(1 * time.Hour),
+		}
+		json.NewEncoder(w).Encode(newToken)
+	})
+
+	localMux := http.NewServeMux()
+	localServer := httptest.NewServer(localMux)
+	defer localServer.Close()
 
 }

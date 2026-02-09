@@ -18,16 +18,16 @@ import (
 // Salesforce API used for this client.
 const SalesforceAPIVersionNumber = "v65.0"
 
-// tokenCache is a helper struct to reliably save and load the OAuth2 token
+// TokenCache is a helper struct to reliably save and load the OAuth2 token
 // and the critical instance_url from a file.
-type tokenCache struct {
+type TokenCache struct {
 	Token       *oauth2.Token `json:"token"`
 	InstanceURL string        `json:"instance_url"`
 }
 
 // NewClient handles the OAuth2 flow to return an authenticated Salesforce client.
 func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
-	cache, err := loadTokenCacheFromFile(cfg.Salesforce.TokenFilePath)
+	cache, err := LoadTokenCacheFromFile(cfg.Salesforce.TokenFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("no token file found at '%s'. Please run the 'login' command first", cfg.Salesforce.TokenFilePath)
 	}
@@ -42,7 +42,7 @@ func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
 		log.Println("Access token was refreshed. Saving new token.")
 		cache.Token = refreshedToken
 		// The instance_url does not change on refresh, so keep the old one.
-		if err := saveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
+		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
 			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
 		}
 	}
@@ -56,9 +56,9 @@ func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
 	}, nil
 }
 
-// InitiateLogin starts the interactive OAuth2 flow to get a new token
-// from the web. It saves the new token and instance URL to the
-// specified configuration path upon success.
+// InitiateLogin starts the interactive cli OAuth2 flow to get a new token from the web.
+// It saves the new token and instance URL to the specified configuration path upon
+// success.
 func InitiateLogin(ctx context.Context, cfg *config.Config) error {
 	tok, err := getNewTokenFromWeb(ctx, cfg)
 	if err != nil {
@@ -70,16 +70,16 @@ func InitiateLogin(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("oauth token did not contain the required 'instance_url'")
 	}
 
-	cache := &tokenCache{Token: tok, InstanceURL: instanceURL}
-	if err := saveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
+	cache := &TokenCache{Token: tok, InstanceURL: instanceURL}
+	if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
 		return fmt.Errorf("failed to save new token: %w", err)
 	}
 	log.Println("Login successful. Token saved.")
 	return nil
 }
 
-// getNewTokenFromWeb starts a temporary web server to handle the OAuth2 callback.
-// It uses the PKCE extension for enhanced security.
+// getNewTokenFromWeb starts a temporary web server for the cli to handle the OAuth2
+// callback. It uses the PKCE extension for enhanced security.
 func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token, error) {
 	codeChan := make(chan string)
 	errChan := make(chan error)
@@ -128,20 +128,90 @@ func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token,
 	return tok, nil
 }
 
-// loadTokenCacheFromFile reads a token cache from a JSON file.
-func loadTokenCacheFromFile(path string) (*tokenCache, error) {
+// ValueStorer is an interface for storing variables. Typically this will be implemented
+// by a session store such as `github.com/alexedwards/scs/v2`.
+type valueStorer interface {
+	Put(ctx context.Context, key string, val any)
+	GetString(ctx context.Context, key string) string
+}
+
+type webServerError interface {
+	serverError(w http.ResponseWriter, r *http.Request, errs ...error)
+}
+
+// InitiateWebLogin is an http.Handler for preparing a Salesforce OAuth2
+// flow from a web interface.
+func InitiateWebLogin(cfg *config.Config, vs valueStorer, log *log.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		verifier := oauth2.GenerateVerifier()
+		authURL := cfg.Salesforce.OAuth2Config.AuthCodeURL(
+			"state-string", oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier),
+		)
+		vs.Put(ctx, "verifier", verifier) // put to session
+		http.Redirect(w, r, authURL, http.StatusSeeOther)
+	})
+}
+
+// WebLoginCallBack is an http.Handler for receiving a web callback initiated from a web
+// interface.
+// Todo: consider injecting the logger and web error function.
+func WebLoginCallBack(cfg *config.Config, vs valueStorer) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		verifier := vs.GetString("verifier") // retrieve from session.
+		if verifier == "" {
+			http.Error(w, "could not get verifier code from session", http.StatusInternalServerError)
+			return
+		}
+
+		// Extract the code from the api platform's response.
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Error(w, "did not get code in OAuth2 response", http.StatusInternalServerError)
+			return
+		}
+
+		// Check that the token could be verified using the PKCE code verifier.
+		tok, err := cfg.Salesforce.OAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to exchange authorization code for token: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// Salesforce requires an "instance_url" to be extracted from the token.
+		instanceURL, ok := tok.Extra("instance_url").(string)
+		if !ok || instanceURL == "" {
+			http.Error(w, fmt.Sprintff("oauth token did not contain the required 'instance_url'"), http.StatusInternalServerError)
+			return
+		}
+
+		// Save the token with the instance url.
+		cache := &TokenCache{Token: tok, InstanceURL: instanceURL}
+		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
+			http.Error(w, fmt.Sprintf("failed to save new token: %v", err), http.StatusInternalServerError)
+		}
+
+		// Success. Redirect to the "/connect" landing page.
+		http.Redirect(w, r, "/connect", http.StatusSeeOther)
+	})
+}
+
+// LoadTokenCacheFromFile reads a token cache from a JSON file.
+func LoadTokenCacheFromFile(path string) (*TokenCache, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	cache := &tokenCache{}
+	cache := &TokenCache{}
 	err = json.NewDecoder(f).Decode(cache)
 	return cache, err
 }
 
-// saveTokenCacheToFile writes a token cache to a JSON file with secure permissions.
-func saveTokenCacheToFile(cache *tokenCache, path string) error {
+// SaveTokenCacheToFile writes a token cache to a JSON file with secure permissions.
+func SaveTokenCacheToFile(cache *TokenCache, path string) error {
 	log.Printf("Saving token to %s", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -161,7 +231,7 @@ func DeleteToken(path string) error {
 
 // TokenIsValid loads a token from file and checks if it is valid.
 func TokenIsValid(path string) bool {
-	token, err := loadTokenCacheFromFile(path)
+	token, err := LoadTokenCacheFromFile(path)
 	if err != nil {
 		return false
 	}
