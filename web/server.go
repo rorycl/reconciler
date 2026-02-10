@@ -5,7 +5,7 @@ package web
 // Note that modules called by this server should provide self-describing errors since
 // these are sent directly to an internal server error func:
 //
-//	web.serverError(w, r, err)
+//	web.ServerError(w, r, err)
 //
 // This web server also sets out each endpoint handler as a HandlerFunc. This allows for
 // the router to provide arguments to the handler, as discussed in Mat Ryer's post at
@@ -16,7 +16,7 @@ package web
 // endpoint. This allows for endpoint-specific template error catching, and potential
 // use-case specific overriding of template `block` components, if required.
 //
-// Helper functions, such as `serverError` and `clientError` are at the end of the file.
+// Helper functions, such as `ServerError` and `clientError` are at the end of the file.
 
 import (
 	"bytes"
@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"os"
 	"reconciler/apiclients/salesforce"
+	"reconciler/apiclients/xero"
 	"reconciler/config"
 	"reconciler/db"
 	"time"
@@ -60,7 +61,15 @@ type WebApp struct {
 }
 
 // New initialises a WebApp. An error type is returned for future use.
-func New(logger *log.Logger, cfg *config.Config, db *db.DB, staticFS, templateFS fs.FS, start, end time.Time) (*WebApp, error) {
+func New(
+	logger *log.Logger,
+	cfg *config.Config,
+	db *db.DB,
+	staticFS fs.FS,
+	templateFS fs.FS,
+	start time.Time,
+	end time.Time,
+) (*WebApp, error) {
 	if start.After(end) {
 		return nil, fmt.Errorf("start date %s after end %s", start.Format("2006-01-2"), end.Format("2006-01-02"))
 	}
@@ -101,33 +110,84 @@ func (web *WebApp) routes() http.Handler {
 	fs := http.FileServerFS(web.staticFS)
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	r.Handle("/", web.handleRoot())
-	r.Handle("/connect", web.handleConnect())
-	r.Handle("/refresh", web.handleRefresh())
-	r.Handle("/home", web.handleHome()) // redirect to handleInvoices.
+	r.Handle(
+		"/",
+		web.handleRoot(), // synonym for /connect
+	)
+	r.Handle(
+		"/connect",
+		web.handleConnect(),
+	)
+	r.Handle(
+		"/refresh",
+		web.apisConnectedOK(web.handleRefresh()),
+	)
+	r.Handle(
+		"/home",
+		web.apisConnectedOK(web.handleHome()),
+	) // redirect to handleInvoices.
 
 	// Main listing pages.
-	r.Handle("/invoices", web.handleInvoices())
-	r.Handle("/bank-transactions", web.handleBankTransactions())
-	r.Handle("/donations", web.handleDonations())
+	r.Handle(
+		"/invoices",
+		web.apisConnectedOK(web.handleInvoices()),
+	)
+	r.Handle(
+		"/bank-transactions",
+		web.apisConnectedOK(web.handleBankTransactions()),
+	)
+	r.Handle(
+		"/donations",
+		web.apisConnectedOK(web.handleDonations()),
+	)
 	// Todo: consider adding campaigns page
 
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", web.handleInvoiceDetail())
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", web.handleBankTransactionDetail())
+	r.Handle(
+		"/invoice/{id:[A-Za-z0-9_-]+}",
+		web.apisConnectedOK(web.handleInvoiceDetail()),
+	)
+	r.Handle(
+		"/bank-transaction/{id:[A-Za-z0-9_-]+}",
+		web.apisConnectedOK(web.handleBankTransactionDetail()),
+	)
 	// Todo: donation detail page.
 
 	// Partial pages.
 	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
-	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsLinked())
-	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", web.handlePartialDonationsFind())
+	r.Handle(
+		"/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}",
+		web.apisConnectedOK(web.handlePartialDonationsLinked()),
+	)
+	r.Handle(
+		"/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}",
+		web.apisConnectedOK(web.handlePartialDonationsFind()),
+	)
 
 	// Donation linking/unlinking.
-	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", web.handleDonationsLinkUnlink())
+	r.Handle(
+		"/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}",
+		web.apisConnectedOK(web.handleDonationsLinkUnlink()),
+	)
 
 	logging := handlers.LoggingHandler(os.Stdout, r)
 	return logging
+}
+
+// apisConnectedOK checks whether the user is connected to the api services. If not, the user is
+// redirected to the /connect endpoint.
+func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		xeroConnected := xero.TokenIsValid(web.cfg.Xero.TokenFilePath)
+		sfConnected := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath)
+		if !xeroConnected || !sfConnected {
+			http.Redirect(w, r, "/connect", http.StatusSeeOther)
+			return
+		}
+	})
+
 }
 
 // handleRoot deals with http calls to "/" by redirecting to "/connect".
@@ -185,7 +245,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 
 		form := NewSearchForm()
 		if err := DecodeURLParams(r, form); err != nil {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -229,7 +289,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			form.Offset(),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -247,7 +307,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 		}
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 		}
 
 		web.render(w, r, templates, name, data)
@@ -267,7 +327,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 
 		form := NewSearchForm()
 		if err := DecodeURLParams(r, form); err != nil {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -311,7 +371,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			form.Offset(),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -329,7 +389,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		}
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 		}
 
 		web.render(w, r, templates, name, data)
@@ -349,7 +409,7 @@ func (web *WebApp) handleDonations() http.Handler {
 
 		form := NewSearchDonationsForm()
 		if err := DecodeURLParams(r, form); err != nil {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -398,7 +458,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			form.Offset(),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -461,7 +521,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		var lineItems []db.WRLineItem
 		data.Invoice, lineItems, err = web.db.InvoiceWRGet(ctx, invoiceID)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -512,7 +572,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		var lineItems []db.WRLineItem
 		data.Transaction, lineItems, err = web.db.BankTransactionWRGet(ctx, transactionReference)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -579,7 +639,7 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 			0, // form offset
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -602,7 +662,7 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		// Todo: fix page number (here 1)
 		data.Pagination, err = NewPagination(pageLen, recordsNo, 1, r.URL.Query())
 		if err != nil {
-			// web.serverError(w, r, err)
+			// web.ServerError(w, r, err)
 			web.log.Printf("pagination error: %v", err)
 		}
 
@@ -633,7 +693,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 
 		form := NewSearchDonationsForm()
 		if err := DecodeURLParams(r, form); err != nil {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 		}
 
 		// Create a validator and validate the form.
@@ -686,7 +746,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 			form.Offset(),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.serverError(w, r, err)
+			web.ServerError(w, r, err)
 			return
 		}
 
@@ -708,7 +768,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
 			log.Printf("pagination error: %v", err)
-			// web.serverError(w, r, err)
+			// web.ServerError(w, r, err)
 		}
 
 		web.render(w, r, templates, name, data)
@@ -772,13 +832,13 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		sfClient, err := salesforce.NewClient(ctx, web.cfg)
 		if err != nil {
 			fmt.Printf("failed to create salesforce client for linking/unlinking: %v", err)
-			web.serverError(w, r, fmt.Errorf("failed to create salesforce client for linking/unlinking: %w", err))
+			web.ServerError(w, r, fmt.Errorf("failed to create salesforce client for linking/unlinking: %w", err))
 			return
 		}
 		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.ID, form.DonationIDs, false)
 		if err != nil {
 			log.Printf("failed to batch update salesforce records for linking/unlinking: %v", err)
-			web.serverError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
+			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
 			return
 		}
 
@@ -806,16 +866,16 @@ func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *temp
 	err := template.ExecuteTemplate(buf, filename, data)
 	if err != nil {
 		web.log.Printf("template %q rendering error %v", filename, err)
-		web.serverError(w, r, err)
+		web.ServerError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 	buf.WriteTo(w)
 }
 
-// serverError logs and return an internal server error. The error should contain the
+// ServerError logs and return an internal server error. The error should contain the
 // information needed for logging.
-func (web *WebApp) serverError(w http.ResponseWriter, r *http.Request, errs ...error) {
+func (web *WebApp) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
 	err := errors.Join(errs...)
 	web.log.Printf(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

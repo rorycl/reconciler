@@ -15,13 +15,19 @@ import (
 // TestWebAppToRun is for running the web server in development.
 func TestWebAppToRun(t *testing.T) {
 
-	t.Skip()
+	// t.Skip()
 
 	logger := log.Default()
 
 	cfg := &config.Config{
 		Web: config.WebConfig{
 			ListenAddress: "127.0.0.1:8000",
+		},
+		Xero: config.XeroConfig{
+			TokenFilePath: "xero.json",
+		},
+		Salesforce: config.SalesforceConfig{
+			TokenFilePath: "salesforce.json",
 		},
 	}
 	accountCodes := "^(53|55|57)"
@@ -61,6 +67,12 @@ func TestWebAppAndShutdown(t *testing.T) {
 	cfg := &config.Config{
 		Web: config.WebConfig{
 			ListenAddress: "127.0.0.1:8000",
+		},
+		Xero: config.XeroConfig{
+			TokenFilePath: "xero.json",
+		},
+		Salesforce: config.SalesforceConfig{
+			TokenFilePath: "sf.json",
 		},
 	}
 	accountCodes := "^(53|55|57)"
