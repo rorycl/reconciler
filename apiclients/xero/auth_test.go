@@ -25,13 +25,13 @@ func TestTokenFileFuncs(t *testing.T) {
 
 	// Save a token.
 	tok := &oauth2.Token{AccessToken: "xyz-123-abc"}
-	err := saveTokenToFile(tok, filePath)
+	err := SaveTokenToFile(tok, filePath)
 	if err != nil {
 		t.Fatalf("save token failed: %v", err)
 	}
 
 	// Load the token from file.
-	tok2, err := loadTokenFromFile(filePath)
+	tok2, err := LoadTokenFromFile(filePath)
 	if err != nil {
 		t.Fatalf("load token failed %v", err)
 	}
@@ -100,7 +100,7 @@ func TestToken_ValidToken(t *testing.T) {
 		AccessToken: "valid-token-123",             // todo: fixme
 		Expiry:      time.Now().Add(1 * time.Hour), // not expired
 	}
-	if err := saveTokenToFile(validToken, tokenPath); err != nil {
+	if err := SaveTokenToFile(validToken, tokenPath); err != nil {
 		t.Fatal(err)
 	}
 
@@ -188,7 +188,7 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 		RefreshToken: "my-refresh-token",
 		Expiry:       time.Now().Add(-1 * time.Hour), // expired
 	}
-	if err := saveTokenToFile(expiredToken, tokenPath); err != nil {
+	if err := SaveTokenToFile(expiredToken, tokenPath); err != nil {
 		t.Fatalf("could not save expired token to temp file %q: %v", tokenPath, err)
 	}
 
@@ -220,7 +220,7 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 	}
 
 	// Save the token.
-	savedToken, err := loadTokenFromFile(tokenPath)
+	savedToken, err := LoadTokenFromFile(tokenPath)
 	if err != nil {
 		t.Fatalf("failed to load token from disk: %v", err)
 	}

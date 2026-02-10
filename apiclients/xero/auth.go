@@ -20,7 +20,7 @@ var connectionsURL = "https://api.xero.com/connections"
 // It attempts to use a saved token first and will refresh it if necessary.
 // If no token exists, it will fail, requiring the user to run the `login` command.
 func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
-	tok, err := loadTokenFromFile(cfg.Xero.TokenFilePath)
+	tok, err := LoadTokenFromFile(cfg.Xero.TokenFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("no token file found at '%s'. Please run 'reconciler login xero' first", cfg.Xero.TokenFilePath)
 	}
@@ -35,7 +35,7 @@ func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
 
 	if refreshedToken.AccessToken != tok.AccessToken {
 		log.Println("Access token was refreshed. Saving new token.")
-		if err := saveTokenToFile(refreshedToken, cfg.Xero.TokenFilePath); err != nil {
+		if err := SaveTokenToFile(refreshedToken, cfg.Xero.TokenFilePath); err != nil {
 			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
 		}
 	}
@@ -50,14 +50,14 @@ func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
 	return NewAPIClient(tenantID, oauthClient), nil
 }
 
-// InitiateLogin starts the interactive OAuth2 flow to get a new token from the web.
+// InitiateLogin starts the interactive cli OAuth2 flow to get a new token from the web.
 // It saves the new token to the specified path upon success.
 func InitiateLogin(ctx context.Context, cfg *config.Config) error {
 	tok, err := getNewTokenFromWeb(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get new token: %w", err)
 	}
-	if err := saveTokenToFile(tok, cfg.Xero.TokenFilePath); err != nil {
+	if err := SaveTokenToFile(tok, cfg.Xero.TokenFilePath); err != nil {
 		return fmt.Errorf("failed to save new token: %w", err)
 	}
 	log.Println("Login successful. Token saved.")
@@ -111,8 +111,8 @@ func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token,
 	return tok, nil
 }
 
-// loadTokenFromFile reads an OAuth2 token from a JSON file.
-func loadTokenFromFile(path string) (*oauth2.Token, error) {
+// LoadTokenFromFile reads an OAuth2 token from a JSON file.
+func LoadTokenFromFile(path string) (*oauth2.Token, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -123,8 +123,8 @@ func loadTokenFromFile(path string) (*oauth2.Token, error) {
 	return tok, err
 }
 
-// saveTokenToFile writes an OAuth2 token to a JSON file with secure permissions.
-func saveTokenToFile(token *oauth2.Token, path string) error {
+// SaveTokenToFile writes an OAuth2 token to a JSON file with secure permissions.
+func SaveTokenToFile(token *oauth2.Token, path string) error {
 	log.Printf("Saving token to %s", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -173,9 +173,9 @@ func getTenantID(ctx context.Context, client *http.Client) (string, error) {
 
 // TokenIsValid loads a token from file and checks if it is valid.
 func TokenIsValid(path string) bool {
-	token, err := loadTokenFromFile(path)
+	token, err := LoadTokenFromFile(path)
 	if err != nil {
 		return false
 	}
-	return token.Valid()
+	return token != nil && token.RefreshToken != ""
 }
