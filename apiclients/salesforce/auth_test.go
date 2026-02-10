@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,7 @@ import (
 
 	"reconciler/config"
 
+	"github.com/alexedwards/scs/v2"
 	"golang.org/x/oauth2"
 )
 
@@ -233,10 +235,23 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 	if got, want := savedTokenCache.Token.AccessToken, newAccessToken; got != want {
 		t.Errorf("token file was not updated: got %q, want %q", got, want)
 	}
-
 }
 
-func FuncTestAuthWebLoginAndCallback(t *testing.T) {
+// Initilise handler to suit the WebServerError interface.
+type errorsString string
+
+func (es errorsString) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
+	s := string(es)
+	for _, err := range errs {
+		s += err.Error() + "\n"
+	}
+	es = errorsString(s)
+}
+
+func TestAuthWebLoginAndCallback(t *testing.T) {
+
+	const instanceURL = "https://instance-url-example"
+	const newAccessToken = "new-token-456"
 
 	mux := http.NewServeMux()
 	server := httptest.NewServer(mux)
@@ -282,5 +297,40 @@ func FuncTestAuthWebLoginAndCallback(t *testing.T) {
 	localMux := http.NewServeMux()
 	localServer := httptest.NewServer(localMux)
 	defer localServer.Close()
+
+	tokenPath := filepath.Join(t.TempDir(), "token.json")
+	cfg := &config.Config{
+		Salesforce: createSFConfig(t, "/salesforce/callback", server.URL, tokenPath),
+	}
+
+	// Initialise session Store.
+	sessionStore := scs.New()
+
+	var theseErrors errorsString
+
+	localMux.Handle("/salesforce/init", InitiateWebLogin(cfg, sessionStore))
+	localMux.Handle("/salesforce/callback", WebLoginCallBack(cfg, sessionStore, theseErrors))
+
+	client := localServer.Client()
+
+	// does this follow redirects?
+	thisURL, err := url.JoinPath(localServer.URL, "/salesforce/init")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.Get(thisURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("web login and callback client failed: %v : status %d", err, resp.StatusCode)
+	}
+
+	// check errorsString
+	if string(theseErrors) != "" {
+		t.Fatalf("unexpected errors received: %v", theseErrors)
+	}
+
+	// check refresh?
+	if !refreshCalled {
+		t.Errorf("refresh not called")
+	}
 
 }

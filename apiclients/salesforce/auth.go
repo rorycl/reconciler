@@ -2,7 +2,10 @@ package salesforce
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -128,27 +131,44 @@ func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token,
 	return tok, nil
 }
 
-// ValueStorer is an interface for storing variables. Typically this will be implemented
+// ValueStorer is an interface for storing values. Typically this will be implemented
 // by a session store such as `github.com/alexedwards/scs/v2`.
-type valueStorer interface {
+type ValueStorer interface {
 	Put(ctx context.Context, key string, val any)
+	Remove(ctx context.Context, key string)
 	GetString(ctx context.Context, key string) string
 }
 
-type webServerError interface {
-	serverError(w http.ResponseWriter, r *http.Request, errs ...error)
+// WebServerError is an interface for raising web server errors.
+type WebServerError interface {
+	ServerError(w http.ResponseWriter, r *http.Request, errs ...error)
 }
 
 // InitiateWebLogin is an http.Handler for preparing a Salesforce OAuth2
 // flow from a web interface.
-func InitiateWebLogin(cfg *config.Config, vs valueStorer, log *log.Logger) http.Handler {
+func InitiateWebLogin(cfg *config.Config, vs ValueStorer) http.Handler {
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		// Generate random state.
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+			return
+		}
+		state := base64.URLEncoding.EncodeToString(b)
+		vs.Put(ctx, "state", state) // Save state to session
+
+		// Generate verifier.
 		verifier := oauth2.GenerateVerifier()
+		vs.Put(ctx, "verifier", verifier) // Save verifier to session
+
 		authURL := cfg.Salesforce.OAuth2Config.AuthCodeURL(
-			"state-string", oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier),
+			state,
+			oauth2.AccessTypeOffline,
+			oauth2.S256ChallengeOption(verifier),
 		)
-		vs.Put(ctx, "verifier", verifier) // put to session
 		http.Redirect(w, r, authURL, http.StatusSeeOther)
 	})
 }
@@ -156,41 +176,59 @@ func InitiateWebLogin(cfg *config.Config, vs valueStorer, log *log.Logger) http.
 // WebLoginCallBack is an http.Handler for receiving a web callback initiated from a web
 // interface.
 // Todo: consider injecting the logger and web error function.
-func WebLoginCallBack(cfg *config.Config, vs valueStorer) http.Handler {
+func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerError) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		verifier := vs.GetString("verifier") // retrieve from session.
+
+		// Retrieve the PKCE verifier from the session.
+		verifier := vs.GetString(ctx, "verifier") // retrieve from session.
 		if verifier == "" {
-			http.Error(w, "could not get verifier code from session", http.StatusInternalServerError)
+			errLogger.ServerError(w, r, errors.New("could not get verifier code from session"))
+			return
+		}
+		vs.Remove(ctx, "verifier")
+
+		// Retrieve the state token from the session.
+		state := vs.GetString(ctx, "state")
+		if state == "" {
+			errLogger.ServerError(w, r, errors.New("could not get state token from session"))
+			return
+		}
+		vs.Remove(ctx, "state")
+
+		// Extract and verify the state.
+		returnedState := r.URL.Query().Get("state")
+		if returnedState == "" || returnedState != state {
+			errLogger.ServerError(w, r, errors.New("invalid oauth state token"))
 			return
 		}
 
-		// Extract the code from the api platform's response.
+		// Extract the code from the api platform's response and check that the token
+		// could be verified using the PKCE code verifier.
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			http.Error(w, "did not get code in OAuth2 response", http.StatusInternalServerError)
+			errLogger.ServerError(w, r, errors.New("did not receive code in platform OAuth2 response"))
 			return
 		}
-
-		// Check that the token could be verified using the PKCE code verifier.
 		tok, err := cfg.Salesforce.OAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to exchange authorization code for token: %v", err), http.StatusInternalServerError)
+			errLogger.ServerError(w, r, fmt.Errorf("failed to exchange authorization code for token: %v", err))
 			return
 		}
 
 		// Salesforce requires an "instance_url" to be extracted from the token.
 		instanceURL, ok := tok.Extra("instance_url").(string)
 		if !ok || instanceURL == "" {
-			http.Error(w, fmt.Sprintff("oauth token did not contain the required 'instance_url'"), http.StatusInternalServerError)
+			errLogger.ServerError(w, r, fmt.Errorf("oauth token did not contain the required 'instance_url'"))
 			return
 		}
 
 		// Save the token with the instance url.
 		cache := &TokenCache{Token: tok, InstanceURL: instanceURL}
 		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
-			http.Error(w, fmt.Sprintf("failed to save new token: %v", err), http.StatusInternalServerError)
+			errLogger.ServerError(w, r, fmt.Errorf("failed to save new token: %v", err))
+			return
 		}
 
 		// Success. Redirect to the "/connect" landing page.
@@ -231,9 +269,9 @@ func DeleteToken(path string) error {
 
 // TokenIsValid loads a token from file and checks if it is valid.
 func TokenIsValid(path string) bool {
-	token, err := LoadTokenCacheFromFile(path)
+	cache, err := LoadTokenCacheFromFile(path)
 	if err != nil {
 		return false
 	}
-	return token.Token.Valid()
+	return cache.Token != nil && cache.Token.RefreshToken != ""
 }
