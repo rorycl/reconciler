@@ -21,7 +21,7 @@ func TestWebAppToRun(t *testing.T) {
 
 	cfg := &config.Config{
 		Web: config.WebConfig{
-			ListenAddress: "127.0.0.1:8000",
+			ListenAddress: "127.0.0.1:8080",
 		},
 		Xero: config.XeroConfig{
 			TokenFilePath: "xero.json",

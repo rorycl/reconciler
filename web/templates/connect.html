@@ -7,27 +7,50 @@
     <div class="prose">
         <h2 class="pb-4 text-base font-semibold">Welcome to the Charity Reconciler App</h2>
         <p class="pb-4">This application helps streamline financial reconciliation between Xero and Salesforce records for ROS.</p>
+        {{ if and (not .XeroTokenIsValid) (not .SFTokenIsValid) -}}
         <p>To begin, please connect to both services using your standard login details. You will need to grant this application permission to access your data.</p>
+        {{ end -}}
     </div>
-
-    <div class="mt-8 space-y-6">
+    <div class="mt-2 space-y-6">
         <!-- Connect to Xero -->
         <div class="p-4 border border border-4 rounded-md">
             <h3 class="font-semibold">Connect to Xero</h3>
             <p class="text-sm text-slate-600 mb-3">Authorize the app to read invoices and bank transactions.</p>
-            <a href="/refresh" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+            {{ if not .XeroTokenIsValid }}
+            <a href="/xero/init" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
                 Connect
             </a>
+            {{ else }}
+            <p class="inline-block text-sky-800 font-bold py-2">
+            Connected!
+            </p>
+            {{ end }}
         </div>
 
         <!-- Connect to Salesforce -->
         <div class="p-4 border border border-4 rounded-md">
             <h3 class="font-semibold">Connect to Salesforce</h3>
             <p class="text-sm text-slate-600 mb-3">Authorize the app to read and update donation records.</p>
-            <a href="/refresh" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+            {{ if not .SFTokenIsValid }}
+            <a href="/salesforce/init" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
                 Connect
             </a>
+            {{ else }}
+            <p class="inline-block text-sky-800 font-bold py-2">
+            Connected!
+            </p>
+            {{ end }}
         </div>
     </div>
+    {{ if and (.XeroTokenIsValid) (.SFTokenIsValid) }}
+    <div class="prose pt-4">
+        <p class="pb-4">Please continue to the data refresh page.</p>
+        <p class="pb-4">
+            <a href="/refresh" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+                Refresh
+            </a>
+        </p>
+    </div>
+    {{ end }}
 </div>
 {{ end }}

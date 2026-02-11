@@ -130,7 +130,8 @@ func (web *WebApp) routes() http.Handler {
 	r.Handle("/", web.handleRoot()) // synonym for /connect
 	r.Handle("/connect", web.handleConnect())
 	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions))
-	r.Handle("/salesforce/callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
+	// r.Handle("/salesforce/callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
+	r.Handle("/sf-callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
 	r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions))
 	r.Handle("/xero/callback", xero.WebLoginCallBack(web.cfg, web.sessions, web))
 
@@ -206,7 +207,15 @@ func (web *WebApp) handleConnect() http.Handler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		web.render(w, r, templates, name, nil)
+
+		sfTokenIsValid := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath)
+		xeroTokenIsValid := xero.TokenIsValid(web.cfg.Xero.TokenFilePath)
+
+		data := map[string]any{
+			"SFTokenIsValid":   sfTokenIsValid,
+			"XeroTokenIsValid": xeroTokenIsValid,
+		}
+		web.render(w, r, templates, name, data)
 	})
 }
 
