@@ -12,6 +12,9 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Todo: consider making OAuth2Config components injectable or come from the
+// configuration file.
+
 // Config represents the entire application configuration.
 type Config struct {
 	DatabasePath            string           `yaml:"database_path"`
@@ -131,7 +134,7 @@ func validateAndPrepare(c *Config) error {
 			AuthURL:  "https://login.xero.com/identity/connect/authorize",
 			TokenURL: "https://identity.xero.com/connect/token",
 		},
-		RedirectURL: "http://localhost:8080/callback/xero",
+		RedirectURL: "http://localhost:8080/xero/callback",
 		Scopes:      []string{"accounting.transactions", "accounting.settings.read", "offline_access"},
 	}
 
@@ -164,7 +167,7 @@ func validateAndPrepare(c *Config) error {
 	sc.OAuth2Config = &oauth2.Config{
 		ClientID:     sc.ClientID,
 		ClientSecret: sc.ClientSecret,
-		RedirectURL:  "http://localhost:8080/callback/sf",
+		RedirectURL:  "http://localhost:8080/salesforce/callback",
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  fmt.Sprintf("https://%s/services/oauth2/authorize", sc.LoginDomain),
 			TokenURL: fmt.Sprintf("https://%s/services/oauth2/token", sc.LoginDomain),
