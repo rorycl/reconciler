@@ -35,6 +35,7 @@ import (
 	"reconciler/db"
 	"time"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -58,6 +59,7 @@ type WebApp struct {
 	defaultStartDate time.Time
 	defaultEndDate   time.Time
 	server           *http.Server
+	sessions         *scs.SessionManager
 }
 
 // New initialises a WebApp. An error type is returned for future use.
@@ -82,6 +84,10 @@ func New(
 		MaxHeaderBytes:    1 << 19, // 100k ish
 	}
 
+	// Initialise in-memory session store.
+	scsSessionStore := scs.NewSession()
+	scsSessionStore.Lifetime = 12 * time.Hour
+
 	webApp := &WebApp{
 		log:              logger, // this conflicts with the gorilla logging middleware; also how about slog?
 		cfg:              cfg,
@@ -91,6 +97,7 @@ func New(
 		defaultStartDate: start,
 		defaultEndDate:   end,
 		server:           server,
+		sessions:         scsSessionStore,
 	}
 	return webApp, nil
 }
@@ -110,69 +117,55 @@ func (web *WebApp) routes() http.Handler {
 	fs := http.FileServerFS(web.staticFS)
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	r.Handle(
-		"/",
-		web.handleRoot(), // synonym for /connect
-	)
-	r.Handle(
-		"/connect",
-		web.handleConnect(),
-	)
-	r.Handle(
-		"/refresh",
-		web.apisConnectedOK(web.handleRefresh()),
-	)
-	r.Handle(
-		"/home",
-		web.apisConnectedOK(web.handleHome()),
-	) // redirect to handleInvoices.
+	// apisConnectedOk is a middleware ensuring certain endpoints are protected by a
+	// func that checks that both Salesforce and Xero apis are connected ok. 'connOK' is
+	// a shortcut.
+	apisOK := web.apisConnectedOK
+
+	// The /connect endpoint is the entry point to the system, ensuring that the api
+	// platform connections are made. All data-related endpoints below this section need
+	// to be protected by the apisOK/web.apisConnectedOK middleware.
+	//
+	// Note that the OAuth2 handlers are in the apiclient modules.
+	r.Handle("/", web.handleRoot()) // synonym for /connect
+	r.Handle("/connect", web.handleConnect())
+	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions))
+	r.Handle("/salesforce/callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
+	// r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions))
+	// r.Handle("/xero/callback", xero.WebLoginCallBack(web.cfg, web.sessions, web))
+
+	// Refresh is the data refresh page.
+	r.Handle("/refresh", apisOK(web.handleRefresh()))
 
 	// Main listing pages.
-	r.Handle(
-		"/invoices",
-		web.apisConnectedOK(web.handleInvoices()),
-	)
-	r.Handle(
-		"/bank-transactions",
-		web.apisConnectedOK(web.handleBankTransactions()),
-	)
-	r.Handle(
-		"/donations",
-		web.apisConnectedOK(web.handleDonations()),
-	)
+	r.Handle("/home", apisOK(web.handleHome())) // redirect to handleInvoices.
+	r.Handle("/invoices", apisOK(web.handleInvoices()))
+	r.Handle("/bank-transactions", apisOK(web.handleBankTransactions()))
+	r.Handle("/donations", apisOK(web.handleDonations()))
 	// Todo: consider adding campaigns page
 
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
-	r.Handle(
-		"/invoice/{id:[A-Za-z0-9_-]+}",
-		web.apisConnectedOK(web.handleInvoiceDetail()),
-	)
-	r.Handle(
-		"/bank-transaction/{id:[A-Za-z0-9_-]+}",
-		web.apisConnectedOK(web.handleBankTransactionDetail()),
-	)
-	// Todo: donation detail page.
+	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.handleInvoiceDetail()))
+	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.handleBankTransactionDetail()))
+	// Todo: donation detail page or callout to salesforce donation page or callout to
+	// a salesforce donation page.
 
 	// Partial pages.
 	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
-	r.Handle(
-		"/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}",
-		web.apisConnectedOK(web.handlePartialDonationsLinked()),
-	)
-	r.Handle(
-		"/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}",
-		web.apisConnectedOK(web.handlePartialDonationsFind()),
-	)
+	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsLinked()))
+	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsFind()))
 
 	// Donation linking/unlinking.
-	r.Handle(
-		"/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}",
-		web.apisConnectedOK(web.handleDonationsLinkUnlink()),
-	)
+	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.handleDonationsLinkUnlink()))
 
+	// Todo: logout
+	// Logout -- delete the api connection tokens and redirect to /connect
+
+	// Chain the desired middleware. Todo: add recover handler.
 	logging := handlers.LoggingHandler(os.Stdout, r)
-	return logging
+	sessionMiddleWare := web.sessions.LoadAndSave(logging)
+	return sessionMiddleWare
 }
 
 // apisConnectedOK checks whether the user is connected to the api services. If not, the user is
@@ -180,14 +173,18 @@ func (web *WebApp) routes() http.Handler {
 func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		xeroConnected := xero.TokenIsValid(web.cfg.Xero.TokenFilePath)
-		sfConnected := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath)
-		if !xeroConnected || !sfConnected {
-			http.Redirect(w, r, "/connect", http.StatusSeeOther)
+		if !xero.TokenIsValid(web.cfg.Xero.TokenFilePath) {
+			web.log.Println("xero token is not valid, redirecting")
+			http.Redirect(w, r, "/connect?status=xero_token_invalid", http.StatusSeeOther)
 			return
 		}
+		if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath) {
+			web.log.Println("saleforce token is not valid, redirecting")
+			http.Redirect(w, r, "/connect?status=sf_token_invalid", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
-
 }
 
 // handleRoot deals with http calls to "/" by redirecting to "/connect".
@@ -831,13 +828,21 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		// Create the salesforce client and run a batch update.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg)
 		if err != nil {
-			fmt.Printf("failed to create salesforce client for linking/unlinking: %v", err)
+			// Todo: decide if sfClient fails to always delete the current token.
+			/*
+				if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath) {
+					...os.Remove...
+					web.log.Print("handle Donations Link/Unlink detected an invalid token, redirecting to /connect")
+					http.Redirect(w, r, "/connect?error=sf_expired", http.StatusSeeOther)
+					return
+				}
+			*/
 			web.ServerError(w, r, fmt.Errorf("failed to create salesforce client for linking/unlinking: %w", err))
 			return
 		}
+
 		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.ID, form.DonationIDs, false)
 		if err != nil {
-			log.Printf("failed to batch update salesforce records for linking/unlinking: %v", err)
 			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
 			return
 		}

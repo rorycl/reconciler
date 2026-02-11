@@ -15,7 +15,7 @@ import (
 // TestWebAppToRun is for running the web server in development.
 func TestWebAppToRun(t *testing.T) {
 
-	// t.Skip()
+	t.Skip()
 
 	logger := log.Default()
 
