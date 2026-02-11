@@ -200,7 +200,7 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 				errLogger.ServerError(w, r, errors.New("missing pkce 'verifier' in session"))
 				return
 			}
-			vs.Remove(ctx, "verifier") // Remove verifier from session.
+			vs.Remove(ctx, "xero-verifier") // Remove verifier from session.
 		}
 
 		// Extract the authorization code from the api platform's response.

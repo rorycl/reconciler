@@ -69,6 +69,20 @@ func TestTokenFileFuncs(t *testing.T) {
 	}
 }
 
+// TestTokenValid tests if a slightly modified real xero token is valid.
+func TestTokenValid(t *testing.T) {
+
+	file := "testdata/xero_token.json"
+	_, err := LoadTokenFromFile(file)
+	if err != nil {
+		t.Fatal("error loading test json file", err)
+	}
+	if !TokenIsValid(file) {
+		t.Errorf("token was not classed as valid")
+	}
+
+}
+
 // setupTestServer creates a test environment for OAuth2 web server calls.
 func setupTestServer(t *testing.T) (mux *http.ServeMux, teardown func(), addr string) {
 	t.Helper()
