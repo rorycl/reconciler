@@ -167,7 +167,8 @@ func validateAndPrepare(c *Config) error {
 	sc.OAuth2Config = &oauth2.Config{
 		ClientID:     sc.ClientID,
 		ClientSecret: sc.ClientSecret,
-		RedirectURL:  "http://localhost:8080/salesforce/callback",
+		// RedirectURL:  "http://localhost:8080/salesforce/callback",
+		RedirectURL: "http://localhost:8080/sf-callback",
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  fmt.Sprintf("https://%s/services/oauth2/authorize", sc.LoginDomain),
 			TokenURL: fmt.Sprintf("https://%s/services/oauth2/token", sc.LoginDomain),
