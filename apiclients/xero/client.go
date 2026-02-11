@@ -250,3 +250,32 @@ func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 
 	return resp, nil
 }
+
+// getTenantID fetches the list of connections and returns the first TenantID found.
+func getTenantID(ctx context.Context, client *http.Client) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", connectionsURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create connections request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get connections: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error getting connections (status %d)", resp.StatusCode)
+	}
+
+	var connections []Connection
+	if err := json.NewDecoder(resp.Body).Decode(&connections); err != nil {
+		return "", fmt.Errorf("failed to decode connections response: %w", err)
+	}
+
+	if len(connections) == 0 {
+		return "", fmt.Errorf("no tenants found for this connection")
+	}
+
+	return connections[0].TenantID, nil
+}

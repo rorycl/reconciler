@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,8 +14,26 @@ import (
 
 	"reconciler/config"
 
+	"github.com/alexedwards/scs/v2"
 	"golang.org/x/oauth2"
 )
+
+func createXeroConfig(t *testing.T, callbackURL, serverURL, tokenPath string) config.XeroConfig {
+	t.Helper()
+	return config.XeroConfig{
+		ClientID:      "my-client-id",
+		ClientSecret:  "my-client-secret",
+		TokenFilePath: tokenPath,
+		OAuth2Config: &oauth2.Config{
+			RedirectURL: callbackURL,
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  fmt.Sprintf("%s/oauth2/authorize", serverURL),
+				TokenURL: fmt.Sprintf("%s/oauth2/token", serverURL),
+			},
+			Scopes: []string{"api", "refresh_token"},
+		},
+	}
+}
 
 // TestTokenFileFuncs tests the token file saving, reading and deletion
 // functions.
@@ -192,8 +211,9 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 		t.Fatalf("could not save expired token to temp file %q: %v", tokenPath, err)
 	}
 
-	if TokenIsValid(tokenPath) {
-		t.Fatalf("token in %q should be invalid", tokenPath)
+	// Counterintuitively, this test succeeds because it has a refresh token entry.
+	if !TokenIsValid(tokenPath) {
+		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
 	cfg := &config.Config{
@@ -228,4 +248,180 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 		t.Errorf("token file was not updated: got %q, want %q", got, want)
 	}
 
+}
+
+// mock the WebServerError interface.
+type mockErrorLogger struct {
+	t *testing.T
+}
+
+// ServerError meets the WebServerError interface for raising web server errors.
+func (m mockErrorLogger) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
+	m.t.Helper()
+	for _, err := range errs {
+		m.t.Logf("[WebServerError] %v", err)
+	}
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+}
+
+// TestAuthWebLoginAndCallbacktests the local web OAuth2 login and callback
+// handlers with and without PKCE verification.
+func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
+
+	const mockInstanceURL = "https://mock-xero-instance.com"
+	const mockAccessToken = "mock-access-token-zyx"
+	const testOAuth2Code = "08b2c1d"
+
+	// set Xero auth useOAuth2PKCE to true
+	uOP := useOAuth2PKCE
+	t.Cleanup(func() {
+		useOAuth2PKCE = uOP
+	})
+
+	// Create a web server to act for the xero platform.
+	xeroMux := http.NewServeMux()
+	xeroServer := httptest.NewServer(xeroMux)
+	defer xeroServer.Close()
+
+	// Mock the xero token endpoint.
+	xeroMux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		// Check this is an authorization_code exchange.
+		if got, want := r.FormValue("grant_type"), "authorization_code"; got != want {
+			t.Errorf("expected grant_type %q, got %q", got, want)
+		}
+		if got, want := r.FormValue("code"), testOAuth2Code; got != want {
+			t.Errorf("expected code %q, got %q", got, want)
+		}
+		if useOAuth2PKCE {
+			if r.FormValue("code_verifier") == "" {
+				t.Errorf("expected a PKCE code_verifier in the token request")
+			}
+		}
+		// Return a token.
+		w.Header().Set("Content-type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  mockAccessToken,
+			"token_type":    "Bearer",
+			"refresh_token": "mock-refresh-token",
+			"instance_url":  mockInstanceURL,
+			"expires_in":    3600,
+		})
+	})
+
+	// Setup a local server for attaching the handlers for testing.
+	tokenPath := filepath.Join(t.TempDir(), "web_handler_token.json")
+
+	cfg := &config.Config{
+		Xero: createXeroConfig(
+			t,
+			"/xero/callback",
+			xeroServer.URL,
+			tokenPath,
+		),
+	}
+
+	// Setup in-memory session manager.
+	sessionManager := scs.New()
+	sessionManager.Lifetime = 1 * time.Hour
+
+	// Attach the handlers with the session middleware.
+	localMux := http.NewServeMux()
+
+	localMux.Handle("/xero/init", sessionManager.LoadAndSave(
+		InitiateWebLogin(cfg, sessionManager),
+	))
+
+	localMux.Handle("/xero/callback", sessionManager.LoadAndSave(
+		WebLoginCallBack(cfg, sessionManager, mockErrorLogger{t: t}),
+	))
+
+	localServer := httptest.NewServer(localMux)
+	defer localServer.Close()
+
+	// ************************************************************************
+	// client testing actions
+	// ************************************************************************
+
+	// Run two clients: one in PKCE mode, one without.
+	for ii, tt := range []bool{true, false} {
+		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
+
+			useOAuth2PKCE = tt
+
+			// Test client has redirect disabled.
+			client := &http.Client{
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
+			}
+
+			// Test phase 1 (init).
+			initURL, _ := url.JoinPath(localServer.URL, "/xero/init")
+			resp, err := client.Get(initURL)
+			if err != nil {
+				t.Fatalf("Failed to call /init: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusSeeOther {
+				t.Fatalf("expected 303 redirect from /init; got %d", resp.StatusCode)
+			}
+
+			cookies := resp.Cookies()
+			if len(cookies) == 0 {
+				t.Fatal("exected session cookie from /init, got none")
+			}
+			phase1SessionCookie := cookies[0]
+
+			locationURL, err := url.Parse(resp.Header.Get("Location"))
+			if err != nil {
+				t.Fatalf("failed to parse redirect location: %v", err)
+			}
+			phase1State := locationURL.Query().Get("state")
+			if phase1State == "" {
+				t.Fatal("redirect URL did not contain 'state' parameter")
+			}
+
+			// Test phase 2 (callback).
+			callbackURL, _ := url.Parse(localServer.URL)
+			callbackURL.Path = "/xero/callback"
+
+			q := callbackURL.Query()
+			q.Set("state", phase1State)
+			q.Set("code", testOAuth2Code)
+			callbackURL.RawQuery = q.Encode()
+
+			// Setup the request to the callback url; attaching the session cookie.
+			req, _ := http.NewRequest("GET", callbackURL.String(), nil)
+			req.AddCookie(phase1SessionCookie)
+
+			respCallback, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("Failed to call /callback: %v", err)
+			}
+			defer respCallback.Body.Close()
+
+			if respCallback.StatusCode != http.StatusSeeOther {
+				t.Fatalf("expected 303 Redirect from /callback (success), got %d", respCallback.StatusCode)
+			}
+
+			expectedRedirect := "/connect"
+			if got := respCallback.Header.Get("Location"); got != expectedRedirect {
+				t.Errorf("expected redirect to %q, got %q", expectedRedirect, got)
+			}
+
+			// Verify persistence.
+			savedToken, err := LoadTokenFromFile(tokenPath)
+			if err != nil {
+				t.Fatalf("could not load generated token file: %v", err)
+			}
+			if got, want := savedToken.AccessToken, mockAccessToken; got != want {
+				t.Errorf("saved Token: got %q want %q", got, want)
+			}
+		})
+	}
 }

@@ -2,7 +2,10 @@ package xero
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,7 +17,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// connectionsURL is the present base API url for Xero.
 var connectionsURL = "https://api.xero.com/connections"
+
+// useOAuth2PKCE sets whether to use PKCE OAuth2 token verification.
+var useOAuth2PKCE = false
 
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
 // It attempts to use a saved token first and will refresh it if necessary.
@@ -111,6 +118,126 @@ func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token,
 	return tok, nil
 }
 
+// ValueStorer is an interface for storing values. Typically this will be implemented
+// by a session store such as `github.com/alexedwards/scs/v2`.
+type ValueStorer interface {
+	Put(ctx context.Context, key string, val any)
+	Remove(ctx context.Context, key string)
+	GetString(ctx context.Context, key string) string
+}
+
+// WebServerError is an interface for raising web server errors.
+type WebServerError interface {
+	ServerError(w http.ResponseWriter, r *http.Request, errs ...error)
+}
+
+// InitiateWebLogin is an http.Handler for preparing a Xero OAuth2
+// flow from a web interface. The Xero flow does not presently use a PKCE verifier.
+func InitiateWebLogin(cfg *config.Config, vs ValueStorer) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Generate random state.
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			http.Error(w, "Failed to generate state", http.StatusInternalServerError)
+			return
+		}
+		state := base64.URLEncoding.EncodeToString(b)
+		vs.Put(ctx, "xero-state", state) // Save state to session
+
+		// Generate verifier if applicable
+		if !useOAuth2PKCE {
+			authURL := cfg.Xero.OAuth2Config.AuthCodeURL(
+				state,
+				oauth2.AccessTypeOffline,
+			)
+			http.Redirect(w, r, authURL, http.StatusSeeOther)
+			return
+		}
+
+		verifier := oauth2.GenerateVerifier()
+		vs.Put(ctx, "xero-verifier", verifier) // Save verifier to session
+
+		authURL := cfg.Xero.OAuth2Config.AuthCodeURL(
+			state,
+			oauth2.AccessTypeOffline,
+			oauth2.S256ChallengeOption(verifier),
+		)
+		http.Redirect(w, r, authURL, http.StatusSeeOther)
+	})
+}
+
+// WebLoginCallBack is an http.Handler for receiving a web callback initiated from a web
+// interface. The Xero callback does not presently support a PKCE verifier.
+// Todo: consider injecting the logger and web error function.
+func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerError) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Retrieve the state (CSRF protection) from the session and then check it
+		// matches the state returned by the platform in the incoming url.
+		state := vs.GetString(ctx, "xero-state")
+		if state == "" {
+			errLogger.ServerError(w, r, errors.New("missing 'state' in session"))
+			return
+		}
+		vs.Remove(ctx, "xero-state") // Remove state from session.
+
+		queryState := r.URL.Query().Get("state")
+		if queryState == "" || queryState != state {
+			errLogger.ServerError(w, r, errors.New("missing oauth 'state' in platform response"))
+			return
+		}
+
+		var verifier string
+		if useOAuth2PKCE {
+			// Retrieve the PKCE verifier from the session.
+			verifier = vs.GetString(ctx, "xero-verifier")
+			if verifier == "" {
+				errLogger.ServerError(w, r, errors.New("missing pkce 'verifier' in session"))
+				return
+			}
+			vs.Remove(ctx, "verifier") // Remove verifier from session.
+		}
+
+		// Extract the authorization code from the api platform's response.
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			errLogger.ServerError(w, r, errors.New("missing 'code' in platform response"))
+			return
+		}
+
+		// Exchange code for token using verifier, if applicable
+		var tok *oauth2.Token
+		var err error
+		if useOAuth2PKCE {
+			tok, err = cfg.Xero.OAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+			if err != nil {
+				errLogger.ServerError(w, r, fmt.Errorf("token with pkce exchange failed: %w", err))
+				return
+			}
+		} else {
+			tok, err = cfg.Xero.OAuth2Config.Exchange(ctx, code)
+			if err != nil {
+				errLogger.ServerError(w, r, fmt.Errorf("token exchange failed: %w", err))
+				return
+			}
+		}
+
+		// Save the token
+		if err := SaveTokenToFile(tok, cfg.Xero.TokenFilePath); err != nil {
+			errLogger.ServerError(w, r, fmt.Errorf("failed to save new token: %w", err))
+			return
+		}
+
+		// Success. Redirect to the "/connect" landing page.
+		http.Redirect(w, r, "/connect", http.StatusSeeOther)
+	})
+}
+
 // LoadTokenFromFile reads an OAuth2 token from a JSON file.
 func LoadTokenFromFile(path string) (*oauth2.Token, error) {
 	f, err := os.Open(path)
@@ -142,40 +269,15 @@ func DeleteToken(path string) error {
 	return nil
 }
 
-// getTenantID fetches the list of connections and returns the first TenantID found.
-func getTenantID(ctx context.Context, client *http.Client) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", connectionsURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create connections request: %w", err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to get connections: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("error getting connections (status %d)", resp.StatusCode)
-	}
-
-	var connections []Connection
-	if err := json.NewDecoder(resp.Body).Decode(&connections); err != nil {
-		return "", fmt.Errorf("failed to decode connections response: %w", err)
-	}
-
-	if len(connections) == 0 {
-		return "", fmt.Errorf("no tenants found for this connection")
-	}
-
-	return connections[0].TenantID, nil
-}
-
-// TokenIsValid loads a token from file and checks if it is valid.
+// TokenIsValid loads a token from file and checks if the token is valid or if a refresh
+// token exists to get a new token.
 func TokenIsValid(path string) bool {
 	token, err := LoadTokenFromFile(path)
 	if err != nil {
 		return false
 	}
-	return token != nil && token.RefreshToken != ""
+	if token == nil {
+		return false
+	}
+	return token.Valid() || token.RefreshToken != ""
 }
