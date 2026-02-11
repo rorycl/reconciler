@@ -26,7 +26,7 @@ import (
 )
 
 //go:embed sql
-var sqlEmbeddedFS embed.FS
+var SQLEmbeddedFS embed.FS
 
 // parameterizedStmt describes an sql file parsed into an sqlx NamedStmt expecting the
 // provided args.
@@ -76,9 +76,8 @@ type DB struct {
 	donationUpsertStmt *parameterizedStmt
 }
 
-// prepareNamedStatementsOnStartup sets whether to register the prepared SQL statements
-// on startup. This is used for testing to delay registration. The default is true.
-var prepareNamedStatementsOnStartup bool = true
+// testingMode defers setup of the schema and prepared statements
+var testingMode = true
 
 // NewConnection creates a new connection to an SQLite database at the given path.
 func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, error) {
@@ -86,7 +85,7 @@ func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, erro
 	// mount the sql fs either using the embedded fs or via the provided path.
 	// The path is likely to need to be relative to "here" as ".." type paths are not
 	// accepted by fs mounting.
-	sqlFS, err := internal.NewFileMount("sql", sqlEmbeddedFS, sqlDir)
+	sqlFS, err := internal.NewFileMount("sql", SQLEmbeddedFS, sqlDir)
 	if err != nil {
 		return nil, fmt.Errorf("mount error: %v", err)
 	}
@@ -128,13 +127,22 @@ func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, erro
 		logger:       logger,
 	}
 
-	// Normally prepared statements are run on startup, but need to be deferred for
-	// loading of schema and test data for testing.
-	if prepareNamedStatementsOnStartup {
-		err = db.prepareNamedStatements()
-		if err != nil {
-			return nil, fmt.Errorf("could not prepare named statements: %w", err)
-		}
+	// Return early in testing mode, so that prepared statments and schema loading can
+	// be tested..
+	if testingMode {
+		return db, nil
+	}
+
+	// Initialize the data schema. This is idempotent.
+	err = db.InitSchema(sqlFS, "schema.sql")
+	if err != nil {
+		return nil, fmt.Errorf("schema setup error: %w", err)
+	}
+
+	// Initialize the databse named statements.
+	err = db.prepareNamedStatements()
+	if err != nil {
+		return nil, fmt.Errorf("could not prepare named statements: %w", err)
 	}
 
 	return db, nil
@@ -145,9 +153,9 @@ func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) 
 	if !strings.Contains(dbPath, ":memory:") {
 		return nil, fmt.Errorf("db path %q invalid for test mode", dbPath)
 	}
-	prepareNamedStatementsOnStartup = false
+	testingMode = true
 	defer func() {
-		prepareNamedStatementsOnStartup = true
+		testingMode = false
 	}()
 
 	testDB, err := NewConnection(dbPath, sqlDir, accountCodes)

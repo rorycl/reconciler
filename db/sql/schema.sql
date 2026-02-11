@@ -3,25 +3,25 @@
  Tables for System, Xero and Salesforce data.
 */
 
-CREATE TABLE system (
+CREATE TABLE IF NOT EXISTS system (
     id INTEGER PRIMARY KEY  -- Assuming only one row with id=1 for the desktop app
-    
+
     -- oauth2 token information
-    ,sf_token TEXT          -- marshalled oauth2.Token 
-    ,sf_instance_url TEXT          
-    ,xero_token TEXT        -- marshalled oauth2.Token 
-    ,xero_tenant_id TEXT           
-    
+    ,sf_token TEXT          -- marshalled oauth2.Token
+    ,sf_instance_url TEXT
+    ,xero_token TEXT        -- marshalled oauth2.Token
+    ,xero_tenant_id TEXT
+
     -- data refresh metadata
     ,sf_data_refreshed DATETIME
     ,xero_data_refreshed DATETIME
 );
 
 -- Ensure only one row for applicaton state.
-CREATE UNIQUE INDEX idx_single_row ON system ((1)); 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_single_row ON system ((1));
 
 -- bank transactions holds Xero bank transactions.
-CREATE TABLE bank_transactions (
+CREATE TABLE IF NOT EXISTS bank_transactions (
     id                  TEXT PRIMARY KEY -- Use TEXT for UUIDs is common in SQLite
     ,type                TEXT
     ,status              TEXT
@@ -36,7 +36,7 @@ CREATE TABLE bank_transactions (
 );
 
 -- Xero bank transaction line items.
-CREATE TABLE bank_transaction_line_items (
+CREATE TABLE IF NOT EXISTS bank_transaction_line_items (
     id              TEXT PRIMARY KEY
     ,transaction_id  TEXT
     ,description     TEXT
@@ -49,7 +49,7 @@ CREATE TABLE bank_transaction_line_items (
 );
 
 -- Xero invoices.
-CREATE TABLE invoices (
+CREATE TABLE IF NOT EXISTS invoices (
     id                  TEXT PRIMARY KEY
     ,type                TEXT
     ,status              TEXT
@@ -65,7 +65,7 @@ CREATE TABLE invoices (
 );
 
 -- Xero invoice line items.
-CREATE TABLE invoice_line_items (
+CREATE TABLE IF NOT EXISTS invoice_line_items (
     id              TEXT PRIMARY KEY
     ,invoice_id      TEXT
     ,description     TEXT
@@ -78,7 +78,7 @@ CREATE TABLE invoice_line_items (
 );
 
 -- Xero accounts.
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
    id             TEXT PRIMARY KEY
    ,code           TEXT
    ,name           TEXT
@@ -93,7 +93,7 @@ CREATE TABLE accounts (
 
 -- Salesforce opportunities are also known as "donations" when a charity
 -- is using the Salesforce non-profit success pack (NPSP).
-CREATE TABLE donations (
+CREATE TABLE IF NOT EXISTS donations (
     id                      TEXT PRIMARY KEY
     ,name                    TEXT
     ,amount                  REAL
