@@ -6,6 +6,7 @@ sfcli/sfcli
 
 # config
 config/config.yaml
+config.yaml
 
 # storage
 xero_token.json
