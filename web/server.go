@@ -131,8 +131,8 @@ func (web *WebApp) routes() http.Handler {
 	r.Handle("/connect", web.handleConnect())
 	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions))
 	r.Handle("/salesforce/callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
-	// r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions))
-	// r.Handle("/xero/callback", xero.WebLoginCallBack(web.cfg, web.sessions, web))
+	r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions))
+	r.Handle("/xero/callback", xero.WebLoginCallBack(web.cfg, web.sessions, web))
 
 	// Refresh is the data refresh page.
 	r.Handle("/refresh", apisOK(web.handleRefresh()))
