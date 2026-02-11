@@ -181,43 +181,44 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Retrieve the PKCE verifier from the session.
-		verifier := vs.GetString(ctx, "verifier") // retrieve from session.
-		if verifier == "" {
-			errLogger.ServerError(w, r, errors.New("could not get verifier code from session"))
-			return
-		}
-		vs.Remove(ctx, "verifier")
-
-		// Retrieve the state token from the session.
+		// Retrieve the state (CSRF protection) from the session and then check it
+		// matches the state returned by the platform in the incoming url.
 		state := vs.GetString(ctx, "state")
 		if state == "" {
-			errLogger.ServerError(w, r, errors.New("could not get state token from session"))
+			errLogger.ServerError(w, r, errors.New("missing 'state' in session"))
 			return
 		}
-		vs.Remove(ctx, "state")
+		vs.Remove(ctx, "state") // Remove state from session.
 
-		// Extract and verify the state.
-		returnedState := r.URL.Query().Get("state")
-		if returnedState == "" || returnedState != state {
-			errLogger.ServerError(w, r, errors.New("invalid oauth state token"))
+		queryState := r.URL.Query().Get("state")
+		if queryState == "" || queryState != state {
+			errLogger.ServerError(w, r, errors.New("missing oauth 'state' in platform response"))
 			return
 		}
 
-		// Extract the code from the api platform's response and check that the token
-		// could be verified using the PKCE code verifier.
+		// Retrieve the PKCE verifier from the session.
+		verifier := vs.GetString(ctx, "verifier")
+		if verifier == "" {
+			errLogger.ServerError(w, r, errors.New("missing 'verifier' in session"))
+			return
+		}
+		vs.Remove(ctx, "verifier") // Remove verifier from session.
+
+		// Extract the authorization code from the api platform's response.
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			errLogger.ServerError(w, r, errors.New("did not receive code in platform OAuth2 response"))
-			return
-		}
-		tok, err := cfg.Salesforce.OAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
-		if err != nil {
-			errLogger.ServerError(w, r, fmt.Errorf("failed to exchange authorization code for token: %v", err))
+			errLogger.ServerError(w, r, errors.New("missing 'code' in platform response"))
 			return
 		}
 
-		// Salesforce requires an "instance_url" to be extracted from the token.
+		// Exchange code for token using verifier.
+		tok, err := cfg.Salesforce.OAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+		if err != nil {
+			errLogger.ServerError(w, r, fmt.Errorf("token exchange failed: %w", err))
+			return
+		}
+
+		// An "instance_url" is required from the token.
 		instanceURL, ok := tok.Extra("instance_url").(string)
 		if !ok || instanceURL == "" {
 			errLogger.ServerError(w, r, fmt.Errorf("oauth token did not contain the required 'instance_url'"))
@@ -227,7 +228,7 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 		// Save the token with the instance url.
 		cache := &TokenCache{Token: tok, InstanceURL: instanceURL}
 		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
-			errLogger.ServerError(w, r, fmt.Errorf("failed to save new token: %v", err))
+			errLogger.ServerError(w, r, fmt.Errorf("failed to save new token: %w", err))
 			return
 		}
 
@@ -267,11 +268,17 @@ func DeleteToken(path string) error {
 	return nil
 }
 
-// TokenIsValid loads a token from file and checks if it is valid.
+// TokenIsValid loads a token from file and checks if it has a valid token or a refresh
+// token to get a new token.
 func TokenIsValid(path string) bool {
 	cache, err := LoadTokenCacheFromFile(path)
 	if err != nil {
 		return false
 	}
-	return cache.Token != nil && cache.Token.RefreshToken != ""
+	if cache.Token == nil {
+		return false
+	}
+	// Returns true if the token is still valid or there is a refresh token to get a new
+	// one.
+	return cache.Token.Valid() || cache.Token.RefreshToken != ""
 }

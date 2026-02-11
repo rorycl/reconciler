@@ -207,8 +207,9 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 		t.Fatalf("could not save expired token cache to temp file %q: %v", tokenPath, err)
 	}
 
-	if TokenIsValid(tokenPath) {
-		t.Fatalf("token in %q should be invalid", tokenPath)
+	// Counterintuitively, this test succeeds because it has a refresh token entry.
+	if !TokenIsValid(tokenPath) {
+		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
 	cfg := &config.Config{
@@ -237,100 +238,165 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 	}
 }
 
-// Initilise handler to suit the WebServerError interface.
-type errorsString string
-
-func (es errorsString) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
-	s := string(es)
-	for _, err := range errs {
-		s += err.Error() + "\n"
-	}
-	es = errorsString(s)
+// mock the WebServerError interface.
+type mockErrorLogger struct {
+	t *testing.T
 }
 
+// ServerError meets the WebServerError interface for raising web server errors.
+func (m mockErrorLogger) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
+	m.t.Helper()
+	for _, err := range errs {
+		m.t.Logf("[WebServerError] %v", err)
+	}
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+}
+
+// TestAuthWebLoginAndCallback tests the local web OAuth2 login and callback handlers.
 func TestAuthWebLoginAndCallback(t *testing.T) {
 
-	const instanceURL = "https://instance-url-example"
-	const newAccessToken = "new-token-456"
+	const mockInstanceURL = "https://mock-salesforce-instance.com"
+	const mockAccessToken = "mock-access-token-zyx"
+	const testOAuth2Code = "01c20e0b"
 
-	mux := http.NewServeMux()
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	// Create a web server to act for the salesforce platform.
+	sfMux := http.NewServeMux()
+	sfServer := httptest.NewServer(sfMux)
+	defer sfServer.Close()
 
-	// Mocked Salesforce API authorization endpoint.
-	mux.HandleFunc("/oauth2/authorize", func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if got, want := authHeader, "Bearer "+newAccessToken; got != want {
-			t.Errorf("Incorrect Authorization header got %q want %q", got, want)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	// Mock the salesforce token endpoint.
+	sfMux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-		fmt.Fprintf(w, `[{"instance_url": "%s"}]`, instanceURL)
+		// Check this is an authorization_code exchange.
+		if got, want := r.FormValue("grant_type"), "authorization_code"; got != want {
+			t.Errorf("expected grant_type %q, got %q", got, want)
+		}
+		if got, want := r.FormValue("code"), testOAuth2Code; got != want {
+			t.Errorf("expected code %q, got %q", got, want)
+		}
+		if r.FormValue("code_verifier") == "" {
+			t.Errorf("expected a PKCE code_verifier in the token request")
+		}
+		// Return a token.
+		w.Header().Set("Content-type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  mockAccessToken,
+			"token_type":    "Bearer",
+			"refresh_token": "mock-refresh-token",
+			"instance_url":  mockInstanceURL,
+			"expires_in":    3600,
+		})
 	})
 
-	// Mocked Salesforce API /oauth2/token refresh endpoint
-	var refreshCalled bool
-	mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
-		refreshCalled = true
+	// Setup a local server for attaching the handlers for testing.
+	tokenPath := filepath.Join(t.TempDir(), "web_handler_token.json")
 
-		// Check that the oauth2 library is requesting a refresh correctly
-		if err := r.ParseForm(); err != nil {
-			t.Fatalf("Failed to parse form: %v", err)
-		}
-		if got := r.FormValue("grant_type"); got != "refresh_token" {
-			t.Errorf("expected grant_type refresh_token, got %s", got)
-		}
-		if got := r.FormValue("refresh_token"); got != "my-refresh-token" {
-			t.Errorf("expected refresh_token my-refresh-token, got %s", got)
-		}
+	cfg := &config.Config{
+		Salesforce: createSFConfig(
+			t,
+			"/salesforce/callback",
+			sfServer.URL,
+			tokenPath,
+		),
+	}
 
-		// Respond with a new, valid token as JSON
-		w.Header().Set("Content-Type", "application/json")
-		newToken := &oauth2.Token{
-			AccessToken: newAccessToken,
-			TokenType:   "Bearer",
-			Expiry:      time.Now().Add(1 * time.Hour),
-		}
-		json.NewEncoder(w).Encode(newToken)
-	})
+	// Setup in-memory session manager.
+	sessionManager := scs.New()
+	sessionManager.Lifetime = 1 * time.Hour
 
+	// Attach the handlers with the session middleware.
 	localMux := http.NewServeMux()
+
+	localMux.Handle("/salesforce/init", sessionManager.LoadAndSave(
+		InitiateWebLogin(cfg, sessionManager),
+	))
+
+	localMux.Handle("/salesforce/callback", sessionManager.LoadAndSave(
+		WebLoginCallBack(cfg, sessionManager, mockErrorLogger{t: t}),
+	))
+
 	localServer := httptest.NewServer(localMux)
 	defer localServer.Close()
 
-	tokenPath := filepath.Join(t.TempDir(), "token.json")
-	cfg := &config.Config{
-		Salesforce: createSFConfig(t, "/salesforce/callback", server.URL, tokenPath),
+	// ************************************************************************
+	// client testing actions
+	// ************************************************************************
+
+	// Test client has redirect disabled.
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
-	// Initialise session Store.
-	sessionStore := scs.New()
-
-	var theseErrors errorsString
-
-	localMux.Handle("/salesforce/init", InitiateWebLogin(cfg, sessionStore))
-	localMux.Handle("/salesforce/callback", WebLoginCallBack(cfg, sessionStore, theseErrors))
-
-	client := localServer.Client()
-
-	// does this follow redirects?
-	thisURL, err := url.JoinPath(localServer.URL, "/salesforce/init")
+	// Test phase 1 (init).
+	initURL, _ := url.JoinPath(localServer.URL, "/salesforce/init")
+	resp, err := client.Get(initURL)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to call /init: %v", err)
 	}
-	resp, err := client.Get(thisURL)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		t.Fatalf("web login and callback client failed: %v : status %d", err, resp.StatusCode)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect from /init; got %d", resp.StatusCode)
 	}
 
-	// check errorsString
-	if string(theseErrors) != "" {
-		t.Fatalf("unexpected errors received: %v", theseErrors)
+	cookies := resp.Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("exected session cookie from /init, got none")
+	}
+	phase1SessionCookie := cookies[0]
+
+	locationURL, err := url.Parse(resp.Header.Get("Location"))
+	if err != nil {
+		t.Fatalf("failed to parse redirect location: %v", err)
+	}
+	phase1State := locationURL.Query().Get("state")
+	if phase1State == "" {
+		t.Fatal("redirect URL did not contain 'state' parameter")
 	}
 
-	// check refresh?
-	if !refreshCalled {
-		t.Errorf("refresh not called")
+	// Test phase 2 (callback).
+	callbackURL, _ := url.Parse(localServer.URL)
+	callbackURL.Path = "/salesforce/callback"
+
+	q := callbackURL.Query()
+	q.Set("state", phase1State)
+	q.Set("code", testOAuth2Code)
+	callbackURL.RawQuery = q.Encode()
+
+	// Setup the request to the callback url; attaching the session cookie.
+	req, _ := http.NewRequest("GET", callbackURL.String(), nil)
+	req.AddCookie(phase1SessionCookie)
+
+	respCallback, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to call /callback: %v", err)
+	}
+	defer respCallback.Body.Close()
+
+	if respCallback.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expected 303 Redirect from /callback (success), got %d", respCallback.StatusCode)
+	}
+
+	expectedRedirect := "/connect"
+	if got := respCallback.Header.Get("Location"); got != expectedRedirect {
+		t.Errorf("expected redirect to %q, got %q", expectedRedirect, got)
+	}
+
+	// Verify persistence.
+	savedCache, err := LoadTokenCacheFromFile(tokenPath)
+	if err != nil {
+		t.Fatalf("could not load generated token file: %v", err)
+	}
+	if got, want := savedCache.InstanceURL, mockInstanceURL; got != want {
+		t.Errorf("saved instanceURL: got %q, want %q", got, want)
+	}
+	if got, want := savedCache.Token.AccessToken, mockAccessToken; got != want {
+		t.Errorf("saved accessToken: got %q want %q", got, want)
 	}
 
 }
