@@ -7,9 +7,13 @@
 <div id="donations-link-error" class="text-red-500"></div>
 
 {{- /* the link form targets: Typer: invoice or bank-transaction .ID: the invoice number or bank-transaction reference */ -}}
+{{- /* Note that the main donations page also uses this page, and has a Typer of "direct", like the PageType  */ -}}
+
+{{ if ne .Typer "direct" }}
 <form hx-post="/donations/{{ .Typer }}/{{ .ID }}/link"
       hx-target="#donations-link-error"
       hx-swap="innerHTML">
+{{ end }}
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
     <table class="min-w-full divide-y divide-slate-300 text-xs">
         <thead class="bg-slate-100 text-slate-700">

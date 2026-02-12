@@ -41,6 +41,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var inDevelopment = func() bool {
+	_, ok := os.LookupEnv("INDEVELOPMENT")
+	if ok {
+		fmt.Println("Nota Bene: INDEVELOPMENT mode")
+	}
+	return ok
+}()
+
 // pageLen is the number of items to show in a page listing.
 const pageLen = 15
 
@@ -174,6 +182,12 @@ func (web *WebApp) routes() http.Handler {
 // apisConnectedOK checks whether the user is connected to the api services. If not, the user is
 // redirected to the /connect endpoint.
 func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
+
+	if inDevelopment {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r)
+		})
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !xero.TokenIsValid(web.cfg.Xero.TokenFilePath) {
@@ -553,6 +567,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			PageTitle     string
 			ViewDonations []viewDonation
 			Form          *SearchDonationsForm
+			Typer         string // needed for the partial search results
 			Validator     *Validator
 			Pagination    *Pagination
 			CurrentPage   string
@@ -561,6 +576,7 @@ func (web *WebApp) handleDonations() http.Handler {
 		}{
 			PageTitle:   "Donations",
 			Form:        form,
+			Typer:       "direct",
 			Validator:   validator,
 			Pagination:  pagination,
 			CurrentPage: "donations",
