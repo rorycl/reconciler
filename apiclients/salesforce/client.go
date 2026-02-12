@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -190,7 +191,7 @@ func (c *Client) do(req *http.Request, v any) (*http.Response, error) {
 	}
 
 	// Uncomment to save the raw response to disk for debugging.
-	// _ = os.WriteFile("salesforce_response.json", body, 0644)
+	_ = os.WriteFile("/tmp/salesforce_response.json", body, 0644)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))

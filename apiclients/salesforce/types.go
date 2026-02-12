@@ -207,14 +207,17 @@ func (su *SOQLUnmarshaller) unmarshalAndMapRecord(data []byte) (Donation, error)
 	}
 
 	// Check all anticipated mapper values exist in donation.
-	for k, v := range su.Mapper {
-		if _, ok := donation.AdditionalFields[v]; !ok {
-			return donation, &ErrUnmarshallFieldNotFoundError{
-				originalField: k,
-				newField:      v,
+	// Todo: deal with SOFT error condition
+	/*
+		for k, v := range su.Mapper {
+			if _, ok := donation.AdditionalFields[v]; !ok {
+				return donation, &ErrUnmarshallFieldNotFoundError{
+					originalField: k,
+					newField:      v,
+				}
 			}
 		}
-	}
+	*/
 
 	return donation, nil
 }
