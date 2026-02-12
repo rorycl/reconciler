@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -242,8 +243,13 @@ func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
+	body, _ := io.ReadAll(resp.Body)
+	_ = os.WriteFile("/tmp/xero.json", body, 0644)
+	bodyReader := bytes.NewReader(body)
+
 	if v != nil { // v might be nil for a DELETE request, for example.
-		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		// if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		if err := json.NewDecoder(bodyReader).Decode(v); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}

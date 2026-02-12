@@ -2,9 +2,26 @@ package xero
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 )
+
+func TestParseXeroDate(t *testing.T) {
+	dateTimes := []string{
+		`/Date(1301880520783+0000)/`,
+		`/Date(1767010099219)/`,
+		`\/Date(1770855011934)\/`,
+	}
+	for _, dt := range dateTimes {
+		parsedDate, err := parseXeroDate(dt)
+		if err != nil {
+			t.Errorf("date string %q could not be parsed", dt)
+		} else {
+			fmt.Println(parsedDate)
+		}
+	}
+}
 
 func TestAccountsType(t *testing.T) {
 	b, err := os.ReadFile("testdata/accounts.json")

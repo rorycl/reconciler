@@ -10,7 +10,8 @@ import (
 )
 
 // xeroDateRegex is used to extract the milliseconds timestamp from Xero's custom date format.
-var xeroDateRegex = regexp.MustCompile(`\/Date\((\d+).*\)\/`)
+// Beware of inconsistent `\/` date escaping.
+var xeroDateRegex = regexp.MustCompile(`Date\((-?\d+)(?:[+-]\d+)?\)`)
 
 // parseXeroDate converts a Xero /Date(1234...)/ string into a time.Time object.
 func parseXeroDate(xeroDate string) (time.Time, error) {
@@ -21,7 +22,7 @@ func parseXeroDate(xeroDate string) (time.Time, error) {
 
 	timestamp, err := strconv.ParseInt(matches[1], 10, 64)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("could not parse timestamp from xero date: %w", err)
+		return time.Time{}, fmt.Errorf("could not parse timestamp %q from xero date: %w", xeroDate, err)
 	}
 
 	// Xero provides milliseconds, time.Unix needs seconds.
