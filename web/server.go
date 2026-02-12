@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -137,6 +138,7 @@ func (web *WebApp) routes() http.Handler {
 
 	// Refresh is the data refresh page.
 	r.Handle("/refresh", apisOK(web.handleRefresh()))
+	r.Handle("/refresh/update", apisOK(web.handleRefreshUpdates()))
 
 	// Main listing pages.
 	r.Handle("/home", apisOK(web.handleHome())) // redirect to handleInvoices.
@@ -226,8 +228,127 @@ func (web *WebApp) handleRefresh() http.Handler {
 	tpls := []string{"base.html", "refresh.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
+	// The start date from which data will be downloaded is set in the configuration file.
+	dataStartDate := web.cfg.DataStartDate
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		web.render(w, r, templates, name, nil)
+		ctx := r.Context()
+		refreshed := web.sessions.GetBool(ctx, "refreshed")
+		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
+
+		data := map[string]any{
+			"DataStartDate": dataStartDate,
+			"Refreshed":     refreshed,
+			"LastRefresh":   lastRefresh,
+		}
+		web.render(w, r, templates, name, data)
+	})
+}
+
+// handleRefreshUpdates serves the htmx partial /refresh/update info for refreshing data
+// from the api platforms into the database.
+func (web *WebApp) handleRefreshUpdates() http.Handler {
+
+	dataStartDate := web.cfg.DataStartDate
+
+	logAndPrintToWeb := func(w io.Writer, format string, a ...any) {
+		web.log.Printf(format, a)
+		// Writing output here doesn't work because it will be buffered.
+		// _, _ = fmt.Fprintf(w, format, a)
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+
+		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
+
+		web.sessions.Put(ctx, "refreshed", false)
+		// web.sessions.Put(ctx, "refreshed-datetime", time.Time{})
+
+		if !lastRefresh.IsZero() {
+			lastRefresh.Add(-1 * time.Minute)
+		}
+
+		xeroClient, err := xero.NewClient(ctx, web.cfg)
+		if err != nil {
+			web.ServerError(w, r, fmt.Errorf("failed to create xero client: %w", err))
+			return
+		}
+		web.log.Println("Xero client authenticated successfully.")
+
+		// Retrieve the Xero accounts, bank transactions and invoices.
+		// The following steps ideally would update the content at the end of the
+		// templates/refresh #data-refresh-updates div.
+
+		// Accounts
+		accounts, err := xeroClient.GetAccounts(ctx, dataStartDate)
+		if err != nil {
+			logAndPrintToWeb(w, "accounts retrieval error: %v", err)
+			return
+		}
+		logAndPrintToWeb(w, "retrieved %d account records", len(accounts))
+
+		if err := web.db.AccountsUpsert(ctx, accounts); err != nil {
+			logAndPrintToWeb(w, "failed to upsert account records", err)
+			return
+		}
+		logAndPrintToWeb(w, "Successfully upserted accounts to database.")
+
+		// Bank Transactions
+		transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh)
+		if err != nil {
+			logAndPrintToWeb(w, "bank transaction retrieval error: %v", err)
+			return
+		}
+		logAndPrintToWeb(w, "retrieved %d bank transactions", len(transactions))
+
+		if err = web.db.BankTransactionsUpsert(ctx, transactions); err != nil {
+			logAndPrintToWeb(w, "failed to upsert bank transactions", err)
+			return
+		}
+		logAndPrintToWeb(w, "Successfully upserted bank transactions to database.")
+
+		// Invoices
+		invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh)
+		if err != nil {
+			logAndPrintToWeb(w, "invoices retrieval error: %v", err)
+			return
+		}
+		logAndPrintToWeb(w, "retrieved %d invoices", len(invoices))
+
+		if err := web.db.InvoicesUpsert(ctx, invoices); err != nil {
+			logAndPrintToWeb(w, "failed to upsert invoices", err)
+			return
+		}
+		logAndPrintToWeb(w, "Successfully upserted invoices to database.")
+
+		// Retrieve the Salesforce donations.
+		sfClient, err := salesforce.NewClient(ctx, web.cfg)
+		if err != nil {
+			logAndPrintToWeb(w, "donations retrieval error: %v", err)
+			return
+		}
+		donations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefresh)
+		if err != nil {
+			logAndPrintToWeb(w, "failed to retrieve donations", err)
+			return
+		}
+		logAndPrintToWeb(w, "retrieved %d donations", len(donations))
+		if err := web.db.UpsertDonations(ctx, donations); err != nil {
+			logAndPrintToWeb(w, "failed to upsert donations", err)
+			return
+		}
+		logAndPrintToWeb(w, "successfully upserted donations to database", err)
+
+		// Update session information
+		web.sessions.Put(ctx, "refreshed", true)
+		web.sessions.Put(ctx, "refreshed-datetime", time.Now())
+
+		// Redirect to invoices
+		w.Header().Set("HX-Redirect", "/invoices")
+		w.WriteHeader(http.StatusOK)
+
 	})
 }
 
