@@ -15,9 +15,7 @@ sf_token.json
 # db
 db/sql/test.db
 db/sql/test.db-*
-
-# backups
-reconciliation.db.*
+reconciliation.db*
 
 # bin files
 bin
