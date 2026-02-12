@@ -41,10 +41,13 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// inDevelopment is a temporary development flag.
 var inDevelopment = func() bool {
 	_, ok := os.LookupEnv("INDEVELOPMENT")
 	if ok {
+		fmt.Println("*****************************")
 		fmt.Println("Nota Bene: INDEVELOPMENT mode")
+		fmt.Println("*****************************")
 	}
 	return ok
 }()
@@ -268,6 +271,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 	logAndPrintToWeb := func(w io.Writer, format string, a ...any) {
 		web.log.Printf(format, a)
 		// Writing output here doesn't work because it will be buffered.
+		// Todo: consider SSE solution.
 		// _, _ = fmt.Fprintf(w, format, a)
 	}
 
@@ -360,8 +364,13 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		web.sessions.Put(ctx, "refreshed-datetime", time.Now())
 
 		// Redirect to invoices
-		w.Header().Set("HX-Redirect", "/invoices")
-		w.WriteHeader(http.StatusOK)
+		/*
+			Causing a double refresh for some reason on Windows.
+			w.Header().Set("HX-Redirect", "/invoices")
+			w.WriteHeader(http.StatusOK)
+		*/
+
+		http.Redirect(w, r, "/invoices", http.StatusFound)
 
 	})
 }
@@ -923,6 +932,8 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 // transactions.
 func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
+	dataStartDate := web.cfg.DataStartDate
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		ctx := r.Context()
@@ -987,6 +998,8 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			return
 		}
 
+		timeStamp := time.Now()
+
 		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.ID, form.DonationIDs, false)
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
@@ -994,6 +1007,14 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		}
 
 		log.Printf("Successfully linked %d donations.", len(form.DonationIDs))
+
+		// Upsert the updated opportunities.
+		// The refresh window is rough; double upserts shouldn't be a major issue.
+		_, err = sfClient.GetOpportunities(ctx, dataStartDate, timeStamp.Add(-5*time.Second))
+		if err != nil {
+			web.ServerError(w, r, fmt.Errorf("failed to upsert the linked opportunities: %v", err))
+			return
+		}
 
 		web.htmxClientError(w, fmt.Sprintf("Successfully linked %d donations.", len(form.DonationIDs)))
 		return
