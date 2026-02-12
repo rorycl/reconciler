@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"reconciler/config"
@@ -109,5 +110,40 @@ func TestWebAppAndShutdown(t *testing.T) {
 	err = webApp.StartServer()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		t.Fatalf("server error: %T %v", err, err)
+	}
+}
+
+// TestDonationSearchTimeSpan tests the dates around which a donation should be searched
+// for in relation to an invoice or bank transaction.
+func TestDonationSearchTimeSpan(t *testing.T) {
+	tests := []struct {
+		dt    time.Time
+		start time.Time
+		end   time.Time
+	}{
+		{
+			dt:    time.Time{},
+			start: time.Time{},
+			end:   time.Time{},
+		},
+		{
+			dt:    time.Date(2026, 07, 01, 12, 0, 0, 0, time.UTC),
+			start: time.Date(2026, 05, 20, 12, 0, 0, 0, time.UTC),
+			end:   time.Date(2026, 07, 15, 12, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("time_test_%d", ii), func(t *testing.T) {
+
+			s, e := donationSearchTimeSpan(tt.dt)
+			if got, want := s, tt.start; got != want {
+				t.Errorf("start got %v want %v", got, want)
+			}
+			if got, want := e, tt.end; got != want {
+				t.Errorf("end got %v want %v", got, want)
+			}
+
+		})
 	}
 }

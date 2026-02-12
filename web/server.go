@@ -20,6 +20,7 @@ package web
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
@@ -364,13 +365,9 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		web.sessions.Put(ctx, "refreshed-datetime", time.Now())
 
 		// Redirect to invoices
-		/*
-			Causing a double refresh for some reason on Windows.
-			w.Header().Set("HX-Redirect", "/invoices")
-			w.WriteHeader(http.StatusOK)
-		*/
-
-		http.Redirect(w, r, "/invoices", http.StatusFound)
+		w.Header().Set("HX-Redirect", "/invoices")
+		w.WriteHeader(http.StatusOK)
+		return
 
 	})
 }
@@ -663,11 +660,16 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 			Invoice   db.WRInvoice
 			LineItems []viewLineItem
 			ID        string
+			DFK       string // for Invoices, this is the Invoice Number
 			TabType   string
+			Typer     string
+			// Donation Search Dates
+			DonationSearchStart, DonationSearchEnd time.Time
 		}{
 			PageTitle: fmt.Sprintf("Invoice %s", invoiceID),
 			ID:        invoiceID,
 			TabType:   "link", // by default the donations tab type is "link", not "find"
+			Typer:     "invoice",
 		}
 
 		var lineItems []db.WRLineItem
@@ -676,8 +678,10 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 			web.ServerError(w, r, err)
 			return
 		}
+		data.DonationSearchStart, data.DonationSearchEnd = donationSearchTimeSpan(data.Invoice.Date)
 
 		data.LineItems = newViewLineItems(lineItems)
+		data.DFK = data.Invoice.InvoiceNumber
 
 		// Return a 404 if no invoice was found.
 		if errors.Is(err, sql.ErrNoRows) {
@@ -714,11 +718,16 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 			Transaction db.WRTransaction
 			LineItems   []viewLineItem
 			ID          string
+			DFK         string // for Transactions , this is the Reference
 			TabType     string
+			Typer       string
+			// Donation Search Dates
+			DonationSearchStart, DonationSearchEnd time.Time
 		}{
 			PageTitle: fmt.Sprintf("Bank Transaction %s", transactionReference),
 			ID:        transactionReference,
 			TabType:   "link", // by default the donations tab type is "link", not "find"
+			Typer:     "bank-transaction",
 		}
 
 		var lineItems []db.WRLineItem
@@ -727,9 +736,13 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 			web.ServerError(w, r, err)
 			return
 		}
+		data.DonationSearchStart, data.DonationSearchEnd = donationSearchTimeSpan(data.Transaction.Date)
 
 		data.LineItems = newViewLineItems(lineItems)
-
+		data.DFK = *data.Transaction.Reference
+		if data.DFK == "" {
+			data.DFK = "missing reference"
+		}
 		// Return a 404 if no bank transaction was found.
 		if errors.Is(err, sql.ErrNoRows) {
 			web.notFound(w, r, fmt.Sprintf("Bank Transaction: %q not found", transactionReference))
@@ -737,7 +750,6 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		}
 
 		web.render(w, r, templates, name, data)
-
 	})
 }
 
@@ -766,18 +778,32 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		// Todo: fix page number (here 1)
 		pagination, _ := NewPagination(pageLen, 1, 1, r.URL.Query())
 
+		// retrieve the related invoice or bank transaction dfk and date
+		dfk, dater, err := web.getInvoiceOrBankTransactionDetails(ctx, typer, id)
+		if err != nil {
+			web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
+			return
+		}
+		donationSearchStart, donationSearchEnd := donationSearchTimeSpan(dater)
+
 		// Prepare data for the template.
 		data := struct {
 			ID            string
 			Typer         string
+			DFK           string
 			ViewDonations []viewDonation
 			Pagination    *Pagination
 			TabType       string
+			// Donation Date Search parameters
+			DonationSearchStart, DonationSearchEnd time.Time
 		}{
-			ID:         id,
-			Typer:      typer,
-			Pagination: pagination,
-			TabType:    "link",
+			ID:                  id,
+			Typer:               typer,
+			DFK:                 dfk,
+			Pagination:          pagination,
+			TabType:             "link",
+			DonationSearchStart: donationSearchStart,
+			DonationSearchEnd:   donationSearchEnd,
 		}
 
 		donations, err := web.db.DonationsGet(
@@ -855,12 +881,21 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 		// Initialise pagination for default state.
 		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
 
+		// retrieve the related invoice or bank transaction dfk and date
+		dfk, dater, err := web.getInvoiceOrBankTransactionDetails(ctx, typer, id)
+		if err != nil {
+			web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
+			return
+		}
+		donationSearchStart, donationSearchEnd := donationSearchTimeSpan(dater)
+
 		// Prepare data for the template, allowing passing of validation
 		// errors back to the template if necessary.
 		data := struct {
 			PageTitle     string
 			ID            string
 			Typer         string
+			DFK           string
 			ViewDonations []viewDonation
 			Form          *SearchDonationsForm
 			Validator     *Validator
@@ -869,16 +904,24 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 			PageType string
 			GetURL   string
 			TabType  string
+
+			// Donation Date Search parameters
+			DonationSearchStart, DonationSearchEnd time.Time
 		}{
 			PageTitle:  "Donations",
 			ID:         id,
 			Typer:      typer,
+			DFK:        dfk,
 			Form:       form,
 			Validator:  validator,
 			Pagination: pagination,
 			PageType:   "indirect", // indirect pages are htmx pages that have an hx target
 			GetURL:     fmt.Sprintf("/partials/donations-find/%s/%s", typer, id),
 			TabType:    "find",
+
+			// Donation Date search parameters.
+			DonationSearchStart: donationSearchStart,
+			DonationSearchEnd:   donationSearchEnd,
 		}
 
 		// Render template with errors and return if the form is invalid.
@@ -930,6 +973,11 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 
 // handleDonationsLinkUnlink links or unlinks donations to either Xero invoices or bank
 // transactions.
+//
+// Todo: the target here is hx-post="/donations/{{ .Typer }}/{{ .ID }}/link"
+// However .ID is the bank-transaction or invoice UUID and the linking info is
+// the bank-transaction *reference* or invoice *invoice-number*.
+// So either we need to get the reference from the url path components or parameters.
 func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 	dataStartDate := web.cfg.DataStartDate
@@ -982,6 +1030,24 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			return
 		}
 
+		// Retrieve the details of the invoice or bank transaction.
+		// retrieve the related invoice or bank transaction dfk and date
+		dfk, _, err := web.getInvoiceOrBankTransactionDetails(ctx, form.Typer, form.ID)
+		if err != nil {
+			web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
+			web.htmxClientError(
+				w,
+				fmt.Sprintf("%s id: %s error: could get invoice/transaction info: %v", form.Typer, form.ID, err))
+			return
+		}
+		if dfk == "" {
+			web.ServerError(w, r, fmt.Errorf("%s id %s had empty dfk", form.Typer, form.ID))
+			web.htmxClientError(
+				w,
+				fmt.Sprintf("%s id %s had empty dfk", form.Typer, form.ID))
+			return
+		}
+
 		// Create the salesforce client and run a batch update.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg)
 		if err != nil {
@@ -1000,24 +1066,25 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 		timeStamp := time.Now()
 
-		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.ID, form.DonationIDs, false)
+		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, dfk, form.DonationIDs, false)
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
 			return
 		}
 
-		log.Printf("Successfully linked %d donations.", len(form.DonationIDs))
+		web.log.Printf("Successfully linked %d donations.", len(form.DonationIDs))
 
 		// Upsert the updated opportunities.
 		// The refresh window is rough; double upserts shouldn't be a major issue.
-		_, err = sfClient.GetOpportunities(ctx, dataStartDate, timeStamp.Add(-5*time.Second))
+		updatedDonations, err := sfClient.GetOpportunities(ctx, dataStartDate, timeStamp.Add(-2*time.Minute))
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to upsert the linked opportunities: %v", err))
 			return
 		}
-
-		web.htmxClientError(w, fmt.Sprintf("Successfully linked %d donations.", len(form.DonationIDs)))
-		return
+		if err := web.db.UpsertDonations(ctx, updatedDonations); err != nil {
+			web.ServerError(w, r, fmt.Errorf("failed to save updated donations to local DB: %v", err))
+			return
+		}
 
 		// Redirect to the originator.
 		// Todo: set focus to either the "find" or "linked" donations tab.
@@ -1073,7 +1140,38 @@ func (web *WebApp) htmxClientError(w http.ResponseWriter, message string) {
 	w.Write([]byte(errorString))
 }
 
+// donationSearchTimeSpan uses a simple heuristic for determining the dates for a
+// donation search, typically -6 weeks and +2 weeks around an invoice or bank
+// transaction date. Most donations are prior to an invoice or bank transaction landing.
+func donationSearchTimeSpan(dt time.Time) (time.Time, time.Time) {
+	if dt.IsZero() {
+		return dt, dt
+	}
+	start := dt.Add(time.Duration(-6 * 7 * 24 * time.Hour))
+	end := dt.Add(time.Duration(+2 * 7 * 24 * time.Hour))
+	return start, end
+}
+
 // notfound raises a 404 clientError.
 func (web *WebApp) notFound(w http.ResponseWriter, r *http.Request, message string) {
 	web.clientError(w, message, http.StatusNotFound)
+}
+
+// getInvoiceOrBankTransactionDetails returns the DFK and Date from an invoice or Bank
+// Transaction identified by id (a uuid).
+func (web *WebApp) getInvoiceOrBankTransactionDetails(ctx context.Context, typer string, id string) (string, time.Time, error) {
+	var rt time.Time
+	if typer == "invoice" {
+		invoice, _, err := web.db.InvoiceWRGet(ctx, id)
+		if err != nil {
+			return "", rt, fmt.Errorf("could not get invoice details for %q: %w", id, err)
+		}
+		return invoice.InvoiceNumber, invoice.Date, nil
+	}
+	transaction, _, err := web.db.BankTransactionWRGet(ctx, id)
+	if err != nil {
+		return "", rt, fmt.Errorf("could not get transaction details for %q: %w", id, err)
+	}
+	ref := *transaction.Reference
+	return ref, transaction.Date, nil
 }
