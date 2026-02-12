@@ -198,8 +198,7 @@ func (f *SearchDonationsForm) Offset() int {
 // Invoice or BankTransaction.
 type LinkOrUnlinkForm struct {
 	Typer       string   `schema:"type"`
-	ID          string   `schema:"id"` // the invoice id or bank-transaction reference
-	DFK         string   `schema:"dfk"`
+	ID          string   `schema:"id"`     // the invoice id or bank-transaction reference
 	Action      string   `schema:"action"` // "link" or "unlink"
 	DonationIDs []string `schema:"donation-ids"`
 }
@@ -233,7 +232,6 @@ func (f *LinkOrUnlinkForm) Validate(v *Validator) {
 	v.Check(allowedTyper[f.Typer], "status", "Invalid type value provided.")
 
 	v.Check(f.ID != "", "id", "An empty ID was provided")
-	v.Check(f.DFK != "", "dfk", "An empty DFK (distributed foreign key reference) was provided")
 
 	allowedActions := map[string]bool{"link": true, "unlink": true}
 	v.Check(allowedActions[f.Action], "action", "Invalid action provided.")
