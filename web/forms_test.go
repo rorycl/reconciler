@@ -290,8 +290,9 @@ func TestFormLinkOrUnlink(t *testing.T) {
 			},
 			routeParams: map[string]string{
 				"type":   "invoice",
-				"id":     "INV-12345",
+				"id":     "e181a801-0829-11f1-b473-7404f143aa1c",
 				"action": "link",
+				"dfk":    "INV-12345",
 			},
 			isErr: false,
 		},
@@ -302,8 +303,9 @@ func TestFormLinkOrUnlink(t *testing.T) {
 			},
 			routeParams: map[string]string{
 				"type":   "invoice",
-				"id":     "INV-12345",
+				"id":     "e181a801-0829-11f1-b473-7404f143aa1c",
 				"action": "link",
+				"dfk":    "INV-12345",
 			},
 			isErr: true,
 		},
@@ -314,8 +316,22 @@ func TestFormLinkOrUnlink(t *testing.T) {
 			},
 			routeParams: map[string]string{
 				"type":   "invoice",
-				"id":     "INV-12345",
+				"id":     "e181a801-0829-11f1-b473-7404f143aa1c",
 				"action": "some-action",
+				"dfk":    "INV-12345",
+			},
+			isErr: true,
+		},
+		{
+			name: "form error with empty distributed foreign key",
+			formData: map[string][]string{
+				"donation-ids": []string{"1", "3", "5"},
+			},
+			routeParams: map[string]string{
+				"type":   "invoice",
+				"id":     "e181a801-0829-11f1-b473-7404f143aa1c",
+				"action": "some-action",
+				"dfk":    "",
 			},
 			isErr: true,
 		},
@@ -338,7 +354,7 @@ func TestFormLinkOrUnlink(t *testing.T) {
 				t.Error("expected validation error")
 			}
 
-			fmt.Printf("form:\n%#v\n", form)
+			// t.Logf("form:\n%#v\n", form)
 		})
 	}
 }
