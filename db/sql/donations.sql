@@ -123,7 +123,9 @@ WITH variables AS (
             WHEN v.TextSearch = '' OR v.TextSearch IS NULL THEN
                 TRUE
             ELSE
-                LOWER(CONCAT(s.name, ' ', s.payout_reference_dfk)) REGEXP LOWER(v.TextSearch)
+                -- Todo searching the additional fields like this is very crude.
+                -- LOWER(CONCAT(s.name, ' ', s.payout_reference_dfk)) REGEXP LOWER(v.TextSearch)
+                LOWER(CONCAT(s.name, ' ', s.payout_reference_dfk, ' ', s.additional_fields_json)) REGEXP LOWER(v.TextSearch)
         END
         AND
         CASE

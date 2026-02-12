@@ -69,7 +69,7 @@ func (db *DB) DonationsGet(ctx context.Context, dateFrom, dateTo time.Time, link
 	err := stmt.SelectContext(ctx, &donations, namedArgs)
 	db.logQuery("donations", stmt, namedArgs, err)
 	if err != nil {
-		return nil, fmt.Errorf("donations select error: %v", err)
+		return nil, fmt.Errorf("donations select error with named args %v\nlook for colons in sql\nerror: %v", namedArgs, err)
 	}
 	// Return early if no rows were returned.
 	if len(donations) == 0 {

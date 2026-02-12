@@ -18,6 +18,11 @@ func ptrFloat64(f float64) *float64 { return &f }
 func setupTestDB(t *testing.T) (*DB, func()) {
 	t.Helper()
 
+	testingMode = true
+	t.Cleanup(func() {
+		testingMode = false
+	})
+
 	accountCodes := "^(53|55|57)"
 	sqlDir := "sql"
 

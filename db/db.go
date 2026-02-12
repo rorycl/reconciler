@@ -162,10 +162,6 @@ func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) 
 	if !strings.Contains(dbPath, ":memory:") {
 		return nil, fmt.Errorf("db path %q invalid for test mode", dbPath)
 	}
-	testingMode = true
-	defer func() {
-		testingMode = false
-	}()
 
 	testDB, err := NewConnection(dbPath, sqlDir, accountCodes)
 	if err != nil {
@@ -194,6 +190,14 @@ func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) 
 	if err != nil {
 		return nil, fmt.Errorf("could not prepare named statements: %v", err)
 	}
+
+	// Run a messy smoke test if desired.
+	/*
+		err = _donations_smoke_test(testDB)
+		if err != nil {
+			return nil, fmt.Errorf("smoke test failed: %v", err)
+		}
+	*/
 
 	return testDB, nil
 
@@ -318,4 +322,26 @@ func (db *DB) logQuery(name string, stmt *parameterizedStmt, args map[string]any
 			err,
 		),
 	)
+}
+
+func _donations_smoke_test(testDB *DB) error {
+	// Messy smoke test for donations
+	fmt.Println("getting 3 donations")
+	type D2 struct {
+		Donation
+		AddFields *string `db:"additional_fields_json"`
+	}
+	rows, err := testDB.Queryx("select * from donations limit 3")
+	if err != nil {
+		return fmt.Errorf("select error :%v", err)
+	}
+	for rows.Next() {
+		var d D2
+		err = rows.StructScan(&d)
+		if err != nil {
+			return fmt.Errorf("scan error :%v", err)
+		}
+		fmt.Printf("row: %#v\n", d)
+	}
+	return nil
 }

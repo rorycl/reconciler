@@ -199,8 +199,11 @@ func Test06_DonationsQuery(t *testing.T) {
 
 			donations, err := testDB.DonationsGet(ctx, tt.dateFrom, tt.dateTo, tt.linkageStatus, tt.payoutReference, tt.searchString, tt.limit, tt.offset)
 			if err != nil {
+				if tt.err == nil {
+					t.Fatalf("got unexpected donations error: %v", err)
+				}
 				if err != tt.err {
-					t.Fatalf("get donations error: %v", err)
+					t.Errorf("expected err %v got donations error: %v", tt.err, err)
 				}
 				return
 			}
