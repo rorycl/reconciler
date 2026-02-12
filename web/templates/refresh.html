@@ -6,36 +6,66 @@
 <div class="max-w-xl mx-auto bg-white p-8 rounded-lg shadow-md border border-slate-300 text-sm">
     <div class="prose">
         <h2 class="pb-4 text-base font-semibold">Refresh Data</h2>
-        <p class="pb-4">You are connected. Before proceeding, please refresh the data for the financial year you wish to work with.</p>
-        <p class="">Financial Year: <span class="font-mono font-bold">&lt; 2025 &gt;</span></p>
+        <p class="pb-4">You are connected. Before proceeding, please refresh the data in the local database.</p>
+        <p class="">Data will be refreshed from the configured started ate of <span class="font-bold">{{ .DataStartDate }}</span></p>
     </div>
 
     <div class="mt-8 space-y-6">
         <!-- Refresh Xero -->
         <div class="p-4 border border border-4 rounded-md">
-            <h3 class="font-semibold">Refresh Xero invoices and bank transactions</h3>
-            <p class="text-sm text-slate-600 mb-3">Retrieve data from Xero over the Xero API to store locally.</p>
+            <h3 class="font-semibold">Refresh Xero and Salesforce records</h3>
+            <p class="text-sm text-slate-600 mb-3">
+            This action will retrieve accounts, bank transaction and invoice records from Xero over the Xero API to
+            store locally.
+            </p>
+            <p class="text-sm text-slate-600 mb-3">
+            This will also retrieve Salesdorce donation (opportunity) records to store locally.
+            </p>
+
+            <div id="data-refresh-updates" class="text-sm text-slate-600 mb-3 hidden">
+
+
+            </div>
+
+            <!--
             <button class="bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors"
                 _="on click toggle @disabled on me then put 'Refreshed!' into my.innerHTML">
                 Refresh
             </button>
+            -->
+
+            {{ if not .Refreshed }}
+            <button hx-get="/refresh/update"
+                    hx-target="#data-refresh-updates"
+                    hx-indicator="#loading-spinner"
+                    class="bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+                Refresh
+            </button>
+            {{ else }}
+            <p class="inline-block text-sky-800 font-bold py-2">
+            The data has successfully been refreshed!
+            </p>
+            {{ end }}
+
+            <!-- loading spinner -->
+            <div id="loading-spinner" class="htmx-indicator mt-4 flex items-center text-sky-700">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-sky-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Syncing with Xero and Salesforce... please wait.</span>
+            </div>
+
         </div>
 
-        <!-- Refresh Salesforce -->
-        <div class="p-4 border border border-4 rounded-md">
-            <h3 class="font-semibold">Refresh Salesforce donations</h3>
-            <p class="text-sm text-slate-600 mb-3">Retrieve data from Salesforce over Salesforce API to store locally.</p>
-            <button class="bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors"
-                _="on click toggle @disabled on me then put 'Refreshed!' into my.innerHTML">
-                Refresh
-            </button>
-        </div>
     </div>
 
+    {{ if .Refreshed }}
     <div class="mt-10 text-center">
         <a href="/home" class="bg-green-600 text-white font-bold py-2 px-6 rounded hover:bg-green-700 transition-colors">
             Continue to App
         </a>
     </div>
+    {{ end }}
 </div>
 {{ end }}
