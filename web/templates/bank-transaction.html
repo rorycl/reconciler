@@ -103,7 +103,7 @@
 
     <div id="tab-content"
          class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none"
-         hx-get="/partials/donations-linked/bank-transaction/{{ .Transaction.Reference }}"
+         hx-get="/partials/donations-linked/bank-transaction/{{ .Transaction.ID }}"
          hx-trigger="load"
          hx-target="#donations-zone"                                           
          hx-swap="innerHTML">

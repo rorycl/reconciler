@@ -12,7 +12,7 @@
                {{- else }}
                class="{{ $inactiveClass }}"
                {{- end }}
-               hx-get="/partials/donations-linked/invoice/{{ .ID }}"
+               hx-get="/partials/donations-linked/{{ .Typer}}/{{ .ID }}?status=Linked"
                hx-target="#donations-zone"
                hx-swap="innerHTML"
                role="tab" aria-selected="true">
@@ -20,14 +20,15 @@
             </a>
         </li>
         <li class="me-2">
-           <!-- probably a good idea to send a from date 1 month before the invoice for the default donations search in the invoice template data -->
+           <!-- Todo: fix verbatim date -->
+           <!-- Todo: probably a good idea to send a from date 1 month before the invoice for the default donations search in the invoice template data -->
             <a href="#"
                {{- if eq .TabType "find" }}
                class="{{ $activeClass }}"
                {{- else }}
                class="{{ $inactiveClass }}"
                {{- end }}
-               hx-get="/partials/donations-find/invoice/{{ .ID }}?status=NotLinked&date-from=2025-04-01"
+               hx-get="/partials/donations-find/{{ .Typer }}/{{ .ID }}?status=NotLinked&date-from={{ .DonationSearchStart.Format "2006-01-02" }}&date-to={{ .DonationSearchEnd.Format "2006-01-02" }}"
                hx-target="#donations-zone"
                hx-swap="innerHTML"
                role="tab" aria-selected="false">

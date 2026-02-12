@@ -10,7 +10,7 @@
 
 {{- /* the unlink form targets: Typer: invoice or bank-transaction .ID: the invoice number or bank-transaction reference */ -}}
 <form hx-post="/donations/{{ .Typer }}/{{ .ID }}/unlink"
-      hx-target="#donations-unlink-error"
+      hx-target="#donations-link-error"
       hx-swap="innerHTML">
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
     <table class="min-w-full divide-y divide-slate-300 text-xs">
