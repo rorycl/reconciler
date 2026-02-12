@@ -28,6 +28,9 @@ import (
 //go:embed sql
 var SQLEmbeddedFS embed.FS
 
+// testingMode defers setup of the schema and prepared statements
+var testingMode = false
+
 // parameterizedStmt describes an sql file parsed into an sqlx NamedStmt expecting the
 // provided args.
 type parameterizedStmt struct {
@@ -39,6 +42,15 @@ type parameterizedStmt struct {
 // verifyArgs determines if the number of arguments provided to a parameterizedStmt is
 // as expected. This check could be more thorough.
 func (p *parameterizedStmt) verifyArgs(args map[string]any) error {
+	if p == nil {
+		panic("verify args called on uninitialised parameterized statement")
+	}
+	if args == nil {
+		return fmt.Errorf("empty args received in verifyArgs")
+	}
+	if p.args == nil {
+		return fmt.Errorf("parameterized args is nil")
+	}
 	if got, want := len(args), len(p.args); got != want {
 		return fmt.Errorf(
 			"argument length to named statement from %q incorrect: got %d want %d",
@@ -75,9 +87,6 @@ type DB struct {
 	donationsGetStmt   *parameterizedStmt
 	donationUpsertStmt *parameterizedStmt
 }
-
-// testingMode defers setup of the schema and prepared statements
-var testingMode = true
 
 // NewConnection creates a new connection to an SQLite database at the given path.
 func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, error) {

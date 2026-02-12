@@ -42,7 +42,7 @@ func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error
 		_, err := stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
 			db.logQuery("accounts", stmt, namedArgs, err)
-			return fmt.Errorf("failed to upsert account %s: %w", acc.AccountID, err)
+			return fmt.Errorf("failed to upsert account %v: %w", acc.AccountID, err)
 		}
 	}
 	return tx.Commit()
