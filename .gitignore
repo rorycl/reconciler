@@ -1,12 +1,6 @@
-xerocli/config.yaml
-xerocli/xerocli
-
-sfcli/config.yaml
-sfcli/sfcli
-
 # config
 config/config.yaml
-config.yaml
+config*.yaml
 
 # storage
 xero_token.json
@@ -17,7 +11,10 @@ db/sql/test.db
 db/sql/test.db-*
 reconciliation.db*
 
-# bin files
+# binaries
 bin
+
+# tmp files
+todo.txt
 
 
