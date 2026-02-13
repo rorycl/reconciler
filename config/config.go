@@ -33,7 +33,7 @@ type WebConfig struct {
 	ListenAddress      string `yaml:"listen_address"`
 	XeroCallBack       string `yaml:"xero_callback"`
 	SalesforceCallBack string `yaml:"salesforce_callback"`
-	DevMode            bool   `yaml:"dev_mode"`
+	DevelopmentMode    bool   `yaml:"development_mode"`
 }
 
 // XeroConfig holds Xero-specific settings.

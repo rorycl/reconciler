@@ -15,13 +15,17 @@ web:
   listen_address: "127.0.0.1:8080"
   xero_callback: "/callback/xero"
   salesforce_callback: "/callback/salesforce"
-  dev_mode: true
+  development_mode: false
 
 ################################################################
 # Data Settings
 
+# The data date start is the date from which information should be
+# reconciled between the systems.
 data_date_start: "2025-04-01"
 
+# The Xero donation account prefixes are the patterns matching the
+# beginning of any account codes that record donation income.
 donation_account_prefixes:
   - "53"                                                                  
   - "55"                                                                  
@@ -29,6 +33,8 @@ donation_account_prefixes:
 
 ################################################################
 # Xero and Salesforce API settings
+# These settings set out the OAuth2 connection settings to the remote
+# platforms.
 
 xero:
   client_id: "XERO_CLIENT_ID"
@@ -41,7 +47,7 @@ salesforce:
   client_secret: "SALESFORCE_CONSUMER_SECRET"
   token_file_path: "./sf_token.json"
 
-  # The SOQL query to execute.
+  # The SOQL query to execute to show information in the local system.
   query: >-
     SELECT
       Id, Name, Amount, CloseDate, LastModifiedDate, Payout_Reference__c,
