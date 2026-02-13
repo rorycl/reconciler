@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"reconciler/config"
 	"reconciler/db"
@@ -18,7 +18,7 @@ func TestWebAppToRun(t *testing.T) {
 
 	t.Skip()
 
-	logger := log.Default()
+	logger := slog.Default()
 
 	cfg := &config.Config{
 		Web: config.WebConfig{
@@ -63,7 +63,7 @@ func TestWebAppToRun(t *testing.T) {
 // TestWebAppAndShutdown tests bringing up the web server and then stopping it.
 func TestWebAppAndShutdown(t *testing.T) {
 
-	logger := log.Default()
+	logger := slog.Default()
 
 	cfg := &config.Config{
 		Web: config.WebConfig{

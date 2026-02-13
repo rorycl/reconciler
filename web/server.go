@@ -1,6 +1,6 @@
 package web
 
-// This file describes the web server for this project.
+// This file describes the web server for the Reconciler project.
 //
 // Note that modules called by this server should provide self-describing errors since
 // these are sent directly to an internal server error func:
@@ -17,6 +17,23 @@ package web
 // use-case specific overriding of template `block` components, if required.
 //
 // Helper functions, such as `ServerError` and `clientError` are at the end of the file.
+//
+// HTMX partials are used in this project to avoid duplicating content and to allow for
+// in-place updates of page components rather than requiring full page refreshes. These
+// are:
+//
+// templates/partial-donations.html
+//	- load the donation tabs, searchform and searchresults
+// templates/partial-donations-linked.html
+//	- linked donations listing
+// templates/partial-donations-searchform.html
+//	- donations search form
+// templates/partial-donations-searchresults.html
+//	- donations search results
+// templates/partial-donations-tabs.html
+//	- donations tabs (linked and search)
+// templates/partial-listingTabs.html
+//	- donations tab headers
 
 import (
 	"bytes"
@@ -28,7 +45,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"reconciler/apiclients/salesforce"
@@ -42,19 +59,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// inDevelopment is a temporary development flag.
-var inDevelopment = func() bool {
-	_, ok := os.LookupEnv("INDEVELOPMENT")
-	if ok {
-		fmt.Println("*****************************")
-		fmt.Println("Nota Bene: INDEVELOPMENT mode")
-		fmt.Println("*****************************")
-	}
-	return ok
-}()
-
 // pageLen is the number of items to show in a page listing.
 const pageLen = 15
+
+// missingTransactionReference indicates a missing transaction reference, which should
+// not be used for linking.
+const missingTransactionReference = "missing reference"
 
 //go:embed static
 var StaticEmbeddedFS embed.FS
@@ -64,7 +74,7 @@ var TemplatesEmbeddedFS embed.FS
 
 // WebApp is the configuration object for the web server.
 type WebApp struct {
-	log              *log.Logger
+	log              *slog.Logger
 	cfg              *config.Config
 	db               *db.DB
 	staticFS         fs.FS // the fs holding the static web resources.
@@ -73,11 +83,12 @@ type WebApp struct {
 	defaultEndDate   time.Time
 	server           *http.Server
 	sessions         *scs.SessionManager
+	inDevelopment    bool // in development mode
 }
 
 // New initialises a WebApp. An error type is returned for future use.
 func New(
-	logger *log.Logger,
+	logger *slog.Logger,
 	cfg *config.Config,
 	db *db.DB,
 	staticFS fs.FS,
@@ -102,7 +113,7 @@ func New(
 	scsSessionStore.Lifetime = 12 * time.Hour
 
 	webApp := &WebApp{
-		log:              logger, // this conflicts with the gorilla logging middleware; also how about slog?
+		log:              logger,
 		cfg:              cfg,
 		db:               db,
 		staticFS:         staticFS,
@@ -112,13 +123,22 @@ func New(
 		server:           server,
 		sessions:         scsSessionStore,
 	}
+
+	// In Development mode triggers a warning
+	if cfg.Web.DevelopmentMode {
+		webApp.inDevelopment = true
+		webApp.log.Warn("*****************************************")
+		webApp.log.Warn("       Warning: IN DEVELOPMENT mode      ")
+		webApp.log.Warn("*****************************************")
+	}
+
 	return webApp, nil
 }
 
 // StartServer starts a WebApp.
 func (web *WebApp) StartServer() error {
 	web.server.Handler = web.routes()
-	web.log.Printf("Starting server on %s", web.cfg.Web.ListenAddress)
+	web.log.Info(fmt.Sprintf("Starting server on %s", web.cfg.Web.ListenAddress))
 	return web.server.ListenAndServe()
 }
 
@@ -185,9 +205,11 @@ func (web *WebApp) routes() http.Handler {
 
 // apisConnectedOK checks whether the user is connected to the api services. If not, the user is
 // redirected to the /connect endpoint.
+//
+// Note that in development mode this handler makes no checks.
 func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 
-	if inDevelopment {
+	if web.inDevelopment {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			next.ServeHTTP(w, r)
 		})
@@ -195,12 +217,12 @@ func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !xero.TokenIsValid(web.cfg.Xero.TokenFilePath) {
-			web.log.Println("xero token is not valid, redirecting")
+			web.log.Info("xero token is not valid, redirecting")
 			http.Redirect(w, r, "/connect?status=xero_token_invalid", http.StatusSeeOther)
 			return
 		}
 		if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath) {
-			web.log.Println("saleforce token is not valid, redirecting")
+			web.log.Info("saleforce token is not valid, redirecting")
 			http.Redirect(w, r, "/connect?status=sf_token_invalid", http.StatusSeeOther)
 			return
 		}
@@ -269,8 +291,12 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 
 	dataStartDate := web.cfg.DataStartDate
 
+	logAndPrintErrorToWeb := func(w io.Writer, format string, a ...any) {
+		web.log.Error(fmt.Sprintf(format, a...))
+	}
+
 	logAndPrintToWeb := func(w io.Writer, format string, a ...any) {
-		web.log.Printf(format, a)
+		web.log.Info(fmt.Sprintf(format, a...))
 		// Writing output here doesn't work because it will be buffered.
 		// Todo: consider SSE solution.
 		// _, _ = fmt.Fprintf(w, format, a)
@@ -283,7 +309,6 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
 
 		web.sessions.Put(ctx, "refreshed", false)
-		// web.sessions.Put(ctx, "refreshed-datetime", time.Time{})
 
 		if !lastRefresh.IsZero() {
 			lastRefresh.Add(-1 * time.Minute)
@@ -294,7 +319,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 			web.ServerError(w, r, fmt.Errorf("failed to create xero client: %w", err))
 			return
 		}
-		web.log.Println("Xero client authenticated successfully.")
+		web.log.Info("Xero client authenticated successfully.")
 
 		// Retrieve the Xero accounts, bank transactions and invoices.
 		// The following steps ideally would update the content at the end of the
@@ -303,13 +328,13 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		// Accounts
 		accounts, err := xeroClient.GetAccounts(ctx, dataStartDate)
 		if err != nil {
-			logAndPrintToWeb(w, "accounts retrieval error: %v", err)
+			logAndPrintErrorToWeb(w, "accounts retrieval error: %v", err)
 			return
 		}
 		logAndPrintToWeb(w, "retrieved %d account records", len(accounts))
 
 		if err := web.db.AccountsUpsert(ctx, accounts); err != nil {
-			logAndPrintToWeb(w, "failed to upsert account records", err)
+			logAndPrintErrorToWeb(w, "failed to upsert account records", err)
 			return
 		}
 		logAndPrintToWeb(w, "Successfully upserted accounts to database.")
@@ -317,13 +342,13 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		// Bank Transactions
 		transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh)
 		if err != nil {
-			logAndPrintToWeb(w, "bank transaction retrieval error: %v", err)
+			logAndPrintErrorToWeb(w, "bank transaction retrieval error: %v", err)
 			return
 		}
 		logAndPrintToWeb(w, "retrieved %d bank transactions", len(transactions))
 
 		if err = web.db.BankTransactionsUpsert(ctx, transactions); err != nil {
-			logAndPrintToWeb(w, "failed to upsert bank transactions", err)
+			logAndPrintErrorToWeb(w, "failed to upsert bank transactions", err)
 			return
 		}
 		logAndPrintToWeb(w, "Successfully upserted bank transactions to database.")
@@ -331,13 +356,13 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		// Invoices
 		invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh)
 		if err != nil {
-			logAndPrintToWeb(w, "invoices retrieval error: %v", err)
+			logAndPrintErrorToWeb(w, "invoices retrieval error: %v", err)
 			return
 		}
 		logAndPrintToWeb(w, "retrieved %d invoices", len(invoices))
 
 		if err := web.db.InvoicesUpsert(ctx, invoices); err != nil {
-			logAndPrintToWeb(w, "failed to upsert invoices", err)
+			logAndPrintErrorToWeb(w, "failed to upsert invoices", err)
 			return
 		}
 		logAndPrintToWeb(w, "Successfully upserted invoices to database.")
@@ -345,17 +370,17 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		// Retrieve the Salesforce donations.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg)
 		if err != nil {
-			logAndPrintToWeb(w, "donations retrieval error: %v", err)
+			logAndPrintErrorToWeb(w, "donations new client error: %v", err)
 			return
 		}
 		donations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefresh)
 		if err != nil {
-			logAndPrintToWeb(w, "failed to retrieve donations", err)
+			logAndPrintErrorToWeb(w, "failed to retrieve donations", err)
 			return
 		}
 		logAndPrintToWeb(w, "retrieved %d donations", len(donations))
 		if err := web.db.UpsertDonations(ctx, donations); err != nil {
-			logAndPrintToWeb(w, "failed to upsert donations", err)
+			logAndPrintErrorToWeb(w, "failed to upsert donations", err)
 			return
 		}
 		logAndPrintToWeb(w, "successfully upserted donations to database", err)
@@ -365,8 +390,8 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		web.sessions.Put(ctx, "refreshed-datetime", time.Now())
 
 		// Redirect to invoices
-		w.Header().Set("HX-Redirect", "/invoices")
 		w.WriteHeader(http.StatusOK)
+		w.Header().Set("HX-Redirect", "/invoices")
 		return
 
 	})
@@ -628,7 +653,7 @@ func (web *WebApp) handleDonations() http.Handler {
 		}
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			web.log.Printf("pagination error: %v", err)
+			web.log.Error(fmt.Sprintf("pagination error: %v", err))
 			http.Redirect(w, r, "/donations", http.StatusFound)
 		}
 
@@ -741,8 +766,9 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		data.LineItems = newViewLineItems(lineItems)
 		data.DFK = *data.Transaction.Reference
 		if data.DFK == "" {
-			data.DFK = "missing reference"
+			data.DFK = missingTransactionReference
 		}
+
 		// Return a 404 if no bank transaction was found.
 		if errors.Is(err, sql.ErrNoRows) {
 			web.notFound(w, r, fmt.Sprintf("Bank Transaction: %q not found", transactionReference))
@@ -775,7 +801,6 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		id := vars["id"]
 
 		// Initialise pagination for default state.
-		// Todo: fix page number (here 1)
 		pagination, _ := NewPagination(pageLen, 1, 1, r.URL.Query())
 
 		// retrieve the related invoice or bank transaction dfk and date
@@ -840,8 +865,7 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		// Todo: fix page number (here 1)
 		data.Pagination, err = NewPagination(pageLen, recordsNo, 1, r.URL.Query())
 		if err != nil {
-			// web.ServerError(w, r, err)
-			web.log.Printf("pagination error: %v", err)
+			web.log.Error(fmt.Sprintf("pagination error: %v", err))
 		}
 
 		web.render(w, r, templates, name, data)
@@ -945,7 +969,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 			return
 		}
 
-		// Process donations into donationView type
+		// Process donations into donationView type.
 		viewDonations := newViewDonations(donations)
 
 		// Set valid data from successful database call.
@@ -962,8 +986,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 		}
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			log.Printf("pagination error: %v", err)
-			// web.ServerError(w, r, err)
+			web.log.Warn(fmt.Sprintf("pagination error: %v", err))
 		}
 
 		web.render(w, r, templates, name, data)
@@ -974,10 +997,10 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 // handleDonationsLinkUnlink links or unlinks donations to either Xero invoices or bank
 // transactions.
 //
-// Todo: the target here is hx-post="/donations/{{ .Typer }}/{{ .ID }}/link"
-// However .ID is the bank-transaction or invoice UUID and the linking info is
-// the bank-transaction *reference* or invoice *invoice-number*.
-// So either we need to get the reference from the url path components or parameters.
+// The target here is hx-post="/donations/{{ .Typer }}/{{ .ID }}/(link|unlink)"
+// However .ID is the bank-transaction or invoice UUID and the linking DFK info is
+// the bank-transaction *reference* or invoice *invoice-number*. The DFK (and record
+// date) is therefore retrieved using the `getInvoiceOrBankTransactionDetails` method.
 func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 	dataStartDate := web.cfg.DataStartDate
@@ -1022,8 +1045,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 		if !validator.Valid() {
-			// Consider reporting the errors better here.
-			fmt.Printf("invalid data was received: %v", validator.Errors)
+			web.log.Error(fmt.Sprintf("invalid data was received: %v", validator.Errors))
 			web.htmxClientError(
 				w,
 				fmt.Sprintf("%s form error: invalid data was received: %v", vars["action"], validator.Errors))
@@ -1040,11 +1062,11 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 				fmt.Sprintf("%s id: %s error: could get invoice/transaction info: %v", form.Typer, form.ID, err))
 			return
 		}
-		if dfk == "" {
-			web.ServerError(w, r, fmt.Errorf("%s id %s had empty dfk", form.Typer, form.ID))
+		if dfk == "" || dfk == missingTransactionReference {
+			web.ServerError(w, r, fmt.Errorf("%s id %s had empty or invalid dfk and cannot be linked", form.Typer, form.ID))
 			web.htmxClientError(
 				w,
-				fmt.Sprintf("%s id %s had empty dfk", form.Typer, form.ID))
+				fmt.Sprintf("%s id %s has an empty dfk and cannot be linked", form.Typer, form.ID))
 			return
 		}
 
@@ -1055,7 +1077,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			/*
 				if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath) {
 					...os.Remove...
-					web.log.Print("handle Donations Link/Unlink detected an invalid token, redirecting to /connect")
+					web.log.Warn("handle Donations Link/Unlink detected an invalid token, redirecting to /connect")
 					http.Redirect(w, r, "/connect?error=sf_expired", http.StatusSeeOther)
 					return
 				}
@@ -1072,7 +1094,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			return
 		}
 
-		web.log.Printf("Successfully linked %d donations.", len(form.DonationIDs))
+		web.log.Info(fmt.Sprintf("Successfully linked %d donations.", len(form.DonationIDs)))
 
 		// Upsert the updated opportunities.
 		// The refresh window is rough; double upserts shouldn't be a major issue.
@@ -1104,7 +1126,7 @@ func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *temp
 	buf := new(bytes.Buffer)
 	err := template.ExecuteTemplate(buf, filename, data)
 	if err != nil {
-		web.log.Printf("template %q rendering error %v", filename, err)
+		web.log.Error(fmt.Sprintf("template %q rendering error %v", filename, err))
 		web.ServerError(w, r, err)
 		return
 	}
@@ -1112,24 +1134,27 @@ func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *temp
 	buf.WriteTo(w)
 }
 
-// ServerError logs and return an internal server error. The error should contain the
-// information needed for logging.
+// ServerError logs and return an internal server 500 error. The error should contain
+// the information needed for logging.
 func (web *WebApp) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
 	err := errors.Join(errs...)
-	web.log.Printf(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
+	web.log.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
 // clientError returns a client error.
 func (web *WebApp) clientError(w http.ResponseWriter, message string, status int) {
 	if message == "" {
+		web.log.Warn(fmt.Sprintf("client error: status %d", status))
 		message = http.StatusText(status)
 	}
+	web.log.Warn("client error: %s (status %d)", message, status)
 	http.Error(w, message, status)
 }
 
 // htmxClientError returns an htmx client error.
 func (web *WebApp) htmxClientError(w http.ResponseWriter, message string) {
+	web.log.Warn(fmt.Sprintf("client htmx error: %s", message))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// htmx won't normally process a non-200 response.
 	w.WriteHeader(http.StatusOK)
@@ -1142,7 +1167,7 @@ func (web *WebApp) htmxClientError(w http.ResponseWriter, message string) {
 
 // donationSearchTimeSpan uses a simple heuristic for determining the dates for a
 // donation search, typically -6 weeks and +2 weeks around an invoice or bank
-// transaction date. Most donations are prior to an invoice or bank transaction landing.
+// transaction date. Most donations are prior to the date recorded for an invoice or bank transaction.
 func donationSearchTimeSpan(dt time.Time) (time.Time, time.Time) {
 	if dt.IsZero() {
 		return dt, dt
