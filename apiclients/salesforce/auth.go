@@ -175,7 +175,6 @@ func InitiateWebLogin(cfg *config.Config, vs ValueStorer) http.Handler {
 
 // WebLoginCallBack is an http.Handler for receiving a web callback initiated from a web
 // interface.
-// Todo: consider injecting the logger and web error function.
 func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerError) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -219,11 +218,13 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 		}
 
 		// An "instance_url" is required from the token.
+		// See https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_client_credentials_flow.htm&type=5
 		instanceURL, ok := tok.Extra("instance_url").(string)
 		if !ok || instanceURL == "" {
 			errLogger.ServerError(w, r, fmt.Errorf("oauth token did not contain the required 'instance_url'"))
 			return
 		}
+		vs.Put(ctx, "salesforce-instance-url", instanceURL)
 
 		// Save the token with the instance url.
 		cache := &TokenCache{Token: tok, InstanceURL: instanceURL}
