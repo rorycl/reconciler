@@ -4,21 +4,11 @@
 ################################################################
 # General settings
 
+# The database file path for the sqlite database.
+# For security or speed the special path ":memory:" can be used. However beware that the
+# system will have to sync _all_ data each time it is used if an in-memory database is
+# used.
 database_path: "./reconciliation.db"
-
-################################################################
-# Web server settings
-
-web:
-  templates_path: "./web/templates"
-  static_path: "./web/static"
-  listen_address: "127.0.0.1:8080"
-  xero_callback: "/callback/xero"
-  salesforce_callback: "/callback/salesforce"
-  development_mode: false
-
-################################################################
-# Data Settings
 
 # The data date start is the date from which information should be
 # reconciled between the systems.
@@ -31,6 +21,17 @@ donation_account_prefixes:
   - "55"                                                                  
   - "57"
 
+# Operate in development mode
+development_mode: false
+
+################################################################
+# Web server settings
+
+web:
+  listen_address: "localhost:8080"
+  xero_oauth2_callback: "/xero/callback"
+  salesforce_oauth2_callback: "/salesforce/callback"
+
 ################################################################
 # Xero and Salesforce API settings
 # These settings set out the OAuth2 connection settings to the remote
@@ -40,12 +41,21 @@ xero:
   client_id: "XERO_CLIENT_ID"
   client_secret: "XERO_CLIENT_SECRET"
   token_file_path: "./xero_token.json"
+  # These oauth2 scopes should not normally be changed
+  scopes:
+    - "accounting.transactions"
+    - "accounting.settings.read"
+    - "offline_access" # provides refresh token capability
 
 salesforce:
   login_domain: "test.salesforce.com"
   client_id: "SALESFORCE_CONSUMER_KEY"
   client_secret: "SALESFORCE_CONSUMER_SECRET"
   token_file_path: "./sf_token.json"
+  # These oauth2 scopes should not normally be changed
+  scopes:
+    - "api"
+    - "refresh_token"
 
   # The SOQL query to execute to show information in the local system.
   query: >-

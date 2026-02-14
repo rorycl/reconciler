@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,49 +14,62 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	XeroAuthURL  = "https://login.xero.com/identity/connect/authorize"
+	XeroTokenURL = "https://identity.xero.com/connect/token"
+)
+
 // Todo: consider making OAuth2Config components injectable or come from the
 // configuration file.
 
 // Config represents the entire application configuration.
 type Config struct {
-	DatabasePath            string           `yaml:"database_path"`
-	Web                     WebConfig        `yaml:"web"`
-	DataStartDateStr        string           `yaml:"data_date_start"`
-	DonationAccountPrefixes []string         `yaml:"donation_account_prefixes"`
-	Xero                    XeroConfig       `yaml:"xero"`
-	Salesforce              SalesforceConfig `yaml:"salesforce"`
-	DataStartDate           time.Time        // Parsed from DataStartDateStr
+	DatabasePath            string   `yaml:"database_path"`
+	DataStartDateStr        string   `yaml:"data_date_start"`
+	DonationAccountPrefixes []string `yaml:"donation_account_prefixes"`
+	InDevelopmentMode       bool     `yaml:"development_mode"`
+
+	// subsections
+	Web           WebConfig        `yaml:"web"`
+	Xero          XeroConfig       `yaml:"xero"`
+	Salesforce    SalesforceConfig `yaml:"salesforce"`
+	DataStartDate time.Time        // Parsed from DataStartDateStr
 }
 
 // WebConfig holds settings specific to the web server.
+// This includes the Xero and Salesforce OAuth2 callback urls.
 type WebConfig struct {
-	TemplatesPath      string `yaml:"templates_path"`
-	StaticPath         string `yaml:"static_path"`
+	// Mandatory settings
 	ListenAddress      string `yaml:"listen_address"`
-	XeroCallBack       string `yaml:"xero_callback"`
-	SalesforceCallBack string `yaml:"salesforce_callback"`
-	DevelopmentMode    bool   `yaml:"development_mode"`
+	XeroCallBack       string `yaml:"xero_oauth2_callback"`
+	SalesforceCallBack string `yaml:"salesforce_oauth2_callback"`
+	// full addresses to callbacks
+	XeroCallBackAddr       string
+	SalesforceCallBackAddr string
 }
 
 // XeroConfig holds Xero-specific settings.
 type XeroConfig struct {
-	ClientID      string `yaml:"client_id"`
-	ClientSecret  string `yaml:"client_secret"`
-	TokenFilePath string `yaml:"token_file_path"`
+	ClientID      string   `yaml:"client_id"`
+	ClientSecret  string   `yaml:"client_secret"`
+	TokenFilePath string   `yaml:"token_file_path"`
+	Scopes        []string `yaml:"scopes"`
 	OAuth2Config  *oauth2.Config
 }
 
 // SalesforceConfig holds Salesforce-specific settings.
 type SalesforceConfig struct {
-	LoginDomain      string            `yaml:"login_domain"`
-	ClientID         string            `yaml:"client_id"`
-	ClientSecret     string            `yaml:"client_secret"`
-	TokenFilePath    string            `yaml:"token_file_path"`
+	LoginDomain   string   `yaml:"login_domain"`
+	ClientID      string   `yaml:"client_id"`
+	ClientSecret  string   `yaml:"client_secret"`
+	TokenFilePath string   `yaml:"token_file_path"`
+	Scopes        []string `yaml:"scopes"`
+	OAuth2Config  *oauth2.Config
+	// SOQL settings.
 	Query            string            `yaml:"query"`
 	FieldMappings    map[string]string `yaml:"field_mappings"`
 	LinkingObject    string            `yaml:"linking_object"`
 	LinkingFieldName string            `yaml:"linking_field_name"`
-	OAuth2Config     *oauth2.Config
 }
 
 // Load loads and validates the configuration from the given file path.
@@ -100,20 +115,33 @@ func validateAndPrepare(c *Config) error {
 	}
 
 	// Web
-	if c.Web.TemplatesPath == "" {
-		return errors.New("web.templates_path is missing")
-	}
-	if c.Web.StaticPath == "" {
-		return errors.New("web.static_path is missing")
-	}
 	if c.Web.ListenAddress == "" {
 		return errors.New("web.listen_address is missing")
 	}
+	if !strings.Contains(c.Web.ListenAddress, "127.0.0.1") && !strings.Contains(c.Web.ListenAddress, "localhost") {
+		return errors.New("web.listen_address must be 127.0.0.1 or localhost")
+	}
 	if c.Web.XeroCallBack == "" {
-		return errors.New("web.xero_callback is missing")
+		return errors.New("web.xero_oauth2_callback is missing")
 	}
 	if c.Web.SalesforceCallBack == "" {
-		return errors.New("web.salesforce_callback is missing")
+		return errors.New("web.salesforce_oauth2_callback is missing")
+	}
+
+	// The full callback addresses are local (http rather than https) addresses.
+	c.Web.XeroCallBackAddr, err = url.JoinPath(
+		fmt.Sprintf("http://%s", c.Web.ListenAddress),
+		c.Web.XeroCallBack,
+	)
+	if err != nil {
+		return fmt.Errorf("could not create full xero callback address: %w", err)
+	}
+	c.Web.SalesforceCallBackAddr, err = url.JoinPath(
+		fmt.Sprintf("http://%s", c.Web.ListenAddress),
+		c.Web.SalesforceCallBack,
+	)
+	if err != nil {
+		return fmt.Errorf("could not create full xero callback address: %w", err)
 	}
 
 	// Xero
@@ -127,15 +155,22 @@ func validateAndPrepare(c *Config) error {
 	if xc.TokenFilePath == "" {
 		return errors.New("xero.token_file_path is missing")
 	}
+	if xc.Scopes == nil || len(xc.Scopes) < 1 {
+		return errors.New("xero.scopes not defined")
+	}
+	if !slices.Contains(xc.Scopes, "offline_access") {
+		return errors.New("xero.scopes does not contain 'offline_access' scope")
+	}
+
 	xc.OAuth2Config = &oauth2.Config{
 		ClientID:     xc.ClientID,
 		ClientSecret: xc.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://login.xero.com/identity/connect/authorize",
-			TokenURL: "https://identity.xero.com/connect/token",
+			AuthURL:  XeroAuthURL,
+			TokenURL: XeroTokenURL,
 		},
-		RedirectURL: "http://localhost:8080/xero/callback",
-		Scopes:      []string{"accounting.transactions", "accounting.settings.read", "offline_access"},
+		RedirectURL: c.Web.XeroCallBackAddr,
+		Scopes:      xc.Scopes,
 	}
 
 	// Salesforce
@@ -164,16 +199,24 @@ func validateAndPrepare(c *Config) error {
 	if sc.LinkingFieldName == "" {
 		return errors.New("salesforce.linking_field_name is missing")
 	}
+	if sc.Scopes == nil || len(sc.Scopes) < 1 {
+		return errors.New("salesforce.scopes not defined")
+	}
+	if !slices.Contains(sc.Scopes, "api") {
+		return errors.New("salesforce.scopes does not contain 'api' scope")
+	}
+	if !slices.Contains(sc.Scopes, "refresh_token") {
+		return errors.New("salesforce.scopes does not contain 'refresh_token' scope")
+	}
 	sc.OAuth2Config = &oauth2.Config{
 		ClientID:     sc.ClientID,
 		ClientSecret: sc.ClientSecret,
-		// RedirectURL:  "http://localhost:8080/salesforce/callback",
-		RedirectURL: "http://localhost:8080/sf-callback",
+		RedirectURL:  c.Web.SalesforceCallBackAddr,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  fmt.Sprintf("https://%s/services/oauth2/authorize", sc.LoginDomain),
 			TokenURL: fmt.Sprintf("https://%s/services/oauth2/token", sc.LoginDomain),
 		},
-		Scopes: []string{"api", "refresh_token"},
+		Scopes: sc.Scopes,
 	}
 
 	return nil
