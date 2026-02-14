@@ -124,10 +124,13 @@ func New(
 		sessions:         scsSessionStore,
 	}
 
-	// In Development mode triggers a warning
+	// In-Development mode triggers a warning as it bypasses the API connection check
+	// middleware.
 	if cfg.Web.DevelopmentMode {
 		webApp.inDevelopment = true
 		webApp.log.Warn("*****************************************")
+		webApp.log.Warn("       Warning: IN DEVELOPMENT mode      ")
+		webApp.log.Warn("       API connection check disabled     ")
 		webApp.log.Warn("       Warning: IN DEVELOPMENT mode      ")
 		webApp.log.Warn("*****************************************")
 	}
@@ -143,6 +146,11 @@ func (web *WebApp) StartServer() error {
 }
 
 // routes connects all of the endpoints and provides middleware.
+//
+// Notes:
+// The /connect endpoint is the entry point to the system, ensuring that the api
+// platform connections are made. All data-related endpoints below this section need
+// to be protected by the apisOK/web.apisConnectedOK middleware.
 func (web *WebApp) routes() http.Handler {
 
 	r := mux.NewRouter()
@@ -155,10 +163,6 @@ func (web *WebApp) routes() http.Handler {
 	// a shortcut.
 	apisOK := web.apisConnectedOK
 
-	// The /connect endpoint is the entry point to the system, ensuring that the api
-	// platform connections are made. All data-related endpoints below this section need
-	// to be protected by the apisOK/web.apisConnectedOK middleware.
-	//
 	// Note that the OAuth2 handlers are in the apiclient modules.
 	r.Handle("/", web.handleRoot()) // synonym for /connect
 	r.Handle("/connect", web.handleConnect())
@@ -286,7 +290,11 @@ func (web *WebApp) handleRefresh() http.Handler {
 }
 
 // handleRefreshUpdates serves the htmx partial /refresh/update info for refreshing data
-// from the api platforms into the database.
+// from the api platforms into the database. Note that Linking/Unlinking donations also
+// calls sfClient.GetOpportunities in a window of 2 minutes.
+//
+// Todo: consider splitting Xero and Salesforce update timestamps, and consider making
+// the time windows smaller.
 func (web *WebApp) handleRefreshUpdates() http.Handler {
 
 	dataStartDate := web.cfg.DataStartDate
@@ -308,14 +316,23 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 
 		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
 
-		web.sessions.Put(ctx, "refreshed", false)
-
-		if !lastRefresh.IsZero() {
-			lastRefresh.Add(-1 * time.Minute)
+		// Determine if refreshing needs to occur. If it does, set the refresh time to 5
+		// minutes before the last refresh to deal with any slow updates on the remote
+		// platform.
+		refreshDeadline := time.Now().Add(-3 * time.Minute)
+		if refreshDeadline.After(lastRefresh) {
+			web.sessions.Put(ctx, "refreshed", false)
+		} else {
+			lastRefresh.Add(-5 * time.Minute)
 		}
+		isRefreshed := web.sessions.GetBool(ctx, "refreshed")
+		web.log.Info(fmt.Sprintf("Refresh status: %t", isRefreshed))
+		web.log.Info(fmt.Sprintf("Refresh last refresh: %s", lastRefresh.Format(time.DateTime)))
 
+		// Connect the Xero client.
 		xeroClient, err := xero.NewClient(ctx, web.cfg)
 		if err != nil {
+			// Todo: consider redirect to /connect.
 			web.ServerError(w, r, fmt.Errorf("failed to create xero client: %w", err))
 			return
 		}
@@ -370,6 +387,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		// Retrieve the Salesforce donations.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg)
 		if err != nil {
+			// consider redirect to /connect
 			logAndPrintErrorToWeb(w, "donations new client error: %v", err)
 			return
 		}
@@ -1093,7 +1111,6 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
 			return
 		}
-
 		web.log.Info(fmt.Sprintf("Successfully linked %d donations.", len(form.DonationIDs)))
 
 		// Upsert the updated opportunities.
