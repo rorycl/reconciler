@@ -22,6 +22,9 @@ type SalesforceTime struct {
 	time.Time
 }
 
+// FlattenedName flattens an obj.Name string to a string.
+type FlattenedName string
+
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (sd *SalesforceDate) UnmarshalJSON(b []byte) error {
 	s := strings.Trim(string(b), `"`)
@@ -51,12 +54,24 @@ func (st *SalesforceTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type CreatedBy struct {
-	CreatedBy string `json:"Name"`
-}
-
-type LastModifiedBy struct {
-	LastModifiedBy string `json:"Name"`
+// UnmarshalJSON implements the json.Unmarshaler interface for a FlattenedName,
+// extracting the "Name" field of the object pointed to by the struct tag into the
+// string field.
+func (fn *FlattenedName) UnmarshalJSON(data []byte) error {
+	// Handle the case of a JSON null value.
+	if string(data) == "null" {
+		*fn = ""
+		return nil
+	}
+	// Use a helper struct to extract the 'Name' field from the object.
+	var helper struct {
+		Name string `json:"Name"`
+	}
+	if err := json.Unmarshal(data, &helper); err != nil {
+		return err
+	}
+	*fn = FlattenedName(helper.Name)
+	return nil
 }
 
 // SOQLResponse is the top-level envelope for a SOQL query response.
@@ -75,9 +90,9 @@ type CoreFields struct {
 	CloseDate        SalesforceDate `json:"CloseDate"`
 	CreatedDate      SalesforceTime `json:"CreatedDate"`
 	LastModifiedDate SalesforceTime `json:"LastModifiedDate"`
-	CreatedBy        `json:"CreatedBy"`
-	LastModifiedBy   `json:"LastModifiedBy"`
-	PayoutReference  *string `json:"Payout_Reference__c"` // Pointer to handle null values
+	CreatedBy        FlattenedName  `json:"CreatedBy"`
+	LastModifiedBy   FlattenedName  `json:"LastModifiedBy"`
+	PayoutReference  *string        `json:"Payout_Reference__c"` // Pointer to handle null values
 }
 
 // Donation represents the data for a single Salesforce donation, combining

@@ -29,6 +29,29 @@ func parseXeroDate(xeroDate string) (time.Time, error) {
 	return time.Unix(timestamp/1000, 0).UTC(), nil
 }
 
+// FlattenedName flattens an obj.Name string to a string.
+type FlattenedName string
+
+// UnmarshalJSON implements the json.Unmarshaler interface for a FlattenedName,
+// extracting the "Name" field of the object pointed to by the struct tag into the
+// string field.
+func (fn *FlattenedName) UnmarshalJSON(data []byte) error {
+	// Handle the case of a JSON null value.
+	if string(data) == "null" {
+		*fn = ""
+		return nil
+	}
+	// Use a helper struct to extract the 'Name' field from the object.
+	var helper struct {
+		Name string `json:"Name"`
+	}
+	if err := json.Unmarshal(data, &helper); err != nil {
+		return err
+	}
+	*fn = FlattenedName(helper.Name)
+	return nil
+}
+
 // XeroDateTime is a custom date type.
 type XeroDateTime struct {
 	time.Time
@@ -65,31 +88,19 @@ type BankTransactionsResponse struct {
 	BankTransactions []BankTransaction `json:"BankTransactions"`
 }
 
-// BankAccount is a nested type in BankTransaction.
-type BankAccount struct {
-	BankAccount   string `json:"Name"`
-	BankAccountID string `json:"AccountID"`
-}
-
-// Contact is a nested type in BankTransaction and Invoice.
-type Contact struct {
-	Contact   string `json:"Name"`
-	ContactID string `json:"ContactID"`
-}
-
 // BankTransaction represents a single bank transaction record.
 type BankTransaction struct {
-	BankTransactionID string `json:"BankTransactionID"`
-	Type              string `json:"Type"`
-	Reference         string `json:"Reference"`
-	Contact           `json:"Contact"`
-	BankAccount       `json:"BankAccount"`
-	Date              XeroDateTime `json:"DateString"`
-	Updated           XeroDateTime `json:"UpdatedDateUTC"`
-	Status            string       `json:"Status"`
-	Total             float64      `json:"Total"`
-	IsReconciled      bool         `json:"IsReconciled"`
-	LineItems         []LineItem   `json:"LineItems"`
+	BankTransactionID string        `json:"BankTransactionID"`
+	Type              string        `json:"Type"`
+	Reference         string        `json:"Reference"`
+	Contact           FlattenedName `json:"Contact"`
+	BankAccount       FlattenedName `json:"BankAccount"`
+	Date              XeroDateTime  `json:"DateString"`
+	Updated           XeroDateTime  `json:"UpdatedDateUTC"`
+	Status            string        `json:"Status"`
+	Total             float64       `json:"Total"`
+	IsReconciled      bool          `json:"IsReconciled"`
+	LineItems         []LineItem    `json:"LineItems"`
 }
 
 // LineItem represents a single line in a transaction or invoice, crucial for splits.
@@ -103,12 +114,10 @@ type LineItem struct {
 	LineAmount  float64 `json:"LineAmount"`
 }
 
-/*
 // BankAccount represents the bank account for the transaction.
 type BankAccount struct {
 	Name string `json:"Name"`
 }
-*/
 
 // InvoiceResponse is the top-level structure of the /Invoices API response.
 type InvoiceResponse struct {
@@ -117,17 +126,17 @@ type InvoiceResponse struct {
 
 // Invoice represents a single invoice record.
 type Invoice struct {
-	InvoiceID     string `json:"InvoiceID"`
-	Type          string `json:"Type"`
-	InvoiceNumber string `json:"InvoiceNumber"`
-	Contact       `json:"Contact"`
-	Date          XeroDateTime `json:"DateString"`
-	Updated       XeroDateTime `json:"UpdatedDateUTC"`
-	Status        string       `json:"Status"`
-	Reference     string       `json:"Reference,omitempty"`
-	Total         float64      `json:"Total"`
-	AmountPaid    float64      `json:"AmountPaid"`
-	LineItems     []LineItem   `json:"LineItems"`
+	InvoiceID     string        `json:"InvoiceID"`
+	Type          string        `json:"Type"`
+	InvoiceNumber string        `json:"InvoiceNumber"`
+	Contact       FlattenedName `json:"Contact"`
+	Date          XeroDateTime  `json:"DateString"`
+	Updated       XeroDateTime  `json:"UpdatedDateUTC"`
+	Status        string        `json:"Status"`
+	Reference     string        `json:"Reference,omitempty"`
+	Total         float64       `json:"Total"`
+	AmountPaid    float64       `json:"AmountPaid"`
+	LineItems     []LineItem    `json:"LineItems"`
 }
 
 // AccountResponse is the top-level structure of the /Accounts API response.

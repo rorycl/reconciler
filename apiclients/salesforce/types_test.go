@@ -68,8 +68,8 @@ func TestTypesExtended(t *testing.T) {
 			CloseDate:        SalesforceDate{time.Date(2025, time.August, 18, 0, 0, 0, 0, time.UTC)},
 			CreatedDate:      SalesforceTime{time.Date(2025, time.November, 27, 10, 21, 45, 0, time.Local)},
 			LastModifiedDate: SalesforceTime{time.Date(2025, time.December, 20, 20, 21, 50, 0, time.Local)},
-			CreatedBy:        CreatedBy{"OrgFarm EPIC"},
-			LastModifiedBy:   LastModifiedBy{"Test User"},
+			CreatedBy:        FlattenedName("OrgFarm EPIC"),
+			LastModifiedBy:   FlattenedName("Test User"),
 			PayoutReference:  ptrStr("ENTH-20251112"),
 		},
 		AdditionalFields: map[string]any{
@@ -87,11 +87,10 @@ func TestTypesExtended(t *testing.T) {
 }
 
 func TestTypesFail(t *testing.T) {
+	var euf *ErrUnmarshallFieldNotFoundError
 
 	SOQLStrictMapping = true
 	t.Cleanup(func() { SOQLStrictMapping = false })
-
-	var euf *ErrUnmarshallFieldNotFoundError
 
 	b, err := os.ReadFile("testdata/salesforce_response.json")
 	if err != nil {

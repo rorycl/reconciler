@@ -49,9 +49,6 @@ func TestBankTransactionsType(t *testing.T) {
 	if got, want := len(bt.BankTransactions), 29; got != want {
 		t.Errorf("got %d bank transactions, want %d", got, want)
 	}
-	if got, want := string(bt.BankTransactions[0].BankAccountID), "bd9e85e0-0478-433d-ae9f-0b3c4f04bfe4"; got != want {
-		t.Errorf("got %q bank account id, want %q for the first transaction", got, want)
-	}
 }
 
 func TestInvoicesType(t *testing.T) {
