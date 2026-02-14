@@ -36,12 +36,14 @@ web:
 # Xero and Salesforce API settings
 # These settings set out the OAuth2 connection settings to the remote
 # platforms.
+# PKCE code verification is strongly recommended.
 
 xero:
   client_id: "XERO_CLIENT_ID"
   client_secret: "XERO_CLIENT_SECRET"
   token_file_path: "./xero_token.json"
   # These oauth2 scopes should not normally be changed
+  pkce_enabled: true
   scopes:
     - "accounting.transactions"
     - "accounting.settings.read"
@@ -52,6 +54,7 @@ salesforce:
   client_id: "SALESFORCE_CONSUMER_KEY"
   client_secret: "SALESFORCE_CONSUMER_SECRET"
   token_file_path: "./sf_token.json"
+  pkce_enabled: true
   # These oauth2 scopes should not normally be changed
   scopes:
     - "api"

@@ -53,6 +53,7 @@ type XeroConfig struct {
 	ClientID      string   `yaml:"client_id"`
 	ClientSecret  string   `yaml:"client_secret"`
 	TokenFilePath string   `yaml:"token_file_path"`
+	PKCEEnabled   bool     `yaml:"pkce_enabled"`
 	Scopes        []string `yaml:"scopes"`
 	OAuth2Config  *oauth2.Config
 }
@@ -63,6 +64,7 @@ type SalesforceConfig struct {
 	ClientID      string   `yaml:"client_id"`
 	ClientSecret  string   `yaml:"client_secret"`
 	TokenFilePath string   `yaml:"token_file_path"`
+	PKCEEnabled   bool     `yaml:"pkce_enabled"`
 	Scopes        []string `yaml:"scopes"`
 	OAuth2Config  *oauth2.Config
 	// SOQL settings.

@@ -21,6 +21,10 @@ func TestConfig(t *testing.T) {
 		t.Errorf("config.Web.XeroCallBackAddr got %q want %q", got, want)
 	}
 
+	if got, want := config.Xero.PKCEEnabled, true; got != want {
+		t.Errorf("config.Xero.PKCEEnabled got %t want %t", got, want)
+	}
+
 	config2 := config // shallow copy; beware maps & slices not copied
 	config2.Web.ListenAddress = "127.0.0.2:9001"
 	if err := validateAndPrepare(config2); err == nil {
