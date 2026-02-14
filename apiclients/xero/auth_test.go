@@ -24,6 +24,7 @@ func createXeroConfig(t *testing.T, callbackURL, serverURL, tokenPath string) co
 		ClientID:      "my-client-id",
 		ClientSecret:  "my-client-secret",
 		TokenFilePath: tokenPath,
+		PKCEEnabled:   true,
 		OAuth2Config: &oauth2.Config{
 			RedirectURL: callbackURL,
 			Endpoint: oauth2.Endpoint{
@@ -233,6 +234,7 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 	cfg := &config.Config{
 		Xero: config.XeroConfig{
 			TokenFilePath: tokenPath,
+			PKCEEnabled:   true,
 			OAuth2Config: &oauth2.Config{
 				Endpoint: oauth2.Endpoint{
 					TokenURL: server.URL + "/oauth/token",
@@ -286,16 +288,21 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 	const mockAccessToken = "mock-access-token-zyx"
 	const testOAuth2Code = "08b2c1d"
 
-	// set Xero auth useOAuth2PKCE to true
-	uOP := useOAuth2PKCE
-	t.Cleanup(func() {
-		useOAuth2PKCE = uOP
-	})
-
 	// Create a web server to act for the xero platform.
 	xeroMux := http.NewServeMux()
 	xeroServer := httptest.NewServer(xeroMux)
 	defer xeroServer.Close()
+
+	// Create config.
+	tokenPath := filepath.Join(t.TempDir(), "web_handler_token.json")
+	cfg := &config.Config{
+		Xero: createXeroConfig(
+			t,
+			"/xero/callback",
+			xeroServer.URL,
+			tokenPath,
+		),
+	}
 
 	// Mock the xero token endpoint.
 	xeroMux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
@@ -310,7 +317,7 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 		if got, want := r.FormValue("code"), testOAuth2Code; got != want {
 			t.Errorf("expected code %q, got %q", got, want)
 		}
-		if useOAuth2PKCE {
+		if cfg.Xero.PKCEEnabled {
 			if r.FormValue("code_verifier") == "" {
 				t.Errorf("expected a PKCE code_verifier in the token request")
 			}
@@ -325,18 +332,6 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 			"expires_in":    3600,
 		})
 	})
-
-	// Setup a local server for attaching the handlers for testing.
-	tokenPath := filepath.Join(t.TempDir(), "web_handler_token.json")
-
-	cfg := &config.Config{
-		Xero: createXeroConfig(
-			t,
-			"/xero/callback",
-			xeroServer.URL,
-			tokenPath,
-		),
-	}
 
 	// Setup in-memory session manager.
 	sessionManager := scs.New()
@@ -364,7 +359,7 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 	for ii, tt := range []bool{true, false} {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
 
-			useOAuth2PKCE = tt
+			cfg.Xero.PKCEEnabled = tt
 
 			// Test client has redirect disabled.
 			client := &http.Client{

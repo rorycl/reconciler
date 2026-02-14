@@ -20,9 +20,6 @@ import (
 // connectionsURL is the present base API url for Xero.
 var connectionsURL = "https://api.xero.com/connections"
 
-// useOAuth2PKCE sets whether to use PKCE OAuth2 token verification.
-var useOAuth2PKCE = false
-
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
 // It attempts to use a saved token first and will refresh it if necessary.
 // If no token exists, it will fail, requiring the user to run the `login` command.
@@ -132,7 +129,8 @@ type WebServerError interface {
 }
 
 // InitiateWebLogin is an http.Handler for preparing a Xero OAuth2
-// flow from a web interface. The Xero flow does not presently use a PKCE verifier.
+// flow from a web interface. The Xero flow optionally does not use a PKCE verifier,
+// although its use is strongly recommended.
 func InitiateWebLogin(cfg *config.Config, vs ValueStorer) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +146,7 @@ func InitiateWebLogin(cfg *config.Config, vs ValueStorer) http.Handler {
 		vs.Put(ctx, "xero-state", state) // Save state to session
 
 		// Generate verifier if applicable
-		if !useOAuth2PKCE {
+		if !cfg.Xero.PKCEEnabled {
 			authURL := cfg.Xero.OAuth2Config.AuthCodeURL(
 				state,
 				oauth2.AccessTypeOffline,
@@ -193,7 +191,7 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 		}
 
 		var verifier string
-		if useOAuth2PKCE {
+		if cfg.Xero.PKCEEnabled {
 			// Retrieve the PKCE verifier from the session.
 			verifier = vs.GetString(ctx, "xero-verifier")
 			if verifier == "" {
@@ -213,7 +211,7 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 		// Exchange code for token using verifier, if applicable
 		var tok *oauth2.Token
 		var err error
-		if useOAuth2PKCE {
+		if cfg.Xero.PKCEEnabled {
 			tok, err = cfg.Xero.OAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
 			if err != nil {
 				errLogger.ServerError(w, r, fmt.Errorf("token with pkce exchange failed: %w", err))
