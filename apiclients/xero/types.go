@@ -90,17 +90,59 @@ type BankTransactionsResponse struct {
 
 // BankTransaction represents a single bank transaction record.
 type BankTransaction struct {
-	BankTransactionID string        `json:"BankTransactionID"`
-	Type              string        `json:"Type"`
-	Reference         string        `json:"Reference"`
-	Contact           FlattenedName `json:"Contact"`
-	BankAccount       FlattenedName `json:"BankAccount"`
-	Date              XeroDateTime  `json:"DateString"`
-	Updated           XeroDateTime  `json:"UpdatedDateUTC"`
-	Status            string        `json:"Status"`
-	Total             float64       `json:"Total"`
-	IsReconciled      bool          `json:"IsReconciled"`
-	LineItems         []LineItem    `json:"LineItems"`
+	BankTransactionID string       `json:"BankTransactionID"`
+	Type              string       `json:"Type"`
+	Reference         string       `json:"Reference"`
+	Date              XeroDateTime `json:"DateString"`
+	Updated           XeroDateTime `json:"UpdatedDateUTC"`
+	Status            string       `json:"Status"`
+	Total             float64      `json:"Total"`
+	IsReconciled      bool         `json:"IsReconciled"`
+	LineItems         []LineItem   `json:"LineItems"`
+	// Fields promoted from the Contact and BankAccount json objects.
+	Contact       string `json:"-"`
+	BankAccountID string `json:"-"`
+	BankAccount   string `json:"-"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for custom unmarshalling of a
+// BankTransaction.
+func (bt *BankTransaction) UnmarshalJSON(data []byte) error {
+
+	// type alias to stop recursion.
+	type Alias BankTransaction
+
+	// helpers for specified fields.
+	type bankAccountHelper struct {
+		AccountID string `json:"AccountID"`
+		Name      string `json:"Name"`
+	}
+	type contactHelper struct {
+		Name string `json:"Name"`
+	}
+
+	// Define an anonymous struct that includes all the fields of BankTransaction
+	// (via the Alias) and the specific nested field we want to process.
+	helper := &struct {
+		*Alias
+		BankAccount bankAccountHelper `json:"BankAccount"`
+		Contact     contactHelper     `json:"Contact"`
+	}{
+		// populate main struct fields
+		Alias: (*Alias)(bt),
+	}
+
+	// Unmarshal the data into our helper struct.
+	if err := json.Unmarshal(data, &helper); err != nil {
+		return err
+	}
+
+	// Assign sub fields to "flattened" names.
+	bt.BankAccountID = helper.BankAccount.AccountID
+	bt.BankAccount = helper.BankAccount.Name
+	bt.Contact = helper.Contact.Name
+
+	return nil
 }
 
 // LineItem represents a single line in a transaction or invoice, crucial for splits.
@@ -112,11 +154,6 @@ type LineItem struct {
 	Quantity    float64 `json:"Quantity"`
 	TaxAmount   float64 `json:"TaxAmount"`
 	LineAmount  float64 `json:"LineAmount"`
-}
-
-// BankAccount represents the bank account for the transaction.
-type BankAccount struct {
-	Name string `json:"Name"`
 }
 
 // InvoiceResponse is the top-level structure of the /Invoices API response.
