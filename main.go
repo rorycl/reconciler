@@ -30,7 +30,7 @@ func runServer() {
 
 	// Configure Logging.
 	logger := slog.Default()
-	if cfg.Web.DevelopmentMode {
+	if cfg.InDevelopmentMode {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
 
