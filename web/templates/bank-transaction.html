@@ -27,7 +27,8 @@
             <div class="md:col-span-2">
                 <h3 class="text-xs text-slate-800 font-semibold">Number</h3>
                 <p class="pb-2 border-b-2 border-dotted border-slate-400"><span class="pr-2">{{ .Transaction.Reference }}</span>
-                    <a href="#" class="text-xs text-sky-700 font-semibold hover:underline">view in Xero</a>
+                <a href="https://go.xero.com/Bank/ViewTransaction.aspx?bankTransactionID={{ .ID }}"
+                   class="text-xs text-sky-700 font-semibold hover:underline">view in Xero</a>
                 </p>
             </div>
             <div>
