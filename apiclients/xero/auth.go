@@ -17,7 +17,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// connectionsURL is the present base API url for Xero.
+// connectionsURL is the Xero API endpoint for connection authorization and a list of
+// tenants.
 var connectionsURL = "https://api.xero.com/connections"
 
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
@@ -168,8 +169,7 @@ func InitiateWebLogin(cfg *config.Config, vs ValueStorer) http.Handler {
 }
 
 // WebLoginCallBack is an http.Handler for receiving a web callback initiated from a web
-// interface. The Xero callback does not presently support a PKCE verifier.
-// Todo: consider injecting the logger and web error function.
+// interface.
 func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerError) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

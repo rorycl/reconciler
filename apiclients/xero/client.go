@@ -257,7 +257,10 @@ func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 	return resp, nil
 }
 
+// GEThttps://api.xero.com/api.xro/2.0/Organisation
+
 // getTenantID fetches the list of connections and returns the first TenantID found.
+// Todo: check suitability of choosing the first connection.
 func getTenantID(ctx context.Context, client *http.Client) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", connectionsURL, nil)
 	if err != nil {
