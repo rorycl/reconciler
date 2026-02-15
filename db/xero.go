@@ -197,6 +197,7 @@ type BankTransaction struct {
 	Reference     string    `db:"reference"`
 	Date          time.Time `db:"date"`
 	Contact       string    `db:"contact"`
+	BankAccountID string    `db:"bank_account_id"`
 	Status        string    `db:"status"`
 	Total         float64   `db:"total"`
 	DonationTotal float64   `db:"donation_total"`
@@ -295,6 +296,7 @@ func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.Ba
 			"Updated":           tr.Updated.Format("2006-01-02T15:04:05Z"),
 			"Contact":           tr.Contact,
 			"BankAccount":       tr.BankAccount,
+			"BankAccountID":     tr.BankAccountID,
 		}
 
 		_, err = stmt.ExecContext(ctx, namedArgs)
@@ -418,6 +420,7 @@ type WRTransaction struct {
 	Type             *string   `db:"type"`
 	Status           string    `db:"status"`
 	Contact          string    `db:"contact"`
+	BankAccountID    string    `db:"bank_account_id"`
 	Total            float64   `db:"total"`
 	DonationTotal    float64   `db:"donation_total"`
 	CRMSTotal        float64   `db:"crms_total"`

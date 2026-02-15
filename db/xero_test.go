@@ -703,6 +703,7 @@ func Test08_BankTransactionsWithLineItemsQuery(t *testing.T) {
 				Type:          nil,
 				Status:        "RECONCILED",
 				Contact:       "JustGiving",
+				BankAccountID: "7404f143aa1c",
 				Total:         190,
 				DonationTotal: 200,
 				CRMSTotal:     200,
