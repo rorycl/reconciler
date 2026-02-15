@@ -100,11 +100,11 @@ func New(
 		return nil, fmt.Errorf("start date %s after end %s", start.Format("2006-01-2"), end.Format("2006-01-02"))
 	}
 
-	// Add settings for the http server. Consider adding logging here.
+	// Add settings for the http server.
 	server := &http.Server{
 		Addr:              cfg.Web.ListenAddress,
-		ReadHeaderTimeout: time.Duration(30 * time.Second),
-		WriteTimeout:      time.Duration(30 * time.Second),
+		ReadHeaderTimeout: time.Duration(240 * time.Second),
+		WriteTimeout:      time.Duration(240 * time.Second),
 		MaxHeaderBytes:    1 << 19, // 100k ish
 	}
 
@@ -126,13 +126,13 @@ func New(
 
 	// In-Development mode triggers a warning as it bypasses the API connection check
 	// middleware.
-	if cfg.Web.DevelopmentMode {
+	if cfg.InDevelopmentMode {
 		webApp.inDevelopment = true
-		webApp.log.Warn("*****************************************")
-		webApp.log.Warn("       Warning: IN DEVELOPMENT mode      ")
-		webApp.log.Warn("       API connection check disabled     ")
-		webApp.log.Warn("       Warning: IN DEVELOPMENT mode      ")
-		webApp.log.Warn("*****************************************")
+		webApp.log.Warn("******************************************")
+		webApp.log.Warn("       Warning: IN DEVELOPMENT mode       ")
+		webApp.log.Warn("    ** API connection check disabled **   ")
+		webApp.log.Warn("       Warning: IN DEVELOPMENT mode       ")
+		webApp.log.Warn("******************************************")
 	}
 
 	return webApp, nil
@@ -166,11 +166,14 @@ func (web *WebApp) routes() http.Handler {
 	// Note that the OAuth2 handlers are in the apiclient modules.
 	r.Handle("/", web.handleRoot()) // synonym for /connect
 	r.Handle("/connect", web.handleConnect())
-	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions))
-	// r.Handle("/salesforce/callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
-	r.Handle("/sf-callback", salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
+
+	// Xero OAuth2 init and callback.
 	r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions))
-	r.Handle("/xero/callback", xero.WebLoginCallBack(web.cfg, web.sessions, web))
+	r.Handle(web.cfg.Web.XeroCallBack, xero.WebLoginCallBack(web.cfg, web.sessions, web))
+
+	// Salesforce OAuth2 init and callback.
+	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions))
+	r.Handle(web.cfg.Web.SalesforceCallBack, salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
 
 	// Refresh is the data refresh page.
 	r.Handle("/refresh", apisOK(web.handleRefresh()))
@@ -187,8 +190,6 @@ func (web *WebApp) routes() http.Handler {
 	// Note that the regexp works for uuids and the system test data.
 	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.handleInvoiceDetail()))
 	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.handleBankTransactionDetail()))
-	// Todo: donation detail page or callout to salesforce donation page or callout to
-	// a salesforce donation page.
 
 	// Partial pages.
 	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
@@ -610,6 +611,9 @@ func (web *WebApp) handleDonations() http.Handler {
 		// Initialise pagination for default state.
 		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
 
+		// Get salesforce instance url from the session (via OAuth2 token)
+		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
+
 		// Prepare data for the template, allowing passing of validation
 		// errors back to the template if necessary.
 		data := struct {
@@ -622,15 +626,17 @@ func (web *WebApp) handleDonations() http.Handler {
 			CurrentPage   string
 			PageType      string
 			GetURL        string
+			SFInstanceURL string
 		}{
-			PageTitle:   "Donations",
-			Form:        form,
-			Typer:       "direct",
-			Validator:   validator,
-			Pagination:  pagination,
-			CurrentPage: "donations",
-			PageType:    "direct", // indirect pages are htmx pages that have an hx target
-			GetURL:      "/donations",
+			PageTitle:     "Donations",
+			Form:          form,
+			Typer:         "direct",
+			Validator:     validator,
+			Pagination:    pagination,
+			CurrentPage:   "donations",
+			PageType:      "direct", // indirect pages are htmx pages that have an hx target
+			GetURL:        "/donations",
+			SFInstanceURL: instanceURL,
 		}
 
 		// Render template with errors and return if the form is invalid.
@@ -698,6 +704,9 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		}
 		invoiceID := vars["id"]
 
+		// Get salesforce instance url from the session (via OAuth2 token)
+		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
+
 		data := struct {
 			PageTitle string
 			Invoice   db.WRInvoice
@@ -708,11 +717,13 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 			Typer     string
 			// Donation Search Dates
 			DonationSearchStart, DonationSearchEnd time.Time
+			SFInstanceURL                          string
 		}{
-			PageTitle: fmt.Sprintf("Invoice %s", invoiceID),
-			ID:        invoiceID,
-			TabType:   "link", // by default the donations tab type is "link", not "find"
-			Typer:     "invoice",
+			PageTitle:     fmt.Sprintf("Invoice %s", invoiceID),
+			ID:            invoiceID,
+			TabType:       "link", // by default the donations tab type is "link", not "find"
+			Typer:         "invoice",
+			SFInstanceURL: instanceURL,
 		}
 
 		var lineItems []db.WRLineItem
@@ -756,6 +767,9 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		}
 		transactionReference := vars["id"]
 
+		// Get salesforce instance url from the session (via OAuth2 token)
+		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
+
 		data := struct {
 			PageTitle   string
 			Transaction db.WRTransaction
@@ -766,11 +780,13 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 			Typer       string
 			// Donation Search Dates
 			DonationSearchStart, DonationSearchEnd time.Time
+			SFInstanceURL                          string
 		}{
-			PageTitle: fmt.Sprintf("Bank Transaction %s", transactionReference),
-			ID:        transactionReference,
-			TabType:   "link", // by default the donations tab type is "link", not "find"
-			Typer:     "bank-transaction",
+			PageTitle:     fmt.Sprintf("Bank Transaction %s", transactionReference),
+			ID:            transactionReference,
+			TabType:       "link", // by default the donations tab type is "link", not "find"
+			Typer:         "bank-transaction",
+			SFInstanceURL: instanceURL,
 		}
 
 		var lineItems []db.WRLineItem
@@ -829,6 +845,9 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		}
 		donationSearchStart, donationSearchEnd := donationSearchTimeSpan(dater)
 
+		// Get salesforce instance url from the session (via OAuth2 token)
+		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
+
 		// Prepare data for the template.
 		data := struct {
 			ID            string
@@ -837,6 +856,7 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 			ViewDonations []viewDonation
 			Pagination    *Pagination
 			TabType       string
+			SFInstanceURL string
 			// Donation Date Search parameters
 			DonationSearchStart, DonationSearchEnd time.Time
 		}{
@@ -845,6 +865,7 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 			DFK:                 dfk,
 			Pagination:          pagination,
 			TabType:             "link",
+			SFInstanceURL:       instanceURL,
 			DonationSearchStart: donationSearchStart,
 			DonationSearchEnd:   donationSearchEnd,
 		}
@@ -931,6 +952,9 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 		}
 		donationSearchStart, donationSearchEnd := donationSearchTimeSpan(dater)
 
+		// Get salesforce instance url from the session (via OAuth2 token)
+		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
+
 		// Prepare data for the template, allowing passing of validation
 		// errors back to the template if necessary.
 		data := struct {
@@ -942,6 +966,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 			Form          *SearchDonationsForm
 			Validator     *Validator
 			Pagination    *Pagination
+			SFInstanceURL string
 
 			PageType string
 			GetURL   string
@@ -950,16 +975,18 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 			// Donation Date Search parameters
 			DonationSearchStart, DonationSearchEnd time.Time
 		}{
-			PageTitle:  "Donations",
-			ID:         id,
-			Typer:      typer,
-			DFK:        dfk,
-			Form:       form,
-			Validator:  validator,
-			Pagination: pagination,
-			PageType:   "indirect", // indirect pages are htmx pages that have an hx target
-			GetURL:     fmt.Sprintf("/partials/donations-find/%s/%s", typer, id),
-			TabType:    "find",
+			PageTitle:     "Donations",
+			ID:            id,
+			Typer:         typer,
+			DFK:           dfk,
+			Form:          form,
+			Validator:     validator,
+			Pagination:    pagination,
+			SFInstanceURL: instanceURL,
+
+			PageType: "indirect", // indirect pages are htmx pages that have an hx target
+			GetURL:   fmt.Sprintf("/partials/donations-find/%s/%s", typer, id),
+			TabType:  "find",
 
 			// Donation Date search parameters.
 			DonationSearchStart: donationSearchStart,
