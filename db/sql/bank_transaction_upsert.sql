@@ -18,6 +18,7 @@ WITH variables AS (
          ,date('2026-01-01')           AS Updated              /* @param */
          ,'Admin User'                 AS Contact              /* @param */
          ,'Current Account'            AS BankAccount          /* @param */
+         ,'b07f-7404f143aa1c'          AS BankAccountID        /* @param */
 )
 INSERT INTO bank_transactions (
     id
@@ -30,31 +31,34 @@ INSERT INTO bank_transactions (
     ,updated_at
     ,contact
     ,bank_account
+    ,bank_account_id
 )
 SELECT
-    v.BankTransactionID   
-    ,v.Type                
-    ,v.Status              
-    ,v.Reference           
-    ,v.Total               
-    ,v.IsReconciled        
-    ,v.Date                
-    ,v.Updated             
+    v.BankTransactionID
+    ,v.Type
+    ,v.Status
+    ,v.Reference
+    ,v.Total
+    ,v.IsReconciled
+    ,v.Date
+    ,v.Updated
     ,v.Contact
-    ,v.BankAccount         
+    ,v.BankAccount
+    ,v.BankAccountID
 FROM
     variables v
 -- sqlite.org/lang_upsert.html PARSING AMBIGUITY
 WHERE
     true
 ON CONFLICT (id) DO UPDATE SET
-    type           = excluded.type
-    ,status        = excluded.status
-    ,reference     = excluded.reference
-    ,total         = excluded.total
-    ,is_reconciled = excluded.is_reconciled
-    ,date          = excluded.date
-    ,updated_at    = excluded.updated_at
-    ,contact       = excluded.contact
-    ,bank_account  = excluded.bank_account
+    type             = excluded.type
+    ,status          = excluded.status
+    ,reference       = excluded.reference
+    ,total           = excluded.total
+    ,is_reconciled   = excluded.is_reconciled
+    ,date            = excluded.date
+    ,updated_at      = excluded.updated_at
+    ,contact         = excluded.contact
+    ,bank_account    = excluded.bank_account
+    ,bank_account_id = excluded.bank_account_id
 ;

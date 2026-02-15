@@ -29,6 +29,7 @@ FROM (
         ,b.type
         ,b.status
         ,b.contact
+        ,b.bank_account_id
         ,b.total
         ,COALESCE(
                 sum(li.line_amount) 

@@ -115,8 +115,8 @@ INSERT INTO "invoice_line_items" (id, invoice_id, description, line_amount, acco
 -- platform fee: 5% of gross = 17.75
 -- net payout (bank transaction total): 337.25
 -- -----------------------------------------------------------------------------
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
-('bt-001', 'JG-PAYOUT-2025-04-15', 'RECONCILED', 337.25, '2025-04-15T14:00:00Z', 'JustGiving');
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact, bank_account_id) VALUES
+('bt-001', 'JG-PAYOUT-2025-04-15', 'RECONCILED', 337.25, '2025-04-15T14:00:00Z', 'JustGiving', '7404f143aa1c');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-001a', 'bt-001', 'JustGiving Payout - General Giving', 200.00, '5501'),
 ('bt-li-001b', 'bt-001', 'JustGiving Payout - Spring Campaign', 155.00, '5701'),
@@ -125,7 +125,7 @@ INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line
 INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-003', 'Anonymous Donor', 20.00, datetime('2025-04-13'), 'JG-PAYOUT-2025-04-15'),
 ('sf-opp-004', 'Anonymous Donor', 20.00, datetime('2025-04-13'), 'JG-PAYOUT-2025-04-15'),
-('sf-opp-005', 'Jane Smith', 100.00, datetime('2025-04-14'), 'JG-PAYOUT-2025-04-15'),
+('sf-opp-005', 'Jane Smith',     100.00, datetime('2025-04-14'), 'JG-PAYOUT-2025-04-15'),
 ('sf-opp-006', 'Anonymous Donor', 20.00, datetime('2025-04-14'), 'JG-PAYOUT-2025-04-15'),
 ('sf-opp-007', 'Anonymous Donor', 20.00, datetime('2025-04-14'), 'JG-PAYOUT-2025-04-15'),
 ('sf-opp-008', 'Anonymous Donor', 20.00, datetime('2025-04-14'), 'JG-PAYOUT-2025-04-15'),
@@ -141,8 +141,8 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 -- A partially reconciled bank transaction.
 -- donation income is 500, but only 250 is accounted for in linked sf opps.
 -- -----------------------------------------------------------------------------
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
-('bt-002', 'STRIPE-PAYOUT-2025-04-20', 'RECONCILED', 490.00, '2025-04-20T09:00:00Z', 'Stripe');
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact, bank_account_id) VALUES
+('bt-002', 'STRIPE-PAYOUT-2025-04-20', 'RECONCILED', 490.00, '2025-04-20T09:00:00Z', 'Stripe', 'ee898997-09f4-11f1-a10c-7404f143aa1c');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-002a', 'bt-002', 'Stripe Payout', 500.00, '5501'),
 ('bt-li-002b', 'bt-002', 'Stripe Platform Fee', -10.00, '429');
@@ -163,13 +163,13 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 -- Unreconciled items in the current financial year
 -- -----------------------------------------------------------------------------
 -- 6 Unreconciled Bank Transactions
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
-('bt-unrec-01', 'JG-PAYOUT-2025-04-22', 'RECONCILED', 97.50, '2025-04-22T14:00:00Z', 'JustGiving'),
-('bt-unrec-02', 'STRIPE-PAYOUT-2025-04-27', 'RECONCILED', 245.00, '2025-04-27T09:00:00Z', 'Stripe'),
-('bt-unrec-03', 'ENTHUSE-PAYOUT-2025-04-28', 'RECONCILED', 112.00, '2025-04-28T10:00:00Z', 'Enthuse'),
-('bt-unrec-04', 'JG-PAYOUT-2025-04-29', 'RECONCILED', 146.25, '2025-04-29T14:00:00Z', 'JustGiving'),
-('bt-unrec-05', 'CAF-PAYOUT-2025-05-01', 'RECONCILED', 500.00, '2025-05-01T11:00:00Z', 'Charities Aid Foundation'),
-('bt-unrec-06', 'STRIPE-PAYOUT-2025-05-04', 'RECONCILED', 332.50, '2025-05-04T09:00:00Z', 'Stripe');
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact, bank_account_id) VALUES
+('bt-unrec-01', 'JG-PAYOUT-2025-04-22'     , 'RECONCILED', 97.50 , '2025-04-22T14:00:00Z', 'JustGiving'              , '7404f143aa1a'),
+('bt-unrec-02', 'STRIPE-PAYOUT-2025-04-27' , 'RECONCILED', 245.00, '2025-04-27T09:00:00Z', 'Stripe'                  , '7404f143aa1b'),
+('bt-unrec-03', 'ENTHUSE-PAYOUT-2025-04-28', 'RECONCILED', 112.00, '2025-04-28T10:00:00Z', 'Enthuse'                 , '7404f143aa1c'),
+('bt-unrec-04', 'JG-PAYOUT-2025-04-29'     , 'RECONCILED', 146.25, '2025-04-29T14:00:00Z', 'JustGiving'              , '7404f143aa1d'),
+('bt-unrec-05', 'CAF-PAYOUT-2025-05-01'    , 'RECONCILED', 500.00, '2025-05-01T11:00:00Z', 'Charities Aid Foundation', '7404f143aa1e'),
+('bt-unrec-06', 'STRIPE-PAYOUT-2025-05-04' , 'RECONCILED', 332.50, '2025-05-04T09:00:00Z', 'Stripe'                  , '7404f143aa1f');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-unrec-01a', 'bt-unrec-01', 'Donation Payout', 100.00, '5501'), ('bt-li-unrec-01b', 'bt-unrec-01', 'Fee', -2.50, '429'),
 ('bt-li-unrec-02a', 'bt-unrec-02', 'Donation Payout', 250.00, '5701'), ('bt-li-unrec-02b', 'bt-unrec-02', 'Fee', -5.00, '429'),
@@ -183,8 +183,8 @@ INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line
 -- Items from the previous financial year
 -- -----------------------------------------------------------------------------
 -- A reconciled bank transaction from Feb 2025
-INSERT INTO "bank_transactions" (id, reference, status, total, date, contact) VALUES
-('bt-prev-fy-01', 'JG-PAYOUT-2025-02-28', 'RECONCILED', 190.00, '2025-02-28T14:00:00Z', 'JustGiving');
+INSERT INTO "bank_transactions" (id, reference, status, total, date, contact, bank_account_id) VALUES
+('bt-prev-fy-01', 'JG-PAYOUT-2025-02-28', 'RECONCILED', 190.00, '2025-02-28T14:00:00Z', 'JustGiving', '7404f143aa1c');
 INSERT INTO "bank_transaction_line_items" (id, transaction_id, description, line_amount, account_code) VALUES
 ('bt-li-prev-fy-01a', 'bt-prev-fy-01', 'Donation Payout', 200.00, '5501'),
 ('bt-li-prev-fy-01b', 'bt-prev-fy-01', 'Fee', -10.00, '429');

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
     ,updated_at          DATETIME
     ,contact             TEXT
     ,bank_account        TEXT
+    ,bank_account_id     TEXT
     /* reconciliation status relating to donations */
     ,is_reconciled       INTEGER DEFAULT 0 -- INTEGER 0 for false 1 for true
 );
