@@ -21,8 +21,11 @@ import (
 // Salesforce API used for this client.
 const SalesforceAPIVersionNumber = "v65.0"
 
-// TokenCache is a helper struct to reliably save and load the OAuth2 token
-// and the critical instance_url from a file.
+// ErrNewLoginRequired reports that a new login is required.
+var ErrNewLoginRequired = errors.New("new login required")
+
+// TokenCache is a helper struct to save and load a Salesforce OAuth2 token and the
+// instance_url from a file.
 type TokenCache struct {
 	Token       *oauth2.Token `json:"token"`
 	InstanceURL string        `json:"instance_url"`
@@ -66,6 +69,11 @@ func InitiateLogin(ctx context.Context, cfg *config.Config) error {
 	tok, err := getNewTokenFromWeb(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get new token: %w", err)
+	}
+
+	// Check if the token (and refresh token) is still valid.
+	if !TokenIsValid(cfg.Salesforce.TokenFilePath, cfg.Salesforce.TokenTimeoutDuration) {
+		return ErrNewLoginRequired
 	}
 
 	instanceURL, ok := tok.Extra("instance_url").(string)
@@ -269,17 +277,25 @@ func DeleteToken(path string) error {
 	return nil
 }
 
-// TokenIsValid loads a token from file and checks if it has a valid token or a refresh
-// token to get a new token.
-func TokenIsValid(path string) bool {
-	cache, err := LoadTokenCacheFromFile(path)
+// TokenIsValid loads a token from file and checks if the token is valid or if a refresh
+// token exists to get a new token. Tokens that expire after the expirationDuration will
+// be considered invalid.
+func TokenIsValid(path string, expirationDuration time.Duration) bool {
+	tokenCache, err := LoadTokenCacheFromFile(path)
 	if err != nil {
 		return false
 	}
-	if cache.Token == nil {
+	token := tokenCache.Token
+	if token == nil {
 		return false
 	}
-	// Returns true if the token is still valid or there is a refresh token to get a new
-	// one.
-	return cache.Token.Valid() || cache.Token.RefreshToken != ""
+	if token.Expiry.IsZero() {
+		return false
+	}
+	projectedExpiry := time.Now().UTC().Add(-1 * expirationDuration)
+	fmt.Println("projectedExpiry", projectedExpiry)
+	if !token.Expiry.After(projectedExpiry) {
+		return false
+	}
+	return token.Valid() || token.RefreshToken != ""
 }

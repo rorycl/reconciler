@@ -21,6 +21,9 @@ import (
 // tenants.
 var connectionsURL = "https://api.xero.com/connections"
 
+// ErrNewLoginRequired reports that a new login is required.
+var ErrNewLoginRequired = errors.New("new login required")
+
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
 // It attempts to use a saved token first and will refresh it if necessary.
 // If no token exists, it will fail, requiring the user to run the `login` command.
@@ -28,6 +31,11 @@ func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
 	tok, err := LoadTokenFromFile(cfg.Xero.TokenFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("no token file found at '%s'. Please run 'reconciler login xero' first", cfg.Xero.TokenFilePath)
+	}
+
+	// Check if the token (and refresh token) is still valid.
+	if !TokenIsValid(cfg.Xero.TokenFilePath, cfg.Xero.TokenTimeoutDuration) {
+		return nil, ErrNewLoginRequired
 	}
 
 	tokenSource := cfg.Xero.OAuth2Config.TokenSource(ctx, tok)
@@ -268,13 +276,22 @@ func DeleteToken(path string) error {
 }
 
 // TokenIsValid loads a token from file and checks if the token is valid or if a refresh
-// token exists to get a new token.
-func TokenIsValid(path string) bool {
+// token exists to get a new token. Tokens that expire after the expirationDuration will
+// be considered invalid.
+func TokenIsValid(path string, expirationDuration time.Duration) bool {
 	token, err := LoadTokenFromFile(path)
 	if err != nil {
 		return false
 	}
 	if token == nil {
+		return false
+	}
+	if token.Expiry.IsZero() {
+		return false
+	}
+	projectedExpiry := time.Now().UTC().Add(-1 * expirationDuration)
+	fmt.Println("projectedExpiry", projectedExpiry)
+	if !token.Expiry.After(projectedExpiry) {
 		return false
 	}
 	return token.Valid() || token.RefreshToken != ""

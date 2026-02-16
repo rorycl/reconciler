@@ -18,13 +18,23 @@ import (
 	"golang.org/x/oauth2"
 )
 
+func duration(t *testing.T, s string) time.Duration {
+	t.Helper()
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
 func createXeroConfig(t *testing.T, callbackURL, serverURL, tokenPath string) config.XeroConfig {
 	t.Helper()
 	return config.XeroConfig{
-		ClientID:      "my-client-id",
-		ClientSecret:  "my-client-secret",
-		TokenFilePath: tokenPath,
-		PKCEEnabled:   true,
+		ClientID:             "my-client-id",
+		ClientSecret:         "my-client-secret",
+		TokenFilePath:        tokenPath,
+		TokenTimeoutDuration: duration(t, "8h"),
+		PKCEEnabled:          true,
 		OAuth2Config: &oauth2.Config{
 			RedirectURL: callbackURL,
 			Endpoint: oauth2.Endpoint{
@@ -70,18 +80,28 @@ func TestTokenFileFuncs(t *testing.T) {
 	}
 }
 
+func tokenPrinter(t *oauth2.Token) string {
+	if t == nil {
+		return ""
+	}
+	return fmt.Sprintf("type: %s\nexpiry: %v\nrefresh: %v\n",
+		t.Type(),
+		t.Expiry,
+		t.RefreshToken,
+	)
+}
+
 // TestTokenValid tests if a slightly modified real xero token is valid.
 func TestTokenValid(t *testing.T) {
 
 	file := "testdata/xero_token.json"
-	_, err := LoadTokenFromFile(file)
+	tok, err := LoadTokenFromFile(file)
 	if err != nil {
 		t.Fatal("error loading test json file", err)
 	}
-	if !TokenIsValid(file) {
-		t.Errorf("token was not classed as valid")
+	if !TokenIsValid(file, duration(t, "99999h")) {
+		t.Errorf("token with expiry was not classed as valid:\n%v", tokenPrinter(tok))
 	}
-
 }
 
 // setupTestServer creates a test environment for OAuth2 web server calls.
@@ -138,13 +158,14 @@ func TestToken_ValidToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !TokenIsValid(tokenPath) {
+	if !TokenIsValid(tokenPath, duration(t, "8h")) {
 		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
 	cfg := &config.Config{
 		Xero: config.XeroConfig{
-			TokenFilePath: tokenPath,
+			TokenFilePath:        tokenPath,
+			TokenTimeoutDuration: duration(t, "8h"),
 			OAuth2Config: &oauth2.Config{
 				Endpoint: oauth2.Endpoint{
 					TokenURL: server.URL + "/oauth/token",
@@ -227,14 +248,15 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 	}
 
 	// Counterintuitively, this test succeeds because it has a refresh token entry.
-	if !TokenIsValid(tokenPath) {
+	if !TokenIsValid(tokenPath, duration(t, "8h")) {
 		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
 	cfg := &config.Config{
 		Xero: config.XeroConfig{
-			TokenFilePath: tokenPath,
-			PKCEEnabled:   true,
+			TokenFilePath:        tokenPath,
+			TokenTimeoutDuration: duration(t, "8h"),
+			PKCEEnabled:          true,
 			OAuth2Config: &oauth2.Config{
 				Endpoint: oauth2.Endpoint{
 					TokenURL: server.URL + "/oauth/token",
@@ -430,6 +452,44 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 			}
 			if got, want := savedToken.AccessToken, mockAccessToken; got != want {
 				t.Errorf("saved Token: got %q want %q", got, want)
+			}
+		})
+	}
+}
+
+// TokenIsValid checks if the token (with or without refresh token) is still valid based
+// on the specified validity period. All tests run with an expected 1 hour token
+// validity.
+func TestOAuth2TokenValidity(t *testing.T) {
+
+	tests := []struct {
+		accessToken  string
+		refreshToken string
+		expiry       time.Time
+		expectedOK   bool
+	}{
+		{"001-ok-token", "", time.Now().UTC().Add(1 * time.Minute), true},
+		{"002-expired-token", "", time.Now().UTC().Add(-1 * time.Minute), false},
+		{"003-ok-token-refresh", "refresh-token", time.Now().UTC().Add(1 * time.Minute), true},
+		{"004-ok-expired-with-refresh", "refresh-token", time.Now().UTC().Add(-59 * time.Minute), true},
+		{"005-expired-with-refresh", "refresh-token", time.Now().UTC().Add(-61 * time.Minute), false},
+	}
+
+	tempFile := filepath.Join(t.TempDir(), "token_validity_test.json")
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.accessToken), func(t *testing.T) {
+			tok := &oauth2.Token{
+				AccessToken:  tt.accessToken,
+				RefreshToken: tt.refreshToken,
+				Expiry:       tt.expiry,
+			}
+			err := SaveTokenToFile(tok, tempFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := TokenIsValid(tempFile, duration(t, "1h")), tt.expectedOK; got != want {
+				t.Errorf("validity check expected got %t want %t\ntoken details %v", got, want, tokenPrinter(tok))
 			}
 		})
 	}

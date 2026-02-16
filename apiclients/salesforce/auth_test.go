@@ -18,13 +18,34 @@ import (
 	"golang.org/x/oauth2"
 )
 
+func duration(t *testing.T, s string) time.Duration {
+	t.Helper()
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+func tokenPrinter(t *oauth2.Token) string {
+	if t == nil {
+		return ""
+	}
+	return fmt.Sprintf("type: %s\nexpiry: %v\nrefresh: %v\n",
+		t.Type(),
+		t.Expiry,
+		t.RefreshToken,
+	)
+}
+
 func createSFConfig(t *testing.T, callbackURL, serverURL, tokenPath string) config.SalesforceConfig {
 	t.Helper()
 	return config.SalesforceConfig{
-		LoginDomain:   serverURL,
-		ClientID:      "my-client-id",
-		ClientSecret:  "my-client-secret",
-		TokenFilePath: tokenPath,
+		LoginDomain:          serverURL,
+		ClientID:             "my-client-id",
+		ClientSecret:         "my-client-secret",
+		TokenFilePath:        tokenPath,
+		TokenTimeoutDuration: duration(t, "8h"),
 		OAuth2Config: &oauth2.Config{
 			RedirectURL: callbackURL,
 			Endpoint: oauth2.Endpoint{
@@ -127,7 +148,7 @@ func TestTokenCache_ValidToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !TokenIsValid(tokenPath) {
+	if !TokenIsValid(tokenPath, duration(t, "8h")) {
 		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
@@ -207,8 +228,9 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 		t.Fatalf("could not save expired token cache to temp file %q: %v", tokenPath, err)
 	}
 
-	// Counterintuitively, this test succeeds because it has a refresh token entry.
-	if !TokenIsValid(tokenPath) {
+	// This test succeeds because it has a refresh token and is within the
+	// TokenTimeoutDuration period.
+	if !TokenIsValid(tokenPath, duration(t, "2h")) {
 		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
@@ -398,5 +420,45 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 	if got, want := savedCache.Token.AccessToken, mockAccessToken; got != want {
 		t.Errorf("saved accessToken: got %q want %q", got, want)
 	}
+}
 
+// TokenIsValid checks if the token (with or without refresh token) is still valid based
+// on the specified validity period. All tests run with an expected 1 hour token
+// validity.
+func TestOAuth2TokenValidity(t *testing.T) {
+
+	tests := []struct {
+		accessToken  string
+		refreshToken string
+		expiry       time.Time
+		expectedOK   bool
+	}{
+		{"001-ok-token", "", time.Now().UTC().Add(1 * time.Minute), true},
+		{"002-expired-token", "", time.Now().UTC().Add(-1 * time.Minute), false},
+		{"003-ok-token-refresh", "refresh-token", time.Now().UTC().Add(1 * time.Minute), true},
+		{"004-ok-expired-with-refresh", "refresh-token", time.Now().UTC().Add(-59 * time.Minute), true},
+		{"005-expired-with-refresh", "refresh-token", time.Now().UTC().Add(-61 * time.Minute), false},
+	}
+
+	tempFile := filepath.Join(t.TempDir(), "token_validity_test.json")
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.accessToken), func(t *testing.T) {
+			tokenCache := &TokenCache{
+				InstanceURL: "https://an-instance.url",
+				Token: &oauth2.Token{
+					AccessToken:  tt.accessToken,
+					RefreshToken: tt.refreshToken,
+					Expiry:       tt.expiry,
+				},
+			}
+			err := SaveTokenCacheToFile(tokenCache, tempFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := TokenIsValid(tempFile, duration(t, "1h")), tt.expectedOK; got != want {
+				t.Errorf("validity check expected got %t want %t\ntoken details %v", got, want, tokenPrinter(tokenCache.Token))
+			}
+		})
+	}
 }
