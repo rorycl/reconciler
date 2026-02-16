@@ -164,40 +164,40 @@ func (web *WebApp) routes() http.Handler {
 	apisOK := web.apisConnectedOK
 
 	// Note that the OAuth2 handlers are in the apiclient modules.
-	r.Handle("/", web.handleRoot()) // synonym for /connect
-	r.Handle("/connect", web.handleConnect())
+	r.Handle("/", web.handleRoot()).Methods("GET") // synonym for /connect
+	r.Handle("/connect", web.handleConnect()).Methods("GET")
 
 	// Xero OAuth2 init and callback.
-	r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions))
-	r.Handle(web.cfg.Web.XeroCallBack, xero.WebLoginCallBack(web.cfg, web.sessions, web))
+	r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions)).Methods("GET")
+	r.Handle(web.cfg.Web.XeroCallBack, xero.WebLoginCallBack(web.cfg, web.sessions, web)).Methods("GET")
 
 	// Salesforce OAuth2 init and callback.
-	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions))
-	r.Handle(web.cfg.Web.SalesforceCallBack, salesforce.WebLoginCallBack(web.cfg, web.sessions, web))
+	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions)).Methods("GET")
+	r.Handle(web.cfg.Web.SalesforceCallBack, salesforce.WebLoginCallBack(web.cfg, web.sessions, web)).Methods("GET")
 
 	// Refresh is the data refresh page.
-	r.Handle("/refresh", apisOK(web.handleRefresh()))
-	r.Handle("/refresh/update", apisOK(web.handleRefreshUpdates()))
+	r.Handle("/refresh", apisOK(web.handleRefresh())).Methods("GET")
+	r.Handle("/refresh/update", apisOK(web.handleRefreshUpdates())).Methods("GET")
 
 	// Main listing pages.
-	r.Handle("/home", apisOK(web.handleHome())) // redirect to handleInvoices.
-	r.Handle("/invoices", apisOK(web.handleInvoices()))
-	r.Handle("/bank-transactions", apisOK(web.handleBankTransactions()))
-	r.Handle("/donations", apisOK(web.handleDonations()))
+	r.Handle("/home", apisOK(web.handleHome())).Methods("GET") // redirect to handleInvoices.
+	r.Handle("/invoices", apisOK(web.handleInvoices())).Methods("GET")
+	r.Handle("/bank-transactions", apisOK(web.handleBankTransactions())).Methods("GET")
+	r.Handle("/donations", apisOK(web.handleDonations())).Methods("GET")
 	// Todo: consider adding campaigns page
 
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.handleInvoiceDetail()))
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.handleBankTransactionDetail()))
+	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.handleInvoiceDetail())).Methods("GET")
+	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.handleBankTransactionDetail())).Methods("GET")
 
 	// Partial pages.
 	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
-	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsLinked()))
-	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsFind()))
+	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsLinked())).Methods("GET")
+	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsFind())).Methods("GET")
 
 	// Donation linking/unlinking.
-	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.handleDonationsLinkUnlink()))
+	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.handleDonationsLinkUnlink())).Methods("POST")
 
 	// Todo: logout
 	// Logout -- delete the api connection tokens and redirect to /connect
