@@ -422,6 +422,24 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 	}
 }
 
+func TestFixSalesforceTokenExpiry(t *testing.T) {
+	/*
+		ms, err := strconv.ParseInt("1278448384000", 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Println(time.UnixMilli(ms)) // 2010-07-06 23:33:04 +0100 BST
+	*/
+	tok := &oauth2.Token{
+		AccessToken: "a-token",
+	}
+	tok2 := tok.WithExtra(map[string]any{"issued_at": "1278448384000"})
+	fixSalesforceTokenExpiry(tok2)
+	if got, want := tok2.Expiry.UTC(), time.Date(2010, 7, 6, 22, 33, 04, 0, time.UTC); got != want {
+		t.Errorf("got fix expiry %v want %v", got, want)
+	}
+}
+
 // TokenIsValid checks if the token (with or without refresh token) is still valid based
 // on the specified validity period. All tests run with an expected 1 hour token
 // validity.

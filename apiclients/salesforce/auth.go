@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"reconciler/config"
@@ -44,9 +45,13 @@ func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
 
+	// Fix the Salesforce lack of an Expiry date.
+	fixSalesforceTokenExpiry(refreshedToken)
+
 	if refreshedToken.AccessToken != cache.Token.AccessToken {
 		log.Println("Access token was refreshed. Saving new token.")
 		cache.Token = refreshedToken
+
 		// The instance_url does not change on refresh, so keep the old one.
 		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
 			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
@@ -135,6 +140,9 @@ func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token,
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange authorization code for token: %w", err)
 	}
+
+	// Generate Expiry (as salesforce tokens are invalid).
+	fixSalesforceTokenExpiry(tok)
 
 	return tok, nil
 }
@@ -225,6 +233,9 @@ func WebLoginCallBack(cfg *config.Config, vs ValueStorer, errLogger WebServerErr
 			return
 		}
 
+		// Generate Expiry (as salesforce tokens are invalid).
+		fixSalesforceTokenExpiry(tok)
+
 		// An "instance_url" is required from the token.
 		// See https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_client_credentials_flow.htm&type=5
 		instanceURL, ok := tok.Extra("instance_url").(string)
@@ -293,9 +304,56 @@ func TokenIsValid(path string, expirationDuration time.Duration) bool {
 		return false
 	}
 	projectedExpiry := time.Now().UTC().Add(-1 * expirationDuration)
-	fmt.Println("projectedExpiry", projectedExpiry)
 	if !token.Expiry.After(projectedExpiry) {
 		return false
 	}
 	return token.Valid() || token.RefreshToken != ""
+}
+
+// fixSalesforceTokenExpiry fixes the "IsZero" expiry of Saleforce's tokens.
+// sf tokens are something like the following. Annoyingly, the expiration time is set to the Go zero time.
+// This causes the TokenIsValid check to fail.
+//
+//	&oauth2.Token{
+//		AccessToken:"00DgL00000GE1HZ!AQEAQLfSAKItTlIlnlHXdspaJKhLFlgxDxbxDpaiGav_JvZSTH227U16WWqOil8Y7O.ZhbfaJ8GmuY1Bu58rkXCXXXXXXXXX",
+//		TokenType:"Bearer",
+//		RefreshToken:"5Aep861eN26Sp9j0R6usW_6CAZUnTI_3Now99RwZbU929ZCwAjRmSTEXHQdUigeK121uGSsEqoAW8xxxxxxxxxx",
+//		Expiry:time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC),
+//		ExpiresIn:0,
+//		raw:map[string]interface {}{
+//			"access_token":"00DgL00000GE1HZ!AQEAQLfSAKItTlIlnlHXdspaJKhLFlgxDxbxDpaiGav_JvZSTH227U16WWqOil8Y7O.ZhbfaJ8GmuY1Bu58rkXCxxxxxxxxx",
+//			"id":"https://login.salesforce.com/id/00DgL00000GE1HZUA1/005gL00000BOwSkQAL",
+//			"instance_url":"https://orgfarm-xxxxxxxxxx-dev-ed.develop.my.salesforce.com",
+//			"issued_at":"1771257689412",
+//			"refresh_token":"5Aep861eN26Sp9j0R6usW_6CAZUnTI_3Now99RwZbU929ZCwAjRmSTEXHQdUigeK121uGSsEqoAW80Yxxxxxxxx",
+//			"scope":"refresh_token api",
+//			"signature":"ze9U3HZv46gm3wmLJ/JmlWgg2wGVvLh0Fxxxxxxxxxxx",
+//			"token_type":"Bearer"
+//		},
+//			expiryDelta:0,
+//	}
+func fixSalesforceTokenExpiry(tok *oauth2.Token) {
+	if tok == nil {
+		return
+	}
+
+	if !tok.Expiry.IsZero() {
+		return
+	}
+
+	// Extract issued_at from the raw token map.
+	issuedAtStr, ok := tok.Extra("issued_at").(string)
+	if !ok {
+		return
+	}
+
+	// Salesforce sends issued_at in milliseconds as a string
+	ms, err := strconv.ParseInt(issuedAtStr, 10, 64)
+	if err != nil {
+		return
+	}
+
+	// Set Expiry.
+	const sessionLength = 2 * time.Hour
+	tok.Expiry = time.UnixMilli(ms).Add(sessionLength)
 }

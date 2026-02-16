@@ -27,6 +27,17 @@ func duration(t *testing.T, s string) time.Duration {
 	return d
 }
 
+func tokenPrinter(t *oauth2.Token) string {
+	if t == nil {
+		return ""
+	}
+	return fmt.Sprintf("type: %s\nexpiry: %v\nrefresh: %v\n",
+		t.Type(),
+		t.Expiry,
+		t.RefreshToken,
+	)
+}
+
 func createXeroConfig(t *testing.T, callbackURL, serverURL, tokenPath string) config.XeroConfig {
 	t.Helper()
 	return config.XeroConfig{
@@ -78,17 +89,6 @@ func TestTokenFileFuncs(t *testing.T) {
 	if !os.IsNotExist(err) {
 		t.Fatal("token file still exists on disk after delete called")
 	}
-}
-
-func tokenPrinter(t *oauth2.Token) string {
-	if t == nil {
-		return ""
-	}
-	return fmt.Sprintf("type: %s\nexpiry: %v\nrefresh: %v\n",
-		t.Type(),
-		t.Expiry,
-		t.RefreshToken,
-	)
 }
 
 // TestTokenValid tests if a slightly modified real xero token is valid.
@@ -247,8 +247,9 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 		t.Fatalf("could not save expired token to temp file %q: %v", tokenPath, err)
 	}
 
-	// Counterintuitively, this test succeeds because it has a refresh token entry.
-	if !TokenIsValid(tokenPath, duration(t, "8h")) {
+	// This test succeeds because it has a refresh token and is within the
+	// TokenTimeoutDuration period.
+	if !TokenIsValid(tokenPath, duration(t, "2h")) {
 		t.Fatalf("token in %q should be valid", tokenPath)
 	}
 
