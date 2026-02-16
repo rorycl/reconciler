@@ -44,6 +44,9 @@ xero:
   token_file_path: "./xero_token.json"
   # These oauth2 scopes should not normally be changed
   pkce_enabled: true
+  # The token timeout is the time at which the refresh token will no
+  # longer be valid or a sensible timeout value.
+  token_timeout: "8h"
   scopes:
     - "accounting.transactions"
     - "accounting.settings.read"
@@ -55,6 +58,9 @@ salesforce:
   client_secret: "SALESFORCE_CONSUMER_SECRET"
   token_file_path: "./sf_token.json"
   pkce_enabled: true
+  # The token timeout is the time at which the refresh token will no
+  # longer be valid or a sensible timeout value.
+  token_timeout: "8h"
   # These oauth2 scopes should not normally be changed
   scopes:
     - "api"

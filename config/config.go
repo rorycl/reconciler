@@ -50,23 +50,27 @@ type WebConfig struct {
 
 // XeroConfig holds Xero-specific settings.
 type XeroConfig struct {
-	ClientID      string   `yaml:"client_id"`
-	ClientSecret  string   `yaml:"client_secret"`
-	TokenFilePath string   `yaml:"token_file_path"`
-	PKCEEnabled   bool     `yaml:"pkce_enabled"`
-	Scopes        []string `yaml:"scopes"`
-	OAuth2Config  *oauth2.Config
+	ClientID             string `yaml:"client_id"`
+	ClientSecret         string `yaml:"client_secret"`
+	TokenFilePath        string `yaml:"token_file_path"`
+	TokenTimeout         string `yaml:"token_timeout"`
+	TokenTimeoutDuration time.Duration
+	PKCEEnabled          bool     `yaml:"pkce_enabled"`
+	Scopes               []string `yaml:"scopes"`
+	OAuth2Config         *oauth2.Config
 }
 
 // SalesforceConfig holds Salesforce-specific settings.
 type SalesforceConfig struct {
-	LoginDomain   string   `yaml:"login_domain"`
-	ClientID      string   `yaml:"client_id"`
-	ClientSecret  string   `yaml:"client_secret"`
-	TokenFilePath string   `yaml:"token_file_path"`
-	PKCEEnabled   bool     `yaml:"pkce_enabled"`
-	Scopes        []string `yaml:"scopes"`
-	OAuth2Config  *oauth2.Config
+	LoginDomain          string `yaml:"login_domain"`
+	ClientID             string `yaml:"client_id"`
+	ClientSecret         string `yaml:"client_secret"`
+	TokenFilePath        string `yaml:"token_file_path"`
+	TokenTimeout         string `yaml:"token_timeout"`
+	TokenTimeoutDuration time.Duration
+	PKCEEnabled          bool     `yaml:"pkce_enabled"`
+	Scopes               []string `yaml:"scopes"`
+	OAuth2Config         *oauth2.Config
 	// SOQL settings.
 	Query            string            `yaml:"query"`
 	FieldMappings    map[string]string `yaml:"field_mappings"`
@@ -157,6 +161,12 @@ func validateAndPrepare(c *Config) error {
 	if xc.TokenFilePath == "" {
 		return errors.New("xero.token_file_path is missing")
 	}
+	if xc.TokenTimeout == "" {
+		return errors.New("xero.token_timeout is missing")
+	}
+	if xc.TokenTimeoutDuration, err = time.ParseDuration(xc.TokenTimeout); err != nil {
+		return fmt.Errorf("could not parse xero.token_timeout %q: %w", xc.TokenTimeout, err)
+	}
 	if xc.Scopes == nil || len(xc.Scopes) < 1 {
 		return errors.New("xero.scopes not defined")
 	}
@@ -188,6 +198,12 @@ func validateAndPrepare(c *Config) error {
 	}
 	if sc.TokenFilePath == "" {
 		return errors.New("salesforce.token_file_path is missing")
+	}
+	if sc.TokenTimeout == "" {
+		return errors.New("salesforce.token_timeout is missing")
+	}
+	if sc.TokenTimeoutDuration, err = time.ParseDuration(sc.TokenTimeout); err != nil {
+		return fmt.Errorf("could not parse salesforce.token_timeout %q: %w", sc.TokenTimeout, err)
 	}
 	if sc.Query == "" {
 		return errors.New("salesforce.query is missing")

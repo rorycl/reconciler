@@ -25,10 +25,20 @@ func TestConfig(t *testing.T) {
 		t.Errorf("config.Xero.PKCEEnabled got %t want %t", got, want)
 	}
 
-	config2 := config // shallow copy; beware maps & slices not copied
-	config2.Web.ListenAddress = "127.0.0.2:9001"
-	if err := validateAndPrepare(config2); err == nil {
-		t.Errorf("expected error for invalid address %q", config2.Web.ListenAddress)
+	config.Web.ListenAddress = "127.0.0.2:9001"
+	if err := validateAndPrepare(config); err == nil {
+		t.Errorf("expected error for invalid address %q", config.Web.ListenAddress)
+	}
+	config.Web.ListenAddress = "127.0.0.1:9001"
+
+	config.Xero.TokenTimeout = "25h"
+	if err := validateAndPrepare(config); err != nil {
+		t.Errorf("unexpected error for token timeout %v", err)
+	}
+
+	config.Xero.TokenTimeout = "not valid"
+	if err := validateAndPrepare(config); err == nil {
+		t.Errorf("expected error for invalid token timeout %q", config.Xero.TokenTimeout)
 	}
 
 }
