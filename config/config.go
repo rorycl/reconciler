@@ -167,6 +167,9 @@ func validateAndPrepare(c *Config) error {
 	if xc.TokenTimeoutDuration, err = time.ParseDuration(xc.TokenTimeout); err != nil {
 		return fmt.Errorf("could not parse xero.token_timeout %q: %w", xc.TokenTimeout, err)
 	}
+	if xc.TokenTimeoutDuration > time.Duration(16*time.Hour) {
+		return fmt.Errorf("xero.token_timeout duration of >16 hours not supported, got %v", xc.TokenTimeoutDuration)
+	}
 	if xc.Scopes == nil || len(xc.Scopes) < 1 {
 		return errors.New("xero.scopes not defined")
 	}
@@ -204,6 +207,9 @@ func validateAndPrepare(c *Config) error {
 	}
 	if sc.TokenTimeoutDuration, err = time.ParseDuration(sc.TokenTimeout); err != nil {
 		return fmt.Errorf("could not parse salesforce.token_timeout %q: %w", sc.TokenTimeout, err)
+	}
+	if sc.TokenTimeoutDuration > time.Duration(16*time.Hour) {
+		return fmt.Errorf("salesforce.token_timeout duration of >16 hours not supported, got %v", sc.TokenTimeoutDuration)
 	}
 	if sc.Query == "" {
 		return errors.New("salesforce.query is missing")

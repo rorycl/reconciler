@@ -31,14 +31,30 @@ func TestConfig(t *testing.T) {
 	}
 	config.Web.ListenAddress = "127.0.0.1:9001"
 
-	config.Xero.TokenTimeout = "25h"
+	config.Xero.TokenTimeout = "15h"
 	if err := validateAndPrepare(config); err != nil {
 		t.Errorf("unexpected error for token timeout %v", err)
+	}
+
+	config.Xero.TokenTimeout = "17h"
+	if err := validateAndPrepare(config); err == nil {
+		t.Errorf("expected error for token timeout %v", config.Xero.TokenTimeout)
 	}
 
 	config.Xero.TokenTimeout = "not valid"
 	if err := validateAndPrepare(config); err == nil {
 		t.Errorf("expected error for invalid token timeout %q", config.Xero.TokenTimeout)
+	}
+	config.Xero.TokenTimeout = "12h"
+
+	config.Salesforce.TokenTimeout = "17h"
+	if err := validateAndPrepare(config); err == nil {
+		t.Errorf("expected error for token timeout %v", config.Salesforce.TokenTimeout)
+	}
+
+	config.Salesforce.TokenTimeout = "not valid"
+	if err := validateAndPrepare(config); err == nil {
+		t.Errorf("expected error for invalid token timeout %q", config.Salesforce.TokenTimeout)
 	}
 
 }
