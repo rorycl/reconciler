@@ -1,5 +1,5 @@
 ---
-# reconciler app combined config
+# Reconciler app configuration
 
 ################################################################
 # General settings
@@ -21,11 +21,11 @@ donation_account_prefixes:
   - "55"                                                                  
   - "57"
 
-# Operate in development mode
+# Operate in development mode.
 development_mode: false
 
 ################################################################
-# Web server settings
+# Web server settings and OAuth2 callback settings.
 
 web:
   listen_address: "localhost:8080"
@@ -36,17 +36,19 @@ web:
 # Xero and Salesforce API settings
 # These settings set out the OAuth2 connection settings to the remote
 # platforms.
-# PKCE code verification is strongly recommended.
+# The use of PKCE code verification is strongly recommended.
 
 xero:
   client_id: "XERO_CLIENT_ID"
   client_secret: "XERO_CLIENT_SECRET"
   token_file_path: "./xero_token.json"
-  # These oauth2 scopes should not normally be changed
   pkce_enabled: true
   # The token timeout is the time at which the refresh token will no
-  # longer be valid or a sensible timeout value.
+  # longer be valid or a sensible timeout value. An "8h" (8 hour)
+  # validity period is recommended. The system does not support validity
+  # periods > 16h.
   token_timeout: "8h"
+  # These oauth2 scopes should not normally be changed
   scopes:
     - "accounting.transactions"
     - "accounting.settings.read"
@@ -59,14 +61,17 @@ salesforce:
   token_file_path: "./sf_token.json"
   pkce_enabled: true
   # The token timeout is the time at which the refresh token will no
-  # longer be valid or a sensible timeout value.
+  # longer be valid or a sensible timeout value. This should match or be
+  # less than the Salesforce "Refresh Token Policy" configuration. An
+  # "8h" (8 hour) validity period is recommended. The system does not
+  # support validity periods > 16h.
   token_timeout: "8h"
   # These oauth2 scopes should not normally be changed
   scopes:
     - "api"
     - "refresh_token"
 
-  # The SOQL query to execute to show information in the local system.
+  # The SOQL query to execute.
   query: >-
     SELECT
       Id, Name, Amount, CloseDate, LastModifiedDate, Payout_Reference__c,
@@ -75,7 +80,7 @@ salesforce:
     FROM Opportunity
     WHERE {{.WhereClause}}
 
-  # Optional field mappings for the UI
+  # Optional field mappings from the SOQL query to show in the UI.
   field_mappings:
     StageName: Stage
     Account.Name: Account
@@ -83,6 +88,8 @@ salesforce:
     LastModifiedBy.Name: ModifiedBy
 
   # Target object and field for Distributed Foreign Key (DFK) updates.
+  # Note that the linking_object.linking_field_name is the only field
+  # that is updated in this system.
   linking_object: "Opportunity"
   linking_field_name: "Payout_Reference__c"
 
