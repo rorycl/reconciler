@@ -205,7 +205,8 @@ func (web *WebApp) routes() http.Handler {
 	// Chain the desired middleware. Todo: add recover handler.
 	logging := handlers.LoggingHandler(os.Stdout, r)
 	sessionMiddleWare := web.sessions.LoadAndSave(logging)
-	return sessionMiddleWare
+	csrfMiddlware := enforceCSRF(sessionMiddleWare)
+	return csrfMiddlware
 }
 
 // apisConnectedOK checks whether the user is connected to the api services. If not, the user is
@@ -221,12 +222,12 @@ func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !xero.TokenIsValid(web.cfg.Xero.TokenFilePath) {
+		if !xero.TokenIsValid(web.cfg.Xero.TokenFilePath, web.cfg.Xero.TokenTimeoutDuration) {
 			web.log.Info("xero token is not valid, redirecting")
 			http.Redirect(w, r, "/connect?status=xero_token_invalid", http.StatusSeeOther)
 			return
 		}
-		if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath) {
+		if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.TokenTimeoutDuration) {
 			web.log.Info("saleforce token is not valid, redirecting")
 			http.Redirect(w, r, "/connect?status=sf_token_invalid", http.StatusSeeOther)
 			return
@@ -255,8 +256,8 @@ func (web *WebApp) handleConnect() http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		sfTokenIsValid := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath)
-		xeroTokenIsValid := xero.TokenIsValid(web.cfg.Xero.TokenFilePath)
+		xeroTokenIsValid := xero.TokenIsValid(web.cfg.Xero.TokenFilePath, web.cfg.Xero.TokenTimeoutDuration)
+		sfTokenIsValid := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.TokenTimeoutDuration)
 
 		data := map[string]any{
 			"SFTokenIsValid":   sfTokenIsValid,
@@ -352,7 +353,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		logAndPrintToWeb(w, "retrieved %d account records", len(accounts))
 
 		if err := web.db.AccountsUpsert(ctx, accounts); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert account records", err)
+			logAndPrintErrorToWeb(w, "failed to upsert account records: %v", err)
 			return
 		}
 		logAndPrintToWeb(w, "Successfully upserted accounts to database.")
@@ -366,7 +367,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		logAndPrintToWeb(w, "retrieved %d bank transactions", len(transactions))
 
 		if err = web.db.BankTransactionsUpsert(ctx, transactions); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert bank transactions", err)
+			logAndPrintErrorToWeb(w, "failed to upsert bank transactions: %v", err)
 			return
 		}
 		logAndPrintToWeb(w, "Successfully upserted bank transactions to database.")
@@ -394,7 +395,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 		donations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefresh)
 		if err != nil {
-			logAndPrintErrorToWeb(w, "failed to retrieve donations", err)
+			logAndPrintErrorToWeb(w, "failed to retrieve donations: %v", err)
 			return
 		}
 		logAndPrintToWeb(w, "retrieved %d donations", len(donations))
@@ -402,15 +403,15 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 			logAndPrintErrorToWeb(w, "failed to upsert donations", err)
 			return
 		}
-		logAndPrintToWeb(w, "successfully upserted donations to database", err)
+		logAndPrintToWeb(w, "successfully upserted donations to database")
 
 		// Update session information
 		web.sessions.Put(ctx, "refreshed", true)
 		web.sessions.Put(ctx, "refreshed-datetime", time.Now())
 
 		// Redirect to invoices
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("HX-Redirect", "/invoices")
+		w.WriteHeader(http.StatusOK)
 		return
 
 	})
@@ -1120,7 +1121,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		if err != nil {
 			// Todo: decide if sfClient fails to always delete the current token.
 			/*
-				if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath) {
+				if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.Token....) {
 					...os.Remove...
 					web.log.Warn("handle Donations Link/Unlink detected an invalid token, redirecting to /connect")
 					http.Redirect(w, r, "/connect?error=sf_expired", http.StatusSeeOther)
