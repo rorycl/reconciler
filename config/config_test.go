@@ -58,3 +58,21 @@ func TestConfig(t *testing.T) {
 	}
 
 }
+
+func TestConfigRegexp(t *testing.T) {
+
+	c := &Config{
+		DonationAccountPrefixes: []string{"a", "b", "c"},
+	}
+	if got, want := c.DonationAccountCodesRegex(), "^(a|b|c)"; got != want {
+		t.Errorf("got %q want %q", got, want)
+	}
+	if _, err := c.DonationAccountCodesAsRegex(); err != nil {
+		t.Errorf("unexpected c.DonationAccountCodesARegex error %v", err)
+	}
+	c.DonationAccountPrefixes = []string{"(xn", "fail"}
+	if _, err := c.DonationAccountCodesAsRegex(); err == nil {
+		t.Errorf("expected c.DonationAccountCodesARegex error %v", err)
+	}
+
+}

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -247,7 +248,13 @@ func validateAndPrepare(c *Config) error {
 }
 
 // DonationAccountCodesRegex returns the donation account prefixes as a
-// compiled regex string suitable for SQLite.
+// string suitable for a regex expression for SQLite.
 func (c *Config) DonationAccountCodesRegex() string {
 	return fmt.Sprintf("^(%s)", strings.Join(c.DonationAccountPrefixes, "|"))
+}
+
+// DonationAccountCodesAsRegex returns the donation account prefixes as a
+// compiled regex version of DonationAccountCodesRegex.
+func (c *Config) DonationAccountCodesAsRegex() (*regexp.Regexp, error) {
+	return regexp.Compile(c.DonationAccountCodesRegex())
 }
