@@ -96,7 +96,8 @@ func New(
 	start time.Time,
 	end time.Time,
 ) (*WebApp, error) {
-	if start.After(end) {
+
+	if !end.IsZero() && start.After(end) {
 		return nil, fmt.Errorf("start date %s after end %s", start.Format("2006-01-2"), end.Format("2006-01-02"))
 	}
 
@@ -849,6 +850,14 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 		// Get salesforce instance url from the session (via OAuth2 token)
 		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
 
+		web.log.Info(fmt.Sprintf("donations linked for %s (%s) : dfk %s start %s end %s",
+			typer,
+			id,
+			dfk,
+			donationSearchStart.Format("2006-01-02"),
+			donationSearchEnd.Format("2006-01-02"),
+		))
+
 		// Prepare data for the template.
 		data := struct {
 			ID            string
@@ -876,7 +885,7 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 			web.defaultStartDate,
 			web.defaultEndDate,
 			"Linked", // linkage status
-			id,       // payout reference
+			dfk,      // payout reference
 			"",       // searchstring
 			pageLen,
 			0, // form offset
@@ -1098,22 +1107,32 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			return
 		}
 
-		// Retrieve the details of the invoice or bank transaction.
+		web.log.Info(fmt.Sprintf("donationLinkUnlink %s action called for %s : %s (%d donations)",
+			form.Action,
+			form.Typer,
+			form.ID,
+			len(form.DonationIDs),
+		))
+
+		// In link mode, retrieve the details of the invoice or bank transaction.
 		// retrieve the related invoice or bank transaction dfk and date
-		dfk, _, err := web.getInvoiceOrBankTransactionDetails(ctx, form.Typer, form.ID)
-		if err != nil {
-			web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
-			web.htmxClientError(
-				w,
-				fmt.Sprintf("%s id: %s error: could get invoice/transaction info: %v", form.Typer, form.ID, err))
-			return
-		}
-		if dfk == "" || dfk == missingTransactionReference {
-			web.ServerError(w, r, fmt.Errorf("%s id %s had empty or invalid dfk and cannot be linked", form.Typer, form.ID))
-			web.htmxClientError(
-				w,
-				fmt.Sprintf("%s id %s has an empty dfk and cannot be linked", form.Typer, form.ID))
-			return
+		var dfk string
+		if form.Action == "link" {
+			dfk, _, err = web.getInvoiceOrBankTransactionDetails(ctx, form.Typer, form.ID)
+			if err != nil {
+				web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
+				web.htmxClientError(
+					w,
+					fmt.Sprintf("%s id: %s error: could get invoice/transaction info: %v", form.Typer, form.ID, err))
+				return
+			}
+			if dfk == "" || dfk == missingTransactionReference {
+				web.ServerError(w, r, fmt.Errorf("%s id %s had empty or invalid dfk and cannot be linked", form.Typer, form.ID))
+				web.htmxClientError(
+					w,
+					fmt.Sprintf("%s id %s has an empty dfk and cannot be linked", form.Typer, form.ID))
+				return
+			}
 		}
 
 		// Create the salesforce client and run a batch update.
@@ -1134,6 +1153,8 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 		timeStamp := time.Now()
 
+		// Update the donations. If it is an unlink action, update the dfk with "", else
+		// the actual dfk from the bank transaction or invoice.
 		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, dfk, form.DonationIDs, false)
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
