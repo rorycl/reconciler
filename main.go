@@ -31,7 +31,7 @@ func runServer() {
 	// Configure Logging.
 	logger := slog.Default()
 	if cfg.InDevelopmentMode {
-		slog.SetLogLoggerLevel(slog.LevelDebug)
+		slog.SetLogLoggerLevel(slog.LevelInfo)
 	}
 
 	// Mount the sql filesystem.
@@ -44,7 +44,7 @@ func runServer() {
 	// Create the database connection.
 	// accountCodes := "^(53|55|57)"
 	accountCodes := cfg.DonationAccountCodesRegex()
-	thisDB, err := db.NewConnection(cfg.DatabasePath, "", accountCodes)
+	thisDB, err := db.NewConnection(cfg.DatabasePath, "", accountCodes, logger)
 	if err != nil {
 		fmt.Println("database setup error", err)
 		os.Exit(1)
