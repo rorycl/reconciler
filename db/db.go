@@ -67,7 +67,7 @@ type DB struct {
 	*sqlx.DB
 	accountCodes string
 	sqlFS        fs.FS
-	logger       *slog.Logger
+	log          *slog.Logger
 
 	// Prepared statements.
 	accountUpsertStmt *parameterizedStmt
@@ -88,8 +88,17 @@ type DB struct {
 	donationUpsertStmt *parameterizedStmt
 }
 
-// NewConnection creates a new connection to an SQLite database at the given path.
-func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, error) {
+// NewConnection creates a new connection to an SQLite database at the given path. The
+// directory containing the SQL files are either mounted at either the provided sqlDir
+// or at the embedded path (SQLEmbeddedFS) which is the default. The accountCodes
+// are passed to the sql statements to ensure that only bank transactions and invoices
+// containing line items starting with those codes are returned.
+func NewConnection(
+	dbPath string,
+	sqlDir string,
+	accountCodes string,
+	logger *slog.Logger,
+) (*DB, error) {
 
 	// mount the sql fs either using the embedded fs or via the provided path.
 	// The path is likely to need to be relative to "here" as ".." type paths are not
@@ -104,10 +113,10 @@ func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, erro
 
 	// for in-memory test databases, check the necessary cached setting is used.
 	if strings.Contains(dbPath, ":memory:") {
-		if !strings.Contains(dbPath, "cache=shared") {
-			return nil, fmt.Errorf("in-memory connection %q should contain '?cache=shared'", dbPath)
+		if !strings.Contains(dbPath, "?cache=shared") {
+			return nil, fmt.Errorf("in-memory connection %q must contain '?cache=shared'", dbPath)
 		}
-		dataSource = dbPath
+		dataSource = fmt.Sprintf("%s&dataSource=foreign_keys(1)&_dataSource=journal_mode(WAL)", dbPath)
 	}
 	dbDB, err := sql.Open("sqlite", dataSource)
 	if err != nil {
@@ -123,17 +132,19 @@ func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, erro
 	}
 
 	// Logger setup.
-	logger := slog.New(slog.NewTextHandler(
-		os.Stdout,
-		&slog.HandlerOptions{Level: slog.LevelInfo},
-	))
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{Level: slog.LevelDebug},
+		))
+	}
 
 	// Wrap the standard library *sql.DB with sqlx.
 	db := &DB{
 		DB:           sqlx.NewDb(dbDB, "sqlite"),
 		accountCodes: accountCodes,
 		sqlFS:        sqlFS,
-		logger:       logger,
+		log:          logger,
 	}
 
 	// Return early in testing mode, so that prepared statments and schema loading can
@@ -145,12 +156,14 @@ func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, erro
 	// Initialize the data schema. This is idempotent.
 	err = db.InitSchema(sqlFS, "schema.sql")
 	if err != nil {
+		db.log.Error(fmt.Sprintf("schema setup error: %v", err))
 		return nil, fmt.Errorf("schema setup error: %w", err)
 	}
 
 	// Initialize the databse named statements.
 	err = db.prepareNamedStatements()
 	if err != nil {
+		db.log.Error(fmt.Sprintf("could not prepare named statements: %v", err))
 		return nil, fmt.Errorf("could not prepare named statements: %w", err)
 	}
 
@@ -158,12 +171,18 @@ func NewConnection(dbPath string, sqlDir string, accountCodes string) (*DB, erro
 }
 
 // NewConnectionInTestMode runs a new connection in test mode, loading the test data.
-func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) (*DB, error) {
+func NewConnectionInTestMode(
+	dbPath string,
+	sqlDir string,
+	accountCodes string,
+	logger *slog.Logger,
+) (*DB, error) {
+
 	if !strings.Contains(dbPath, ":memory:") {
 		return nil, fmt.Errorf("db path %q invalid for test mode", dbPath)
 	}
 
-	testDB, err := NewConnection(dbPath, sqlDir, accountCodes)
+	testDB, err := NewConnection(dbPath, sqlDir, accountCodes, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialise test database: %w", err)
 	}
@@ -171,7 +190,7 @@ func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) 
 	// Load the schema definitions.
 	if err := testDB.InitSchema(testDB.sqlFS, "schema.sql"); err != nil {
 		_ = testDB.Close()
-		return nil, fmt.Errorf("Failed to initialize schema for test database: %v", err)
+		return nil, fmt.Errorf("Failed to initialize schema for test database: %w", err)
 	}
 
 	// Load the test data.
@@ -182,16 +201,18 @@ func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) 
 	_, err = testDB.Exec(string(data))
 	if err != nil {
 		_ = testDB.Close()
+		testDB.log.Error(fmt.Sprintf("Failed to load data for test database: %v", err))
 		return nil, fmt.Errorf("Failed to load data for test database: %w", err)
 	}
 
 	// Prepare the functions and named statements.
 	err = testDB.prepareNamedStatements()
 	if err != nil {
+		testDB.log.Error(fmt.Sprintf("could not prepare named statements: %v", err))
 		return nil, fmt.Errorf("could not prepare named statements: %v", err)
 	}
 
-	// Run a messy smoke test if desired.
+	// Run a rough smoke test if desired.
 	/*
 		err = _donations_smoke_test(testDB)
 		if err != nil {
@@ -207,7 +228,7 @@ func NewConnectionInTestMode(dbPath string, sqlDir string, accountCodes string) 
 func (db *DB) SetLogLevel(lvl slog.Level) {
 	opts := &slog.HandlerOptions{Level: lvl}
 	handler := slog.NewTextHandler(os.Stdout, opts)
-	db.logger = slog.New(handler)
+	db.log = slog.New(handler)
 }
 
 // prepareNamedStatements prepares all the named statements for this database connection.
@@ -286,6 +307,7 @@ func (db *DB) prepNamedStatement(fileFS fs.FS, filePath string) (*parameterizedS
 
 	pQuery, err := db.PrepareNamed(string(query.Body))
 	if err != nil {
+		db.log.Error(fmt.Sprintf("could not prepare statement %q: %v", filePath, err))
 		return nil, fmt.Errorf("could not prepare statement %q: %w", filePath, err)
 	}
 	return &parameterizedStmt{
@@ -301,11 +323,13 @@ func (db *DB) InitSchema(fileFS fs.FS, filePath string) error {
 
 	schema, err := fs.ReadFile(fileFS, filePath)
 	if err != nil {
+		db.log.Error(fmt.Sprintf("could not read schema file at %q: %v", filePath, err))
 		return fmt.Errorf("could not read schema file at %q: %w", filePath, err)
 	}
 
 	_, err = db.ExecContext(context.Background(), string(schema))
 	if err != nil {
+		db.log.Error(fmt.Sprintf("failed to execute schema initialization: %v", err))
 		return fmt.Errorf("failed to execute schema initialization: %w", err)
 	}
 	return nil
@@ -313,7 +337,7 @@ func (db *DB) InitSchema(fileFS fs.FS, filePath string) error {
 
 // logQuery is for helping debug SQL issues.
 func (db *DB) logQuery(name string, stmt *parameterizedStmt, args map[string]any, err error) {
-	db.logger.Debug(
+	db.log.Debug(
 		fmt.Sprintf(
 			"sql: %s\n---\nquery:\n%q\n---\nargs: %#v\nerror: %v\n",
 			name,
@@ -333,15 +357,15 @@ func _donations_smoke_test(testDB *DB) error {
 	}
 	rows, err := testDB.Queryx("select * from donations limit 3")
 	if err != nil {
-		return fmt.Errorf("select error :%v", err)
+		return fmt.Errorf("smoke test select error :%v", err)
 	}
 	for rows.Next() {
 		var d D2
 		err = rows.StructScan(&d)
 		if err != nil {
-			return fmt.Errorf("scan error :%v", err)
+			return fmt.Errorf("smoke test scan error :%v", err)
 		}
-		fmt.Printf("row: %#v\n", d)
+		testDB.log.Warn(fmt.Sprintf("row: %#v\n", d))
 	}
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 // AccountsUpsert upserts Xero account records.
 func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error {
 	if len(accounts) == 0 {
+		db.log.Info("no accounts received for upsert")
 		return nil
 	}
 	tx, err := db.Begin()
@@ -37,14 +38,16 @@ func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error
 			"Updated":       acc.Updated.Format("2006-01-02T15:04:05Z"),
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return fmt.Errorf("accounts upsert verify arguments error: %v", err)
+			db.log.Error(fmt.Sprintf("accounts upsert verify arguments error: %v", err))
+			return fmt.Errorf("accounts upsert verify arguments error: %w", err)
 		}
 		_, err := stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
-			db.logQuery("accounts", stmt, namedArgs, err)
-			return fmt.Errorf("failed to upsert account %v: %w", acc.AccountID, err)
+			db.log.Error(fmt.Sprintf("failed to upsert account %s: %v", acc.AccountID, err))
+			return fmt.Errorf("failed to upsert account %s: %w", acc.AccountID, err)
 		}
 	}
+	db.log.Info(fmt.Sprintf("successfully upserted %d accounts", len(accounts)))
 	return tx.Commit()
 }
 
@@ -68,6 +71,15 @@ type Invoice struct {
 // values. It isn't necessary to run this query in a transaction.
 func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error) {
 
+	db.log.Info(fmt.Sprintf("InvoicesGet %s from %s to %s search %s limit %d offset %d",
+		reconciliationStatus,
+		dateFrom.Format("2006-01-02"),
+		dateTo.Format("2006-01-02"),
+		search,
+		limit,
+		offset,
+	))
+
 	// Set named statement and parameter list.
 	stmt := db.invoicesGetStmt
 
@@ -75,6 +87,7 @@ func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, date
 	switch reconciliationStatus {
 	case "All", "Reconciled", "NotReconciled":
 	default:
+		db.log.Error(fmt.Sprintf("invoicesGet reconciliation error: type %s", reconciliationStatus))
 		return nil, fmt.Errorf(
 			"reconciliation must be one of All, Reconciled or NotReconciled, got %q",
 			reconciliationStatus,
@@ -92,8 +105,8 @@ func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, date
 		"HereOffset":           offset,
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
-		db.logger.Warn(fmt.Sprintf("invoices verify args error: %v", err))
-		return nil, fmt.Errorf("invoices verify args error: %v", err)
+		db.log.Error(fmt.Sprintf("invoicesGet verify args error: %v", err))
+		return nil, fmt.Errorf("invoices verify args error: %w", err)
 	}
 
 	// Scan results into the provided slice.
@@ -101,15 +114,16 @@ func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, date
 	err := stmt.SelectContext(ctx, &invoices, namedArgs)
 	db.logQuery("invoices", stmt, namedArgs, err)
 	if err != nil {
-		db.logger.Warn(fmt.Sprintf("invoices select error: %v", err))
-		return nil, fmt.Errorf("invoices select error: %v", err)
+		db.log.Error(fmt.Sprintf("invoicesGet select error: %v", err))
+		return nil, fmt.Errorf("invoices select error: %w", err)
 	}
 
 	// Return early if no rows were returned.
 	if len(invoices) == 0 {
-		db.logger.Info("no invoices were found.")
+		db.log.Info("invoicesGet: no invoices were found.")
 		return nil, sql.ErrNoRows
 	}
+	db.log.Info(fmt.Sprintf("invoicesGet: %d invoices were found.", len(invoices)))
 	return invoices, nil
 }
 
@@ -117,6 +131,7 @@ func (db *DB) InvoicesGet(ctx context.Context, reconciliationStatus string, date
 // for each invoice in the set to ensure consistency.
 func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error {
 	if len(invoices) == 0 {
+		db.log.Info("no invoices received for upsert")
 		return nil
 	}
 
@@ -135,10 +150,12 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 			"InvoiceID": inv.InvoiceID,
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			fmt.Errorf("invoices upsert verify arguments error: %v", err)
+			db.log.Error(fmt.Sprintf("invoicesUpsert verify arguments error: %v", err))
+			return fmt.Errorf("invoices upsert verify arguments error: %w", err)
 		}
 		_, err := stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
+			db.log.Error(fmt.Sprintf("invoicesUpsert: failed to delete old line items for invoice %s: %v", inv.InvoiceID, err))
 			return fmt.Errorf("failed to delete old line items for invoice %s: %w", inv.InvoiceID, err)
 		}
 
@@ -157,11 +174,13 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 			"Contact":       inv.Contact,
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return fmt.Errorf("invoices upsert verify arguments error: %v", err)
+			db.log.Error(fmt.Sprintf("invoicesUpsert verify arguments error: %v", err))
+			return fmt.Errorf("invoices upsert verify arguments error: %w", err)
 		}
 		_, err = stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
-			return fmt.Errorf("failed to upsert invoice %s: %w", inv.InvoiceID, err)
+			db.log.Error(fmt.Sprintf("invoicesUpsert: failed to upsert invoice %s: %v", inv.InvoiceID, err))
+			return fmt.Errorf("failed to upsert invoice %s: %v", inv.InvoiceID, err)
 		}
 
 		// Add the related line items for this invoice.
@@ -182,10 +201,13 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 			}
 			_, err := stmt.ExecContext(ctx, namedArgs)
 			if err != nil {
+				db.log.Error(fmt.Sprintf("invoicesUpsert: failed to upsert line item %s invoice %s: %v", line.LineItemID, inv.InvoiceID, err))
 				return fmt.Errorf("failed to upsert line item %s invoice %s: %w", line.LineItemID, inv.InvoiceID, err)
 			}
 		}
 	}
+
+	db.log.Info(fmt.Sprintf("successfully upserted %d invoices", len(invoices)))
 
 	return tx.Commit()
 }
@@ -211,6 +233,15 @@ type BankTransaction struct {
 // and donation values. It isn't necessary to run this query in a transaction.
 func (db *DB) BankTransactionsGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error) {
 
+	db.log.Info(fmt.Sprintf("BankTransactionGet %s from %s to %s search %s limit %d offset %d",
+		reconciliationStatus,
+		dateFrom.Format("2006-01-02"),
+		dateTo.Format("2006-01-02"),
+		search,
+		limit,
+		offset,
+	))
+
 	// Set named statement and parameter list.
 	stmt := db.bankTransactionsGetStmt
 
@@ -218,6 +249,7 @@ func (db *DB) BankTransactionsGet(ctx context.Context, reconciliationStatus stri
 	switch reconciliationStatus {
 	case "All", "Reconciled", "NotReconciled":
 	default:
+		db.log.Error(fmt.Sprintf("bankTransactionGet reconciliation error: type %s", reconciliationStatus))
 		return nil, fmt.Errorf(
 			"reconciliation must be one of All, Reconciled or NotReconciled, got %q",
 			reconciliationStatus,
@@ -235,21 +267,25 @@ func (db *DB) BankTransactionsGet(ctx context.Context, reconciliationStatus stri
 		"HereOffset":           offset,
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
-		return nil, fmt.Errorf("bank transactions verify arguments error: %v", err)
+		db.log.Error(fmt.Sprintf("bank transactions verify arguments error: %v", err))
+		return nil, fmt.Errorf("bank transactions verify arguments error: %w", err)
 	}
 
 	// Use sqlx to scan results into the provided slice.
 	var transactions []BankTransaction
 	err := stmt.SelectContext(ctx, &transactions, namedArgs)
 	if err != nil {
-		db.logQuery("bank transactions", stmt, namedArgs, err)
-		return nil, fmt.Errorf("bank transactions select error: %v", err)
+		db.log.Error(fmt.Sprintf("bank transactions select error: %v", err))
+		return nil, fmt.Errorf("bank transactions select error: %w", err)
 	}
 
 	// Return early if no rows were returned.
 	if len(transactions) == 0 {
+		db.log.Info("bank transactions: no rows found")
 		return nil, sql.ErrNoRows
 	}
+
+	db.log.Info(fmt.Sprintf("bank transactions: %d rows found", len(transactions)))
 	return transactions, nil
 }
 
@@ -258,12 +294,14 @@ func (db *DB) BankTransactionsGet(ctx context.Context, reconciliationStatus stri
 // consistency.
 func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error {
 	if len(transactions) == 0 {
+		db.log.Info("bankTransactionUpsert:  no transactions provided for upsert")
 		return nil
 	}
 
 	// Start transaction.
 	tx, err := db.Begin()
 	if err != nil {
+		db.log.Error(fmt.Sprintf("bankTransactionUpsert: transaction start error: %v", err))
 		return err
 	}
 	defer tx.Rollback() // no-op after a commit.
@@ -276,11 +314,13 @@ func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.Ba
 			"BankTransactionID": tr.BankTransactionID,
 		}
 		if err := stmt.verifyArgs(namedArgs); err != nil {
-			return err
+			db.log.Error(fmt.Sprintf("bank transaction upsert: failed to verify arguments %v", err))
+			return fmt.Errorf("bank transaction upsert: failed to verify arguments %w", err)
 		}
 		_, err := stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
-			return fmt.Errorf("failed to delete old line items for transaction %s: %w", tr.BankTransactionID, err)
+			db.log.Error(fmt.Sprintf("bank transaction upsert: failed to delete old line items for transaction %s: %v", tr.BankTransactionID, err))
+			return fmt.Errorf("bank transaction upsert: failed to delete old line items for transaction %s: %w", tr.BankTransactionID, err)
 		}
 
 		// Upsert the new bank transaction.
@@ -301,6 +341,7 @@ func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.Ba
 
 		_, err = stmt.ExecContext(ctx, namedArgs)
 		if err != nil {
+			db.log.Error(fmt.Sprintf("failed to upsert bank transaction %s: %v", tr.BankTransactionID, err))
 			return fmt.Errorf("failed to upsert bank transaction %s: %w", tr.BankTransactionID, err)
 		}
 
@@ -319,14 +360,18 @@ func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.Ba
 				"TaxAmount":         line.TaxAmount,
 			}
 			if err := stmt.verifyArgs(namedArgs); err != nil {
-				return fmt.Errorf("bank transaction upsert verify arguments error: %v", err)
+				db.log.Error(fmt.Sprintf("bank transaction upsert verify arguments error: %v", err))
+				return fmt.Errorf("bank transaction upsert verify arguments error: %w", err)
 			}
 			_, err = stmt.ExecContext(ctx, namedArgs)
 			if err != nil {
+				db.log.Error(fmt.Sprintf("failed to insert line item %s for transaction %s: %v", line.LineItemID, tr.BankTransactionID, err))
 				return fmt.Errorf("failed to insert line item %s for transaction %s: %w", line.LineItemID, tr.BankTransactionID, err)
 			}
 		}
 	}
+
+	db.log.Info(fmt.Sprintf("successfully upserted %d bank transaction records", len(transactions)))
 
 	return tx.Commit()
 }
@@ -364,6 +409,8 @@ type WRLineItem struct {
 // rows for each line item.
 func (db *DB) InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error) {
 
+	db.log.Info(fmt.Sprintf("InvoiceWRGet for %s", invoiceID))
+
 	// Set named statement and parameter list.
 	stmt := db.invoiceGetStmt
 
@@ -386,6 +433,7 @@ func (db *DB) InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []
 		"InvoiceID":    invoiceID,
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
+		db.log.Error(fmt.Sprintf("InvoiceWRGet verify args error %v", err))
 		return invoice, nil, err
 	}
 
@@ -394,6 +442,7 @@ func (db *DB) InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []
 	err := stmt.SelectContext(ctx, &iwli, namedArgs)
 	db.logQuery("invoiceWLI", stmt, namedArgs, err)
 	if err != nil {
+		db.log.Error(fmt.Sprintf("InvoiceWRGet select error %v", err))
 		return invoice, nil, fmt.Errorf("invoice select error: %v", err)
 	}
 
@@ -408,6 +457,8 @@ func (db *DB) InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []
 	for i, li := range iwli {
 		lineItems[i] = li.WRLineItem
 	}
+
+	db.log.Info(fmt.Sprintf("InvoiceWRGet successful with %d line items", len(lineItems)))
 	return invoice, lineItems, nil
 }
 
@@ -433,6 +484,8 @@ type WRTransaction struct {
 // rows for each line item.
 func (db *DB) BankTransactionWRGet(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error) {
 
+	db.log.Info(fmt.Sprintf("BankTransactionWRGet for %s", transactionID))
+
 	// Set named statement and parameter list.
 	stmt := db.bankTransactionGetStmt
 
@@ -455,15 +508,16 @@ func (db *DB) BankTransactionWRGet(ctx context.Context, transactionID string) (W
 		"BankTransactionID": transactionID,
 	}
 	if err := stmt.verifyArgs(namedArgs); err != nil {
+		db.log.Error(fmt.Sprintf("BankTransactionWRGet verify args error %v", err))
 		return transaction, nil, err
 	}
 
 	// Use sqlx to scan results into the provided slice.
 	var twli transactionsWLI
 	err := stmt.SelectContext(ctx, &twli, namedArgs)
-	db.logQuery("transactionWLI", stmt, namedArgs, err)
 	if err != nil {
-		return transaction, nil, fmt.Errorf("transaction select error: %v", err)
+		db.log.Error(fmt.Sprintf("BankTransactionWRGet select error %v", err))
+		return transaction, nil, fmt.Errorf("transaction select error: %w", err)
 	}
 
 	// Return early if no errors were returned.
@@ -477,5 +531,7 @@ func (db *DB) BankTransactionWRGet(ctx context.Context, transactionID string) (W
 	for i, li := range twli {
 		lineItems[i] = li.WRLineItem
 	}
+
+	db.log.Info(fmt.Sprintf("BankTransactionWRGet successful with %d line items", len(lineItems)))
 	return transaction, lineItems, nil
 }

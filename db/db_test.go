@@ -27,7 +27,7 @@ func setupTestDB(t *testing.T) (*DB, func()) {
 	sqlDir := "sql"
 
 	var err error
-	testDB, err := NewConnectionInTestMode("file::memory:?cache=shared", sqlDir, accountCodes)
+	testDB, err := NewConnectionInTestMode("file::memory:?cache=shared", sqlDir, accountCodes, nil)
 	if err != nil {
 		t.Fatalf("in-memory test database opening error: %v", err)
 	}
