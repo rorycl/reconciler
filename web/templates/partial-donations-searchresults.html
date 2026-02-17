@@ -2,6 +2,7 @@
 
 {{ define "partial-donations-searchresults" }}
 {{ $pageType := .PageType }}
+{{ $sfInstanceURL := .SFInstanceURL }}
 <!-- start of partial -->
 
 <div id="donations-link-error" class="text-red-500"></div>
@@ -36,7 +37,7 @@
                 {{ if eq $pageType "indirect" }}
                 <td class="px-4 py-1 text-center"><input name="donation-ids" value="{{ .ID }}" type="checkbox"></td>
                 {{ end }}
-                <td class="px-4 py-1"><a href="{{ .SFInstanceURL }}/lightning/r/Opportunity/{{ .ID }}" class="text-sky-700 font-semibold hover:underline">{{ .Name }}</a></td>
+                <td class="px-4 py-1"><a href="{{ $sfInstanceURL }}/lightning/r/Opportunity/{{ .ID }}" class="text-sky-700 font-semibold hover:underline">{{ .Name }}</a></td>
                 <td class="px-4 py-1 whitespace-nowrap">{{ .CloseDateStr }}</td>
                 <td class="px-4 py-1">{{ .PayoutReference }}</td>
                 <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .Amount }}</td>
