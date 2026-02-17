@@ -290,7 +290,6 @@ func TokenIsValid(path string, expirationDuration time.Duration) bool {
 		return false
 	}
 	projectedExpiry := time.Now().UTC().Add(-1 * expirationDuration)
-	fmt.Println("projectedExpiry", projectedExpiry)
 	if !token.Expiry.After(projectedExpiry) {
 		return false
 	}
