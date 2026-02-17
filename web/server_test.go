@@ -18,8 +18,6 @@ func TestWebAppToRun(t *testing.T) {
 
 	t.Skip()
 
-	logger := slog.Default()
-
 	cfg := &config.Config{
 		Web: config.WebConfig{
 			ListenAddress: "127.0.0.1:8080",
@@ -31,8 +29,14 @@ func TestWebAppToRun(t *testing.T) {
 			TokenFilePath: "salesforce.json",
 		},
 	}
+
+	logger := slog.New(slog.NewTextHandler(
+		t.Output(),
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+
 	accountCodes := "^(53|55|57)"
-	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", "", accountCodes)
+	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", "", accountCodes, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,8 +67,6 @@ func TestWebAppToRun(t *testing.T) {
 // TestWebAppAndShutdown tests bringing up the web server and then stopping it.
 func TestWebAppAndShutdown(t *testing.T) {
 
-	logger := slog.Default()
-
 	cfg := &config.Config{
 		Web: config.WebConfig{
 			ListenAddress: "127.0.0.1:8000",
@@ -76,8 +78,14 @@ func TestWebAppAndShutdown(t *testing.T) {
 			TokenFilePath: "sf.json",
 		},
 	}
+
+	logger := slog.New(slog.NewTextHandler(
+		t.Output(),
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+
 	accountCodes := "^(53|55|57)"
-	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", "", accountCodes)
+	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", "", accountCodes, logger)
 	if err != nil {
 		t.Fatal(err)
 	}

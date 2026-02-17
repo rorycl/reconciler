@@ -333,7 +333,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		web.log.Info(fmt.Sprintf("Refresh last refresh: %s", lastRefresh.Format(time.DateTime)))
 
 		// Connect the Xero client.
-		xeroClient, err := xero.NewClient(ctx, web.cfg)
+		xeroClient, err := xero.NewClient(ctx, web.cfg, web.log)
 		if err != nil {
 			// Todo: consider redirect to /connect.
 			web.ServerError(w, r, fmt.Errorf("failed to create xero client: %w", err))
@@ -388,7 +388,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		logAndPrintToWeb(w, "Successfully upserted invoices to database.")
 
 		// Retrieve the Salesforce donations.
-		sfClient, err := salesforce.NewClient(ctx, web.cfg)
+		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log)
 		if err != nil {
 			// consider redirect to /connect
 			logAndPrintErrorToWeb(w, "donations new client error: %v", err)
@@ -1136,7 +1136,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		}
 
 		// Create the salesforce client and run a batch update.
-		sfClient, err := salesforce.NewClient(ctx, web.cfg)
+		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log)
 		if err != nil {
 			// Todo: decide if sfClient fails to always delete the current token.
 			/*
