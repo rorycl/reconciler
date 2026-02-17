@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -174,7 +175,12 @@ func TestToken_ValidToken(t *testing.T) {
 		},
 	}
 
-	client, err := NewClient(context.Background(), cfg)
+	logger := slog.New(slog.NewTextHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+
+	client, err := NewClient(context.Background(), cfg, logger)
 	if err != nil {
 		t.Fatalf("NewClient returned an error: %v", err)
 	}
@@ -267,7 +273,11 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 	}
 
 	// Run NewClient.
-	client, err := NewClient(context.Background(), cfg)
+	logger := slog.New(slog.NewTextHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+	client, err := NewClient(context.Background(), cfg, logger)
 	if err != nil {
 		t.Fatalf("NewClient returned an error: %v", err)
 	}

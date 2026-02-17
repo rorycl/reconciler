@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -17,21 +19,40 @@ const baseURL = "https://api.xero.com/api.xro/2.0"
 
 // APIClient is a wrapper for making authenticated calls to the Xero API.
 type APIClient struct {
-	httpClient *http.Client
-	tenantID   string
-	baseURL    string
+	httpClient     *http.Client
+	tenantID       string
+	baseURL        string
+	accountsRegexp *regexp.Regexp
+	log            *slog.Logger
 }
 
-// NewAPIClient creates a new Xero API client. If not httpClient is
-// provided http.DefaultClient is used.
-func NewAPIClient(tenantID string, httpClient *http.Client) *APIClient {
+// NewAPIClient creates a new Xero API client. If not httpClient is provided
+// http.DefaultClient is used. The accountsRegexp is used to filter
+func NewAPIClient(
+	tenantID string,
+	httpClient *http.Client,
+	accountsRegexp *regexp.Regexp,
+	logger *slog.Logger,
+) *APIClient {
+
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+
+	// Logger setup.
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{Level: slog.LevelDebug},
+		))
+	}
+
 	return &APIClient{
-		httpClient: httpClient,
-		tenantID:   tenantID,
-		baseURL:    baseURL,
+		httpClient:     httpClient,
+		tenantID:       tenantID,
+		baseURL:        baseURL,
+		accountsRegexp: accountsRegexp,
+		log:            logger,
 	}
 }
 
@@ -44,9 +65,7 @@ func (c *APIClient) GetBankTransactions(ctx context.Context, fromDate, ifModifie
 		// Build the 'where' clause for the query.
 		var conditions []string
 		conditions = append(conditions, `Type=="RECEIVE"`, `(Status=="AUTHORISED" OR Status=="PAID")`)
-		toDate := fromDate.AddDate(1, 0, 0) // One year from the start date
 		conditions = append(conditions, fmt.Sprintf(`Date >= DateTime(%d, %d, %d)`, fromDate.Year(), fromDate.Month(), fromDate.Day()))
-		conditions = append(conditions, fmt.Sprintf(`Date < DateTime(%d, %d, %d)`, toDate.Year(), toDate.Month(), toDate.Day()))
 		whereClause := strings.Join(conditions, " AND ")
 
 		// Prepare the request URL with query parameters.
@@ -55,14 +74,18 @@ func (c *APIClient) GetBankTransactions(ctx context.Context, fromDate, ifModifie
 		params.Add("page", fmt.Sprintf("%d", page))
 		requestURL := fmt.Sprintf("%s/BankTransactions?%s", c.baseURL, params.Encode())
 
+		c.log.Info(fmt.Sprintf("GetBankTransactions request %v", requestURL))
+
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {
+			c.log.Error(fmt.Sprintf("GetBankTransactions: request error: %v", err))
 			return nil, err
 		}
 
 		var response BankTransactionsResponse
 		resp, err := do(c, req, &response)
 		if err != nil {
+			c.log.Error(fmt.Sprintf("GetBankTransactions: failed to execute request for page %d: %v", page, err))
 			return nil, fmt.Errorf("failed to execute request for page %d: %w", page, err)
 		}
 
@@ -79,6 +102,8 @@ func (c *APIClient) GetBankTransactions(ctx context.Context, fromDate, ifModifie
 		page++
 	}
 
+	c.log.Info(fmt.Sprintf("GetBankTransactions: retrieved %d bank transactions", len(allTransactions)))
+
 	return allTransactions, nil
 }
 
@@ -90,9 +115,7 @@ func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince t
 	for {
 		var conditions []string
 		conditions = append(conditions, `Type=="ACCREC"`, `(Status=="AUTHORISED" OR Status=="PAID" OR Status=="VOIDED")`)
-		toDate := fromDate.AddDate(1, 0, 0)
 		conditions = append(conditions, fmt.Sprintf(`Date >= DateTime(%d, %d, %d)`, fromDate.Year(), fromDate.Month(), fromDate.Day()))
-		conditions = append(conditions, fmt.Sprintf(`Date < DateTime(%d, %d, %d)`, toDate.Year(), toDate.Month(), toDate.Day()))
 		whereClause := strings.Join(conditions, " AND ")
 
 		params := url.Values{}
@@ -100,14 +123,18 @@ func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince t
 		params.Add("page", fmt.Sprintf("%d", page))
 		requestURL := fmt.Sprintf("%s/Invoices?%s", c.baseURL, params.Encode())
 
+		c.log.Info(fmt.Sprintf("Invoices request %v", requestURL))
+
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {
+			c.log.Error(fmt.Sprintf("Invoices: request error: %v", err))
 			return nil, err
 		}
 
 		var response InvoiceResponse
 		resp, err := do(c, req, &response)
 		if err != nil {
+			c.log.Error(fmt.Sprintf("Invoices: failed to execute request for page %d: %v", page, err))
 			return nil, fmt.Errorf("failed to execute request for page %d: %w", page, err)
 		}
 
@@ -121,6 +148,8 @@ func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince t
 		allInvoices = append(allInvoices, response.Invoices...)
 		page++
 	}
+
+	c.log.Info(fmt.Sprintf("Invoices: retrieved %d invoices", len(allInvoices)))
 
 	return allInvoices, nil
 }
@@ -139,6 +168,7 @@ func (c *APIClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) 
 	var response AccountResponse
 	resp, err := do(c, req, &response)
 	if err != nil {
+		c.log.Error(fmt.Sprintf("GetAccounts: failed to execute request: %v", err))
 		return nil, fmt.Errorf("failed to execute request for accounts: %w", err)
 	}
 
@@ -146,6 +176,7 @@ func (c *APIClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) 
 		return nil, nil
 	}
 
+	c.log.Info(fmt.Sprintf("Accounts: retrieved %d accounts", len(response.Accounts)))
 	return response.Accounts, nil
 }
 
@@ -159,12 +190,15 @@ func (c *APIClient) GetBankTransactionByID(ctx context.Context, uuid string) (Ba
 
 	var response BankTransactionsResponse
 	if _, err := do(c, req, &response); err != nil {
+		c.log.Error(fmt.Sprintf("GetBankTransactionByID: failed to retrieve record: %v", err))
 		return BankTransaction{}, err
 	}
 
 	if len(response.BankTransactions) == 0 {
+		c.log.Error(fmt.Sprintf("GetBankTransactionByID: failed to retrieve record %s", uuid))
 		return BankTransaction{}, fmt.Errorf("bank transaction with UUID %s not found", uuid)
 	}
+	c.log.Info("GetBankTransactionByID successful")
 	return response.BankTransactions[0], nil
 }
 
@@ -175,23 +209,28 @@ func (c *APIClient) UpdateBankTransactionReference(ctx context.Context, tx BankT
 	payload := map[string][]BankTransaction{"BankTransactions": {tx}}
 	body, err := json.Marshal(payload)
 	if err != nil {
+		c.log.Error(fmt.Sprintf("UpdateBankTransactionReference: failed to marshal update payload: %v", err))
 		return BankTransaction{}, fmt.Errorf("failed to marshal update payload: %w", err)
 	}
 
 	requestURL := fmt.Sprintf("%s/BankTransactions", c.baseURL)
 	req, err := c.newRequest(ctx, "POST", requestURL, time.Time{}, body)
 	if err != nil {
+		c.log.Error(fmt.Sprintf("UpdateBankTransactionReference: new request error: %v", err))
 		return BankTransaction{}, err
 	}
 
 	var response BankTransactionsResponse
 	if _, err := do(c, req, &response); err != nil {
+		c.log.Error(fmt.Sprintf("UpdateBankTransactionReference: request error: %v", err))
 		return BankTransaction{}, err
 	}
 
 	if len(response.BankTransactions) == 0 {
+		c.log.Error("UpdateBankTransactionReference: update response did not contain a bank transaction")
 		return BankTransaction{}, fmt.Errorf("update response did not contain a bank transaction")
 	}
+	c.log.Info("UpdateBankTransactionReference: succesful")
 	return response.BankTransactions[0], nil
 }
 
@@ -243,13 +282,8 @@ func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	body, _ := io.ReadAll(resp.Body)
-	_ = os.WriteFile("/tmp/xero.json", body, 0644)
-	bodyReader := bytes.NewReader(body)
-
 	if v != nil { // v might be nil for a DELETE request, for example.
-		// if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
-		if err := json.NewDecoder(bodyReader).Decode(v); err != nil {
+		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
 			return nil, fmt.Errorf("failed to decode response: %w", err)
 		}
 	}
@@ -257,7 +291,8 @@ func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 	return resp, nil
 }
 
-// GEThttps://api.xero.com/api.xro/2.0/Organisation
+// GET https://api.xero.com/api.xro/2.0/Organisation
+// func getOrgansisation tbc : retrieve organisation info including short code.
 
 // getTenantID fetches the list of connections and returns the first TenantID found.
 // Todo: check suitability of choosing the first connection.

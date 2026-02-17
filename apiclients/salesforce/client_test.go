@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,6 +33,10 @@ func setup(t *testing.T) (mux *http.ServeMux, client *Client, teardown func()) {
 				LoginDomain: server.URL,
 			},
 		},
+		log: slog.New(slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{Level: slog.LevelDebug},
+		)),
 	}
 	teardown = func() {
 		server.Close()

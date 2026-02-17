@@ -32,41 +32,6 @@ type TokenCache struct {
 	InstanceURL string        `json:"instance_url"`
 }
 
-// NewClient handles the OAuth2 flow to return an authenticated Salesforce client.
-func NewClient(ctx context.Context, cfg *config.Config) (*Client, error) {
-	cache, err := LoadTokenCacheFromFile(cfg.Salesforce.TokenFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("no token file found at '%s'. Please run the 'login' command first", cfg.Salesforce.TokenFilePath)
-	}
-
-	tokenSource := cfg.Salesforce.OAuth2Config.TokenSource(ctx, cache.Token)
-	refreshedToken, err := tokenSource.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to refresh token: %w", err)
-	}
-
-	// Fix the Salesforce lack of an Expiry date.
-	fixSalesforceTokenExpiry(refreshedToken)
-
-	if refreshedToken.AccessToken != cache.Token.AccessToken {
-		log.Println("Access token was refreshed. Saving new token.")
-		cache.Token = refreshedToken
-
-		// The instance_url does not change on refresh, so keep the old one.
-		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
-			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
-		}
-	}
-
-	oauthClient := oauth2.NewClient(ctx, tokenSource)
-	return &Client{
-		httpClient:  oauthClient,
-		instanceURL: cache.InstanceURL,
-		apiVersion:  SalesforceAPIVersionNumber,
-		config:      *cfg,
-	}, nil
-}
-
 // InitiateLogin starts the interactive cli OAuth2 flow to get a new token from the web.
 // It saves the new token and instance URL to the specified configuration path upon
 // success.

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	"reconciler/config"
+
+	"golang.org/x/oauth2"
 )
 
 // maxBatchUpdateCount is the maximum number of Salesforce records that
@@ -25,6 +28,51 @@ type Client struct {
 	instanceURL string
 	apiVersion  string
 	config      config.Config
+	log         *slog.Logger
+}
+
+// NewClient handles the OAuth2 flow to return an authenticated Salesforce client.
+func NewClient(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Client, error) {
+
+	cache, err := LoadTokenCacheFromFile(cfg.Salesforce.TokenFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("no token file found at '%s'. Please run the 'login' command first", cfg.Salesforce.TokenFilePath)
+	}
+
+	tokenSource := cfg.Salesforce.OAuth2Config.TokenSource(ctx, cache.Token)
+	refreshedToken, err := tokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+
+	if logger != nil {
+		logger = slog.New(slog.NewTextHandler(
+			os.Stdout,
+			&slog.HandlerOptions{Level: slog.LevelDebug},
+		))
+	}
+
+	// Fix the Salesforce lack of an Expiry date.
+	fixSalesforceTokenExpiry(refreshedToken)
+
+	if refreshedToken.AccessToken != cache.Token.AccessToken {
+		logger.Info("Access token was refreshed. Saving new token.")
+		cache.Token = refreshedToken
+
+		// The instance_url does not change on refresh, so keep the old one.
+		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
+			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
+		}
+	}
+
+	oauthClient := oauth2.NewClient(ctx, tokenSource)
+	return &Client{
+		httpClient:  oauthClient,
+		instanceURL: cache.InstanceURL,
+		apiVersion:  SalesforceAPIVersionNumber,
+		config:      *cfg,
+		log:         logger,
+	}, nil
 }
 
 // GetOpportunities fetches records from Salesforce using a configurable SOQL query.
@@ -41,6 +89,7 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 
 	// Replace the placeholder in the query template with the generated WHERE clause.
 	finalSOQL := strings.Replace(c.config.Salesforce.Query, "{{.WhereClause}}", whereClause, 1)
+	c.log.Info(fmt.Sprintf("GetOpportunities finalSQL %s", finalSOQL))
 
 	// Dump the final query for debugging purposes.
 	// _ = os.WriteFile("salesforce_query.log", []byte(finalSOQL), 0644)
@@ -59,11 +108,13 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 		pageNo++
 		req, err := c.newRequest(ctx, "GET", requestURL, nil)
 		if err != nil {
+			c.log.Error(fmt.Sprintf("GetOpportunities: newRequest error pageNo %d: %v", pageNo, err))
 			return nil, fmt.Errorf("newRequest error pageNo %d: %w", pageNo, err)
 		}
 
 		var response SOQLResponse
 		if _, err := c.do(req, &response); err != nil {
+			c.log.Error(fmt.Sprintf("GetOpportunities soql do error pageNo %d: %v", pageNo, err))
 			return nil, fmt.Errorf("soql do error pageNo %d: %w", pageNo, err)
 		}
 		records = append(records, response.Donations...)
@@ -72,6 +123,7 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 		}
 		requestURL, err = url.JoinPath(c.instanceURL, response.NextRecordsURL)
 		if err != nil {
+			c.log.Error(fmt.Sprintf("GetOpportunities: url construction error for page %d: (%s) %v", pageNo+1, response.NextRecordsURL, err))
 			return nil, fmt.Errorf("url construction error for page %d: (%s) %w", pageNo+1, response.NextRecordsURL, err)
 		}
 
@@ -101,6 +153,7 @@ func (c *Client) BatchUpdateOpportunityRefs(
 	urlTpl := "%s/services/data/%s/composite/sobjects"
 
 	if len(ids) > maxBatchUpdateCount {
+		c.log.Error("BatchUpdateOpportunityRefs: cannot update more than 200 records in a single batch")
 		return nil, fmt.Errorf("cannot update more than 200 records in a single batch")
 	}
 
@@ -124,17 +177,20 @@ func (c *Client) BatchUpdateOpportunityRefs(
 
 	body, err := json.Marshal(payload)
 	if err != nil {
+		c.log.Error(fmt.Sprintf("BatchUpdateOpportunityRefs: failed to marshal batch request: %v", err))
 		return nil, fmt.Errorf("failed to marshal batch request: %w", err)
 	}
 
 	requestURL := fmt.Sprintf(urlTpl, c.instanceURL, c.apiVersion)
 	req, err := c.newRequest(ctx, "PATCH", requestURL, body)
 	if err != nil {
+		c.log.Error(fmt.Sprintf("BatchUpdateOpportunityRefs: new patch request error: %v", err))
 		return nil, fmt.Errorf("new patch request error: %w", err)
 	}
 
 	var response CollectionsUpdateResponse
 	if _, err := c.do(req, &response); err != nil {
+		c.log.Error(fmt.Sprintf("BatchUpdateOpportunityRefs: response error: %v", err))
 		return nil, err
 	}
 
@@ -146,17 +202,19 @@ func (c *Client) BatchUpdateOpportunityRefs(
 			for _, e := range result.Errors {
 				errors = append(errors, fmt.Sprintf("%s (%s)", e.Message, e.ErrorCode))
 			}
-			msg := fmt.Sprintf("failed to update donation %s: %s", result.ID,
-				strings.Join(errors, ", "))
+			msg := fmt.Sprintf("BatchUpdateOpportunityRefs: failed to update donation %s: %s", result.ID, strings.Join(errors, ", "))
 			errorMessages = append(errorMessages, msg)
 		}
 	}
 
 	if len(errorMessages) > 0 {
+
+		c.log.Error("BatchUpdateOpportunityRefs: one or more donations failed to update")
 		return response, fmt.Errorf("one or more donations failed to update:\n- %s",
 			strings.Join(errorMessages, "\n- "))
 	}
 
+	c.log.Info("BatchUpdateOpportunityRefs: one or more donations failed to update")
 	return response, nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -27,7 +28,8 @@ var ErrNewLoginRequired = errors.New("new login required")
 // NewClient handles the OAuth2 flow to return an authenticated http.Client.
 // It attempts to use a saved token first and will refresh it if necessary.
 // If no token exists, it will fail, requiring the user to run the `login` command.
-func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
+func NewClient(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*APIClient, error) {
+
 	tok, err := LoadTokenFromFile(cfg.Xero.TokenFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("no token file found at '%s'. Please run 'reconciler login xero' first", cfg.Xero.TokenFilePath)
@@ -60,7 +62,12 @@ func NewClient(ctx context.Context, cfg *config.Config) (*APIClient, error) {
 		return nil, fmt.Errorf("failed to determine tenant ID: %w", err)
 	}
 
-	return NewAPIClient(tenantID, oauthClient), nil
+	accountsRegexp, err := cfg.DonationAccountCodesAsRegex()
+	if err != nil {
+		return nil, fmt.Errorf("accounts regexp compliation failure: %w", err)
+	}
+
+	return NewAPIClient(tenantID, oauthClient, accountsRegexp, logger), nil
 }
 
 // InitiateLogin starts the interactive cli OAuth2 flow to get a new token from the web.

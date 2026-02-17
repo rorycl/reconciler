@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +19,8 @@ func setup(t *testing.T) (mux *http.ServeMux, client *APIClient, teardown func()
 	t.Helper()
 	mux = http.NewServeMux()
 	server := httptest.NewServer(mux)
-	client = NewAPIClient("fake-tenant-id", server.Client())
+	accountsRegexp := regexp.MustCompile("")
+	client = NewAPIClient("fake-tenant-id", server.Client(), accountsRegexp, nil)
 	client.baseURL = server.URL // Override the default base URL.
 	teardown = func() {
 		server.Close()
