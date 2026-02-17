@@ -176,7 +176,7 @@ func TestToken_ValidToken(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(
-		os.Stdout,
+		t.Output(),
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
 
@@ -274,7 +274,7 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 
 	// Run NewClient.
 	logger := slog.New(slog.NewTextHandler(
-		os.Stdout,
+		t.Output(),
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
 	client, err := NewClient(context.Background(), cfg, logger)

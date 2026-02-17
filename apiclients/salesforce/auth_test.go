@@ -158,7 +158,7 @@ func TestTokenCache_ValidToken(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(
-		os.Stdout,
+		t.Output(),
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
 
@@ -245,7 +245,7 @@ func TestTokenCache_RefreshExpiredToken(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(
-		os.Stdout,
+		t.Output(),
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
 

@@ -34,7 +34,7 @@ func setup(t *testing.T) (mux *http.ServeMux, client *Client, teardown func()) {
 			},
 		},
 		log: slog.New(slog.NewTextHandler(
-			os.Stdout,
+			t.Output(),
 			&slog.HandlerOptions{Level: slog.LevelDebug},
 		)),
 	}
