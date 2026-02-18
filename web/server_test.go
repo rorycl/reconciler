@@ -109,10 +109,8 @@ func TestWebAppAndShutdown(t *testing.T) {
 	}
 
 	go func() {
-		select {
-		case <-time.After(50 * time.Millisecond):
-			_ = webApp.server.Shutdown(context.Background())
-		}
+		<-time.After(50 * time.Millisecond)
+		_ = webApp.server.Shutdown(context.Background())
 	}()
 
 	err = webApp.StartServer()

@@ -198,8 +198,9 @@ func TestURLParse(t *testing.T) {
 			url:  "http://test.com?hi=there&ok=fine&not=needed",
 			keys: []string{"hi", "ok"},
 			vals: url.Values{
-				"hi": []string{"there"},
-				"ok": []string{"fine"},
+				"hi":  []string{"there"},
+				"not": []string{"needed"},
+				"ok":  []string{"fine"},
 			},
 			hasErr: nil,
 		},
@@ -228,7 +229,7 @@ func TestURLParse(t *testing.T) {
 				return
 			}
 			if diff := cmp.Diff(tt.vals, vq); diff != "" {
-				fmt.Errorf("unexpected diff %v", diff)
+				t.Errorf("unexpected diff %v", diff)
 			}
 
 		})

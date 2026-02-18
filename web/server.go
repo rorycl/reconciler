@@ -112,7 +112,7 @@ func New(
 	}
 
 	// Initialise in-memory session store.
-	scsSessionStore := scs.NewSession()
+	scsSessionStore := scs.New()
 	scsSessionStore.Lifetime = 12 * time.Hour
 
 	// Compile the donation accounts filtering regexp
@@ -338,19 +338,21 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 
 		ctx := r.Context()
 
-		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
-
-		// Determine if refreshing needs to occur. If it does, set the refresh time to 5
+		// Determine if refreshing needs to occur. If it does, set the refresh time to 2
 		// minutes before the last refresh to deal with any slow updates on the remote
-		// platform.
+		// platform. This uses the fact that an empty call for the refreshed-datetime
+		// session var will return a time.Time.IsZero() time.
+		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
 		refreshDeadline := time.Now().Add(-3 * time.Minute)
+		var refreshed bool
 		if refreshDeadline.After(lastRefresh) {
-			web.sessions.Put(ctx, "refreshed", false)
+			refreshed = false
 		} else {
-			lastRefresh.Add(-5 * time.Minute)
+			refreshed = true
+			lastRefresh = lastRefresh.Add(-2 * time.Minute)
 		}
-		isRefreshed := web.sessions.GetBool(ctx, "refreshed")
-		web.log.Info(fmt.Sprintf("Refresh status: %t", isRefreshed))
+		web.sessions.Put(ctx, "refreshed", refreshed)
+		web.log.Info(fmt.Sprintf("Refresh status: %t", refreshed))
 		web.log.Info(fmt.Sprintf("Refresh last refresh: %s", lastRefresh.Format(time.DateTime)))
 
 		// Connect the Xero client.
@@ -398,7 +400,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 
 		if err := web.db.InvoicesUpsert(ctx, invoices); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert invoices", err)
+			logAndPrintErrorToWeb(w, "failed to upsert invoices: %v", err)
 			return
 		}
 
@@ -416,7 +418,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 		logAndPrintToWeb(w, "retrieved %d donations", len(donations))
 		if err := web.db.UpsertDonations(ctx, donations); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert donations", err)
+			logAndPrintErrorToWeb(w, "failed to upsert donations: %v", err)
 			return
 		}
 
@@ -429,7 +431,6 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		// Redirect to invoices
 		w.Header().Set("HX-Redirect", "/invoices")
 		w.WriteHeader(http.StatusOK)
-		return
 
 	})
 }
@@ -1213,7 +1214,7 @@ func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *temp
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	buf.WriteTo(w)
+	_, _ = buf.WriteTo(w)
 }
 
 // ServerError logs and return an internal server 500 error. The error should contain
@@ -1244,7 +1245,7 @@ func (web *WebApp) htmxClientError(w http.ResponseWriter, message string) {
 		`<div class="text-sm text-red px-4 pb-2">%s</div>`,
 		message,
 	)
-	w.Write([]byte(errorString))
+	_, _ = w.Write([]byte(errorString))
 }
 
 // donationSearchTimeSpan uses a simple heuristic for determining the dates for a
