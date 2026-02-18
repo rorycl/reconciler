@@ -312,7 +312,9 @@ func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotModified {
 		return resp, nil
@@ -351,7 +353,9 @@ func getTenantID(ctx context.Context, client *http.Client) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get connections: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("error getting connections (status %d)", resp.StatusCode)

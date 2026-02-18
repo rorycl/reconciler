@@ -61,14 +61,14 @@ func testPagination[T any](
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(jsonContent)
+			_, _ = w.Write(jsonContent)
 		case 2: // Second page request
 			if page := r.URL.Query().Get("page"); page != "2" {
 				t.Errorf("expected page 2, got %s", page)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(emptyResponseJSON))
+			_, _ = w.Write([]byte(emptyResponseJSON))
 		default:
 			t.Fatalf("handler called too many times: %d", callCount)
 		}
@@ -112,7 +112,7 @@ func testNoPagination[T any](
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(jsonContent)
+		_, _ = w.Write(jsonContent)
 	})
 
 	return getFunc(client)
@@ -239,7 +239,7 @@ func TestGetInvoices_APIError(t *testing.T) {
 	mux.HandleFunc("/Invoices", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError) // 500
-		w.Write([]byte(apiErrorBody))
+		_, _ = w.Write([]byte(apiErrorBody))
 	})
 
 	_, err := client.GetInvoices(context.Background(), time.Now(), time.Time{}, allAccountsRegexp)

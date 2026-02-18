@@ -105,17 +105,6 @@ func TestTokenValid(t *testing.T) {
 	}
 }
 
-// setupTestServer creates a test environment for OAuth2 web server calls.
-func setupTestServer(t *testing.T) (mux *http.ServeMux, teardown func(), addr string) {
-	t.Helper()
-	mux = http.NewServeMux()
-	server := httptest.NewServer(mux)
-	teardown = func() {
-		server.Close()
-	}
-	return mux, teardown, server.URL
-}
-
 // TestNewClient_ValidToken tests that a client with a valid, non-expired token
 // is created successfully without triggering a token refresh.
 func TestToken_ValidToken(t *testing.T) {
@@ -140,7 +129,7 @@ func TestToken_ValidToken(t *testing.T) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		fmt.Fprintf(w, `[{"tenantId": "%s"}]`, expectedTenantID)
+		_, _ = fmt.Fprintf(w, `[{"tenantId": "%s"}]`, expectedTenantID)
 	})
 
 	// Xero API /oauth/token endpoint (which should not be called in
@@ -215,7 +204,7 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		fmt.Fprintf(w, `[{"tenantId": "%s"}]`, expectedTenantID)
+		_, _ = fmt.Fprintf(w, `[{"tenantId": "%s"}]`, expectedTenantID)
 	})
 
 	// Xero API /oauth/token endpoint
@@ -237,7 +226,7 @@ func TestToken_RefreshExpiredToken(t *testing.T) {
 			AccessToken: newAccessToken,
 			Expiry:      time.Now().Add(1 * time.Hour),
 		}
-		json.NewEncoder(w).Encode(newToken)
+		_ = json.NewEncoder(w).Encode(newToken)
 
 	})
 
@@ -357,7 +346,7 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 		}
 		// Return a token.
 		w.Header().Set("Content-type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  mockAccessToken,
 			"token_type":    "Bearer",
 			"refresh_token": "mock-refresh-token",
@@ -407,7 +396,9 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to call /init: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 
 			if resp.StatusCode != http.StatusSeeOther {
 				t.Fatalf("expected 303 redirect from /init; got %d", resp.StatusCode)
@@ -445,7 +436,9 @@ func TestAuthWebLoginAndCallbackPKCE(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to call /callback: %v", err)
 			}
-			defer respCallback.Body.Close()
+			defer func() {
+				_ = respCallback.Body.Close()
+			}()
 
 			if respCallback.StatusCode != http.StatusSeeOther {
 				t.Fatalf("expected 303 Redirect from /callback (success), got %d", respCallback.StatusCode)
