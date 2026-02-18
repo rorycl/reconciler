@@ -82,7 +82,7 @@ func (c *APIClient) GetBankTransactions(
 		params.Add("page", fmt.Sprintf("%d", page))
 		requestURL := fmt.Sprintf("%s/BankTransactions?%s", c.baseURL, params.Encode())
 
-		c.log.Info(fmt.Sprintf("GetBankTransactions request %v", requestURL))
+		c.log.Debug(fmt.Sprintf("GetBankTransactions request %v", requestURL))
 
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {
@@ -154,7 +154,7 @@ func (c *APIClient) GetInvoices(
 		params.Add("page", fmt.Sprintf("%d", page))
 		requestURL := fmt.Sprintf("%s/Invoices?%s", c.baseURL, params.Encode())
 
-		c.log.Info(fmt.Sprintf("Invoices request %v", requestURL))
+		c.log.Debug(fmt.Sprintf("Invoices request %v", requestURL))
 
 		req, err := c.newRequest(ctx, "GET", requestURL, ifModifiedSince, nil)
 		if err != nil {

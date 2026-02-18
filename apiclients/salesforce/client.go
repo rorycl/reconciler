@@ -77,11 +77,9 @@ func NewClient(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*C
 
 // GetOpportunities fetches records from Salesforce using a configurable SOQL query.
 func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Donation, error) {
-	var conditions []string
-	toDate := fromDate.AddDate(1, 0, 0) // One year from the start date
-	conditions = append(conditions, fmt.Sprintf("CloseDate >= %s", fromDate.Format("2006-01-02")))
-	conditions = append(conditions, fmt.Sprintf("CloseDate < %s", toDate.Format("2006-01-02")))
 
+	var conditions []string
+	conditions = append(conditions, fmt.Sprintf("CloseDate >= %s", fromDate.Format("2006-01-02")))
 	if !ifModifiedSince.IsZero() {
 		conditions = append(conditions, fmt.Sprintf("LastModifiedDate > %s", ifModifiedSince.UTC().Format(time.RFC3339)))
 	}
@@ -89,7 +87,7 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 
 	// Replace the placeholder in the query template with the generated WHERE clause.
 	finalSOQL := strings.Replace(c.config.Salesforce.Query, "{{.WhereClause}}", whereClause, 1)
-	c.log.Info(fmt.Sprintf("GetOpportunities finalSQL %s", finalSOQL))
+	c.log.Info(fmt.Sprintf("GetOpportunities sql: %s", finalSOQL))
 
 	// Dump the final query for debugging purposes.
 	// _ = os.WriteFile("salesforce_query.log", []byte(finalSOQL), 0644)
@@ -106,6 +104,8 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 	var pageNo int
 	for {
 		pageNo++
+		c.log.Debug("GetOpportunities: page %d: url %s", pageNo, requestURL)
+
 		req, err := c.newRequest(ctx, "GET", requestURL, nil)
 		if err != nil {
 			c.log.Error(fmt.Sprintf("GetOpportunities: newRequest error pageNo %d: %v", pageNo, err))
@@ -136,7 +136,7 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 // https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/resources_sobject_describe.htm.
 //
 // The method replaces the data in the stated salesforce LinkingFieldName for salesforce
-// opportunity records with the provided IDs with `reference`.
+// opportunity records with the provided IDs with the provided `reference`.
 //
 // Note that setting `allOrNone` to true makes the SOQL update atomic and the
 // transaction will fail in it's entirety if any single opportunity record cannot be
@@ -182,6 +182,8 @@ func (c *Client) BatchUpdateOpportunityRefs(
 	}
 
 	requestURL := fmt.Sprintf(urlTpl, c.instanceURL, c.apiVersion)
+	c.log.Debug(fmt.Sprintf("BatchUpdateOpportunityRefs: requestURL %s", requestURL))
+
 	req, err := c.newRequest(ctx, "PATCH", requestURL, body)
 	if err != nil {
 		c.log.Error(fmt.Sprintf("BatchUpdateOpportunityRefs: new patch request error: %v", err))
@@ -249,7 +251,7 @@ func (c *Client) do(req *http.Request, v any) (*http.Response, error) {
 	}
 
 	// Uncomment to save the raw response to disk for debugging.
-	_ = os.WriteFile("/tmp/salesforce_response.json", body, 0644)
+	// _ = os.WriteFile("/tmp/salesforce_response.json", body, 0644)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
