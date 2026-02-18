@@ -52,6 +52,7 @@ import (
 	"reconciler/apiclients/xero"
 	"reconciler/config"
 	"reconciler/db"
+	"regexp"
 	"time"
 
 	"github.com/alexedwards/scs/v2"
@@ -83,6 +84,7 @@ type WebApp struct {
 	defaultEndDate   time.Time
 	server           *http.Server
 	sessions         *scs.SessionManager
+	accountsRegexp   *regexp.Regexp
 	inDevelopment    bool // in development mode
 }
 
@@ -113,6 +115,12 @@ func New(
 	scsSessionStore := scs.NewSession()
 	scsSessionStore.Lifetime = 12 * time.Hour
 
+	// Compile the donation accounts filtering regexp
+	accountsRegexp, err := cfg.DonationAccountCodesAsRegex()
+	if err != nil {
+		panic(fmt.Sprintf("accounts Regexp did not compile: %v", err))
+	}
+
 	webApp := &WebApp{
 		log:              logger,
 		cfg:              cfg,
@@ -123,6 +131,7 @@ func New(
 		defaultEndDate:   end,
 		server:           server,
 		sessions:         scsSessionStore,
+		accountsRegexp:   accountsRegexp,
 	}
 
 	// In-Development mode triggers a warning as it bypasses the API connection check
@@ -360,7 +369,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		logAndPrintToWeb(w, "Successfully upserted accounts to database.")
 
 		// Bank Transactions
-		transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh)
+		transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh, web.accountsRegexp)
 		if err != nil {
 			logAndPrintErrorToWeb(w, "bank transaction retrieval error: %v", err)
 			return
@@ -374,7 +383,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		logAndPrintToWeb(w, "Successfully upserted bank transactions to database.")
 
 		// Invoices
-		invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh)
+		invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh, web.accountsRegexp)
 		if err != nil {
 			logAndPrintErrorToWeb(w, "invoices retrieval error: %v", err)
 			return
