@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"regexp"
@@ -86,7 +85,7 @@ func Load(filePath string) (*Config, error) {
 		return nil, fmt.Errorf("config file does not exist: %s", filePath)
 	}
 
-	configFile, err := ioutil.ReadFile(filePath)
+	configFile, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -175,7 +174,7 @@ func validateAndPrepare(c *Config) error {
 	if xc.TokenTimeoutDuration > time.Duration(16*time.Hour) {
 		return fmt.Errorf("xero.token_timeout duration of >16 hours not supported, got %v", xc.TokenTimeoutDuration)
 	}
-	if xc.Scopes == nil || len(xc.Scopes) < 1 {
+	if len(xc.Scopes) < 1 {
 		return errors.New("xero.scopes not defined")
 	}
 	if !slices.Contains(xc.Scopes, "offline_access") {
@@ -228,7 +227,7 @@ func validateAndPrepare(c *Config) error {
 	if sc.LinkingFieldName == "" {
 		return errors.New("salesforce.linking_field_name is missing")
 	}
-	if sc.Scopes == nil || len(sc.Scopes) < 1 {
+	if len(sc.Scopes) < 1 {
 		return errors.New("salesforce.scopes not defined")
 	}
 	if !slices.Contains(sc.Scopes, "api") {
