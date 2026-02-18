@@ -5,32 +5,44 @@
 {{ define "content" }}
 <div class="max-w-xl mx-auto bg-white p-8 rounded-lg shadow-md border border-slate-300 text-sm">
     <div class="prose">
-        <h2 class="pb-4 text-base font-semibold">Refresh Data</h2>
-        <p class="pb-4">You are connected. Before proceeding, please refresh the data in the local database.</p>
-        <p class="">Data will be refreshed from the configured started ate of <span class="font-bold">{{ .DataStartDate }}</span></p>
+        <h2 class="pt-4 pb-2 text-base font-semibold">Refresh Data</h2>
+        <p class="pb-2">Please refresh the data in the local database.</p>
+        <p class="pb-2">Data will be refreshed from the configured start date of <span class="font-bold">{{ .DataStartDate.Format "02 January 2006" }}</span>.</p>
+        <p class="pb-2">Based on the local configuration, only financial records which contain line items with account codes starting with any of 
+        {{ range $i, $ac := .DonationAccountCodes }} 
+        {{- if gt $i 0 }}, {{ end -}}
+        <span class="font-mono font-bold text-sky-700">{{- $ac -}}</span>
+        {{ end -}}
+        will be considered.
+        </p>
     </div>
 
-    <div class="mt-8 space-y-6">
+    <div class="mt-2 space-y-6">
         <!-- Refresh Xero -->
-        <div class="p-4 border border border-4 rounded-md">
+        <div class="pt-4 pb-2 px-4 border border border-4 rounded-md">
             <h3 class="font-semibold">Refresh Xero and Salesforce records</h3>
-            <p class="text-sm text-slate-600 mb-3">
-            This action will retrieve accounts, bank transaction and invoice records from Xero over the Xero API to
-            store locally.
+
+            <p class="pb-2 pt-4 text-sm mb-3">
+            This action will retrieve Xero accounts and donation-related bank transaction and
+            invoice records, and Salesdorce donation (opportunity) records to store locally.
             </p>
-            <p class="text-sm text-slate-600 mb-3">
-            This will also retrieve Salesdorce donation (opportunity) records to store locally.
+
+            <p class="pb-2 text-sm mb-3">
+            The data may take several minutes to update. Please do not interrupt the update process.
             </p>
 
             <div id="data-refresh-updates" class="text-sm text-slate-600 mb-3 hidden">
-                <!-- intended refresh target -->
+                <!-- intended SSE refresh console target area -->
             </div>
 
             {{ if not .Refreshed }}
+            <!-- when the user clicks this button the button should be disabled and the loading spinner div should be unhidden. -->
             <button hx-get="/refresh/update"
                     hx-target="#data-refresh-updates"
                     hx-indicator="#loading-spinner"
-                    class="bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+                    class="bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors"
+                    _="on click toggle @disabled"
+            >
                 Refresh
             </button>
             {{ else }}
@@ -39,7 +51,7 @@
             </p>
             {{ end }}
 
-            <!-- loading spinner -->
+            <!-- loading spinner (div should be hidden until button above is clicked) -->
             <div id="loading-spinner" class="htmx-indicator mt-4 flex items-center text-sky-700">
                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-sky-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -53,6 +65,9 @@
 
     {{ if .Refreshed }}
     <div class="mt-10 text-center">
+        <p class="text-sm text-slate-600 mb-3">
+        Data has been refreshed within the last 15 minutes at {{ .LastRefresh.Format "15:04" }}.
+        </p>
         <a href="/home" class="bg-green-600 text-white font-bold py-2 px-6 rounded hover:bg-green-700 transition-colors">
             Continue to App
         </a>

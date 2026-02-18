@@ -270,6 +270,7 @@ func (web *WebApp) handleConnect() http.Handler {
 		sfTokenIsValid := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.TokenTimeoutDuration)
 
 		data := map[string]any{
+			"Organisation":     web.cfg.Organisation,
 			"SFTokenIsValid":   sfTokenIsValid,
 			"XeroTokenIsValid": xeroTokenIsValid,
 		}
@@ -284,18 +285,29 @@ func (web *WebApp) handleRefresh() http.Handler {
 	tpls := []string{"base.html", "refresh.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	// The start date from which data will be downloaded is set in the configuration file.
+	// Configuration start date.
 	dataStartDate := web.cfg.DataStartDate
+	accountCodes := web.cfg.DonationAccountPrefixes
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		refreshed := web.sessions.GetBool(ctx, "refreshed")
+
+		// Todo: Refresh data is best determined by database data freshness.
 		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
+		m15, _ := time.ParseDuration("15m")
+		var refreshed bool
+		if time.Now().Add(-1 * m15).Before(lastRefresh) {
+			refreshed = true
+		} else {
+			refreshed = false
+		}
+		web.sessions.Put(ctx, "refreshed", refreshed)
 
 		data := map[string]any{
-			"DataStartDate": dataStartDate,
-			"Refreshed":     refreshed,
-			"LastRefresh":   lastRefresh,
+			"DataStartDate":        dataStartDate,
+			"Refreshed":            refreshed,
+			"LastRefresh":          lastRefresh,
+			"DonationAccountCodes": accountCodes,
 		}
 		web.render(w, r, templates, name, data)
 	})
