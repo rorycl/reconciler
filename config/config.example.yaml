@@ -1,20 +1,24 @@
 ---
 # Reconciler app configuration
 
-################################################################
+#######################################################################
 # General settings
+#######################################################################
 
 # The organisation name is the charity name.
 organisation_name: "Your Organisation"
 
 # The database file path for the sqlite database.
-# For security or speed the special path ":memory:" can be used. However beware that the
-# system will have to sync _all_ data each time it is used if an in-memory database is
-# used.
+#
+# For security or speed the special path ":memory:" can be used. However
+# beware that the system will have to sync _all_ data each time it is
+# used if an in-memory database is used.
 database_path: "./reconciliation.db"
+# database_path: ":memory:?cache=shared"
 
 # The data date start is the date from which information should be
-# reconciled between the systems.
+# synchronised into the local system to effect reconciliation between
+# the systems.
 data_date_start: "2025-04-01"
 
 # The Xero donation account prefixes are the patterns matching the
@@ -27,35 +31,51 @@ donation_account_prefixes:
 # Operate in development mode.
 development_mode: false
 
-################################################################
-# Web server settings and OAuth2 callback settings.
+#######################################################################
+# Web server settings
+#######################################################################
 
 web:
   listen_address: "localhost:8080"
   xero_oauth2_callback: "/xero/callback"
   salesforce_oauth2_callback: "/salesforce/callback"
 
-################################################################
-# Xero and Salesforce API settings
+#######################################################################
+# Xero API settings
+#
 # These settings set out the OAuth2 connection settings to the remote
-# platforms.
-# The use of PKCE code verification is strongly recommended.
+# platform. PKCE code verification is strongly recommended.
+#######################################################################
 
 xero:
   client_id: "XERO_CLIENT_ID"
   client_secret: "XERO_CLIENT_SECRET"
   token_file_path: "./xero_token.json"
   pkce_enabled: true
+
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. An "8h" (8 hour)
   # validity period is recommended. The system does not support validity
   # periods > 12h.
   token_timeout: "8h"
+
   # These oauth2 scopes should not normally be changed
   scopes:
-    - "accounting.transactions"
+    - "accounting.invoices.read"
+    - "accounting.banktransactions.read"
     - "accounting.settings.read"
     - "offline_access" # provides refresh token capability
+
+#######################################################################
+# Salesforce API settings
+#
+# These settings set out the OAuth2 connection settings to the remote
+# platform. PKCE code verification is strongly recommended.
+#
+# The SOQL donation retrieval query is specified, together with the
+# object and field name to target in distributed foreign key (DFK)
+# updates.
+#######################################################################
 
 salesforce:
   login_domain: "test.salesforce.com"
@@ -63,12 +83,14 @@ salesforce:
   client_secret: "SALESFORCE_CONSUMER_SECRET"
   token_file_path: "./sf_token.json"
   pkce_enabled: true
+
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. This should match or be
   # less than the Salesforce "Refresh Token Policy" configuration. An
   # "8h" (8 hour) validity period is recommended. The system does not
-  # support validity periods > 16h.
+  # support validity periods > 12h.
   token_timeout: "8h"
+
   # These oauth2 scopes should not normally be changed
   scopes:
     - "api"
