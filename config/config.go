@@ -171,8 +171,8 @@ func validateAndPrepare(c *Config) error {
 	if xc.TokenTimeoutDuration, err = time.ParseDuration(xc.TokenTimeout); err != nil {
 		return fmt.Errorf("could not parse xero.token_timeout %q: %w", xc.TokenTimeout, err)
 	}
-	if xc.TokenTimeoutDuration > time.Duration(16*time.Hour) {
-		return fmt.Errorf("xero.token_timeout duration of >16 hours not supported, got %v", xc.TokenTimeoutDuration)
+	if xc.TokenTimeoutDuration > time.Duration(12*time.Hour) {
+		return fmt.Errorf("xero.token_timeout duration of >12 hours not supported, got %v", xc.TokenTimeoutDuration)
 	}
 	if len(xc.Scopes) < 1 {
 		return errors.New("xero.scopes not defined")

@@ -31,12 +31,12 @@ func TestConfig(t *testing.T) {
 	}
 	config.Web.ListenAddress = "127.0.0.1:9001"
 
-	config.Xero.TokenTimeout = "15h"
+	config.Xero.TokenTimeout = "11h"
 	if err := validateAndPrepare(config); err != nil {
 		t.Errorf("unexpected error for token timeout %v", err)
 	}
 
-	config.Xero.TokenTimeout = "17h"
+	config.Xero.TokenTimeout = "13h"
 	if err := validateAndPrepare(config); err == nil {
 		t.Errorf("expected error for token timeout %v", config.Xero.TokenTimeout)
 	}

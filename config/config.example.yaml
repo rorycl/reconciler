@@ -49,7 +49,7 @@ xero:
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. An "8h" (8 hour)
   # validity period is recommended. The system does not support validity
-  # periods > 16h.
+  # periods > 12h.
   token_timeout: "8h"
   # These oauth2 scopes should not normally be changed
   scopes:
