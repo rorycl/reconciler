@@ -25,6 +25,7 @@ const (
 
 // Config represents the entire application configuration.
 type Config struct {
+	Organisation            string   `yaml:"organisation_name"`
 	DatabasePath            string   `yaml:"database_path"`
 	DataStartDateStr        string   `yaml:"data_date_start"`
 	DonationAccountPrefixes []string `yaml:"donation_account_prefixes"`
@@ -106,6 +107,9 @@ func Load(filePath string) (*Config, error) {
 // validateAndPrepare checks for required fields and sets up derived values.
 func validateAndPrepare(c *Config) error {
 	// General
+	if c.Organisation == "" {
+		return errors.New("organisation_name is missing")
+	}
 	if c.DatabasePath == "" {
 		return errors.New("database_path is missing")
 	}

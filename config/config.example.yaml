@@ -4,6 +4,9 @@
 ################################################################
 # General settings
 
+# The organisation name is the charity name.
+organisation_name: "Your Organisation"
+
 # The database file path for the sqlite database.
 # For security or speed the special path ":memory:" can be used. However beware that the
 # system will have to sync _all_ data each time it is used if an in-memory database is
