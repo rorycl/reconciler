@@ -360,13 +360,11 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 			logAndPrintErrorToWeb(w, "accounts retrieval error: %v", err)
 			return
 		}
-		logAndPrintToWeb(w, "retrieved %d account records", len(accounts))
 
 		if err := web.db.AccountsUpsert(ctx, accounts); err != nil {
 			logAndPrintErrorToWeb(w, "failed to upsert account records: %v", err)
 			return
 		}
-		logAndPrintToWeb(w, "Successfully upserted accounts to database.")
 
 		// Bank Transactions
 		transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh, web.accountsRegexp)
@@ -374,13 +372,11 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 			logAndPrintErrorToWeb(w, "bank transaction retrieval error: %v", err)
 			return
 		}
-		logAndPrintToWeb(w, "retrieved %d bank transactions", len(transactions))
 
 		if err = web.db.BankTransactionsUpsert(ctx, transactions); err != nil {
 			logAndPrintErrorToWeb(w, "failed to upsert bank transactions: %v", err)
 			return
 		}
-		logAndPrintToWeb(w, "Successfully upserted bank transactions to database.")
 
 		// Invoices
 		invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh, web.accountsRegexp)
@@ -388,13 +384,11 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 			logAndPrintErrorToWeb(w, "invoices retrieval error: %v", err)
 			return
 		}
-		logAndPrintToWeb(w, "retrieved %d invoices", len(invoices))
 
 		if err := web.db.InvoicesUpsert(ctx, invoices); err != nil {
 			logAndPrintErrorToWeb(w, "failed to upsert invoices", err)
 			return
 		}
-		logAndPrintToWeb(w, "Successfully upserted invoices to database.")
 
 		// Retrieve the Salesforce donations.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log)
@@ -413,7 +407,8 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 			logAndPrintErrorToWeb(w, "failed to upsert donations", err)
 			return
 		}
-		logAndPrintToWeb(w, "successfully upserted donations to database")
+
+		logAndPrintToWeb(w, "Refresh successfully completed.")
 
 		// Update session information
 		web.sessions.Put(ctx, "refreshed", true)
