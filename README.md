@@ -4,9 +4,11 @@ The `reconciler` app is a cross-platform desktop webapp for charities to
 reconcile their accounts and CRMS systems to align and audit donation
 income and records, presently focusing on Xero and Salesforce.
 
-Reconciler acts as an Application Programming Interface (API) client to
-the remote systems, providing swift search and operation to effect
-reconciliation.
+Reconciler draws records over OAuth2 secured API connections into a
+local database to assist users to update a field in Salesforce donation
+records to match an identifier from Xero invoices or bank transactions.
+This process allows an organisation to bring the donation totals for
+Xero income into reconciliation with the related Salesforce donations.
 
 <img width="1000" src="docs/reconciler.png" />
 
