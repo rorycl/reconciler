@@ -56,8 +56,16 @@ func NewAPIClient(
 	}
 }
 
-// GetBankTransactions fetches bank transactions from Xero, applying appropriate filters.
-func (c *APIClient) GetBankTransactions(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]BankTransaction, error) {
+// GetBankTransactions fetches bank transactions from Xero, applying appropriate
+// filters.  The results are then filtered by those transactions having at least one
+// line item which matches the account code regexp.
+func (c *APIClient) GetBankTransactions(
+	ctx context.Context,
+	fromDate time.Time,
+	ifModifiedSince time.Time,
+	accountsRegexp *regexp.Regexp,
+) ([]BankTransaction, error) {
+
 	var allTransactions []BankTransaction
 	page := 1
 
@@ -104,11 +112,34 @@ func (c *APIClient) GetBankTransactions(ctx context.Context, fromDate, ifModifie
 
 	c.log.Info(fmt.Sprintf("GetBankTransactions: retrieved %d bank transactions", len(allTransactions)))
 
-	return allTransactions, nil
+	if accountsRegexp == nil {
+		return allTransactions, nil
+	}
+
+	// If accountsRegexp is provided (which should be the default except in testing,
+	// filter the transactions to only return those which have line items whose account code
+	// matches accountsRegexp.
+	var accountsFilteredTransactions []BankTransaction
+	for _, trn := range allTransactions {
+		if lineItemHasWantedAccount(trn.LineItems, accountsRegexp) {
+			accountsFilteredTransactions = append(accountsFilteredTransactions, trn)
+		}
+	}
+	c.log.Info(fmt.Sprintf("GetBankTransactions: total %d filtered transactions", len(accountsFilteredTransactions)))
+
+	return accountsFilteredTransactions, nil
 }
 
-// GetInvoices fetches invoices from Xero, applying appropriate filters.
-func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]Invoice, error) {
+// GetInvoices fetches invoices from Xero, applying appropriate filters. The results are
+// then filtered by those invoices having at least one line item which matches the
+// account code regexp.
+func (c *APIClient) GetInvoices(
+	ctx context.Context,
+	fromDate time.Time,
+	ifModifiedSince time.Time,
+	accountsRegexp *regexp.Regexp,
+) ([]Invoice, error) {
+
 	var allInvoices []Invoice
 	page := 1
 
@@ -148,10 +179,24 @@ func (c *APIClient) GetInvoices(ctx context.Context, fromDate, ifModifiedSince t
 		allInvoices = append(allInvoices, response.Invoices...)
 		page++
 	}
-
 	c.log.Info(fmt.Sprintf("Invoices: retrieved %d invoices", len(allInvoices)))
 
-	return allInvoices, nil
+	if accountsRegexp == nil {
+		return allInvoices, nil
+	}
+
+	// If accountsRegexp is provided (which should be the default except in testing,
+	// filter the invoices to only return those which have line items whose account code
+	// matches accountsRegexp.
+	var accountsFilteredInvoices []Invoice
+	for _, inv := range allInvoices {
+		if lineItemHasWantedAccount(inv.LineItems, accountsRegexp) {
+			accountsFilteredInvoices = append(accountsFilteredInvoices, inv)
+		}
+	}
+	c.log.Info(fmt.Sprintf("Invoices: total %d filtered invoices", len(accountsFilteredInvoices)))
+
+	return accountsFilteredInvoices, nil
 }
 
 // GetAccounts fetches accounts from Xero, applying appropriate filters.
@@ -322,4 +367,15 @@ func getTenantID(ctx context.Context, client *http.Client) (string, error) {
 	}
 
 	return connections[0].TenantID, nil
+}
+
+// lineItemHasWantedAccount checks if at least one line item in a slice matches the
+// desired account codes.
+func lineItemHasWantedAccount(lis []LineItem, accountsRegexp *regexp.Regexp) bool {
+	for _, li := range lis {
+		if accountsRegexp.MatchString(li.AccountCode) {
+			return true
+		}
+	}
+	return false
 }

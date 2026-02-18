@@ -122,8 +122,11 @@ func testNoPagination[T any](
 // and termination.
 func TestGetInvoices_PaginationAndTermination(t *testing.T) {
 
+	// invoices.json has no line items
+	// allAccountsRegexp := regexp.MustCompile("^[0-9]+")
+
 	getInvoicesFunc := func(client *APIClient) ([]Invoice, error) {
-		return client.GetInvoices(context.Background(), time.Now(), time.Time{})
+		return client.GetInvoices(context.Background(), time.Now(), time.Time{}, nil)
 	}
 
 	invoices, err := testPagination(
@@ -146,8 +149,10 @@ func TestGetInvoices_PaginationAndTermination(t *testing.T) {
 // BankTransaction API pagination and termination.
 func TestGetBankTransactions_PaginationAndTermination(t *testing.T) {
 
+	allAccountsRegexp := regexp.MustCompile("^[0-9]+")
+
 	getBankTransactionsFunc := func(client *APIClient) ([]BankTransaction, error) {
-		return client.GetBankTransactions(context.Background(), time.Now(), time.Time{})
+		return client.GetBankTransactions(context.Background(), time.Now(), time.Time{}, allAccountsRegexp)
 	}
 
 	bankTransactions, err := testPagination(
@@ -199,6 +204,8 @@ func TestGetInvoices_NotModified(t *testing.T) {
 	mux, client, teardown := setup(t)
 	defer teardown()
 
+	allAccountsRegexp := regexp.MustCompile("^[0-9]+")
+
 	mux.HandleFunc("/Invoices", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("If-Modified-Since") == "" {
 			t.Error("expected If-Modified-Since header to be set, but it was empty")
@@ -208,7 +215,7 @@ func TestGetInvoices_NotModified(t *testing.T) {
 
 	// The actual time used here doesn't matter, as long as it's not the zero value.
 	ifModifiedSince := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-	invoices, err := client.GetInvoices(context.Background(), time.Now(), ifModifiedSince)
+	invoices, err := client.GetInvoices(context.Background(), time.Now(), ifModifiedSince, allAccountsRegexp)
 
 	if err != nil {
 		t.Fatalf("GetInvoices returned an unexpected error: %v", err)
@@ -226,6 +233,8 @@ func TestGetInvoices_APIError(t *testing.T) {
 	mux, client, teardown := setup(t)
 	defer teardown()
 
+	allAccountsRegexp := regexp.MustCompile("^[0-9]+")
+
 	const apiErrorBody = `{"Message": "An internal error occurred"}`
 
 	// Register a handler that always returns an error status.
@@ -235,7 +244,7 @@ func TestGetInvoices_APIError(t *testing.T) {
 		w.Write([]byte(apiErrorBody))
 	})
 
-	_, err := client.GetInvoices(context.Background(), time.Now(), time.Time{})
+	_, err := client.GetInvoices(context.Background(), time.Now(), time.Time{}, allAccountsRegexp)
 
 	if err == nil {
 		t.Fatal("expected an error, but got nil")
@@ -246,5 +255,21 @@ func TestGetInvoices_APIError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), apiErrorBody) {
 		t.Errorf("error message should contain API response body, but was: %q", err.Error())
+	}
+}
+
+// TestLineItemHasWantedAccount checks if an invoice or bank-transaction has a line item
+// (which is commen to both) which matches the account regexp.
+func TestLineItemHasWantedAccount(t *testing.T) {
+
+	lis := []LineItem{
+		LineItem{AccountCode: "a"},
+		LineItem{AccountCode: "b"},
+	}
+	if !lineItemHasWantedAccount(lis, regexp.MustCompile("b")) {
+		t.Error("unexpected false return from lineItemHasWantedAccount")
+	}
+	if lineItemHasWantedAccount(lis, regexp.MustCompile("d")) {
+		t.Error("unexpected true return from lineItemHasWantedAccount")
 	}
 }
