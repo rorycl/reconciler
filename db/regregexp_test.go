@@ -2,14 +2,11 @@ package db
 
 import (
 	"database/sql"
-	"regexp"
 	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite" // pure go sqlite driver
 )
-
-var regexpToMatch = regexp.MustCompile("^[A-Z]")
 
 // TestRegexpFunctionFail tests the failure of a REGEXP call without first registering
 // the custom function.

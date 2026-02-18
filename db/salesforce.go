@@ -91,7 +91,9 @@ func (db *DB) UpsertDonations(ctx context.Context, donations []salesforce.Donati
 		db.log.Error(fmt.Sprintf("upsertDonations: could not begin transaction: %v", err))
 		return fmt.Errorf("upsertDonations: could not begin transaction: %w", err)
 	}
-	defer tx.Rollback() // no-op after commit.
+	defer func() {
+		_ = tx.Rollback() // no-op after commit.
+	}()
 
 	stmt := db.donationUpsertStmt
 

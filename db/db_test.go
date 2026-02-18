@@ -10,7 +10,7 @@ func ptrTime(ti time.Time) *time.Time { return &ti }
 
 func ptrStr(s string) *string { return &s }
 
-func ptrBool(b bool) *bool { return &b }
+// func ptrBool(b bool) *bool { return &b }
 
 func ptrFloat64(f float64) *float64 { return &f }
 

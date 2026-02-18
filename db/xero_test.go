@@ -7,10 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"reconciler/apiclients/xero"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -289,8 +287,8 @@ func Test03_InvoicesUpsert(t *testing.T) {
 			InvoiceID:     "9fe6d963-fa41",
 			InvoiceNumber: "INV-TEST-01",
 			Contact:       "Contact Name",
-			Date:          xero.XeroDateTime{time.Now().Add(-2 * time.Hour)},
-			Updated:       xero.XeroDateTime{time.Now()},
+			Date:          xero.XeroDateTime{Time: time.Now().Add(-2 * time.Hour)},
+			Updated:       xero.XeroDateTime{Time: time.Now()},
 			Status:        "PAID",
 			Reference:     "A reference",
 			Total:         212.20,
@@ -530,8 +528,8 @@ func Test05_BankTransactionsUpsert(t *testing.T) {
 			IsReconciled:      true, // most transactions will be
 			Reference:         "TEST-REF-20251101",
 			Status:            "AUTHORISED", // or DELETED
-			Date:              xero.XeroDateTime{time.Now()},
-			Updated:           xero.XeroDateTime{time.Now()},
+			Date:              xero.XeroDateTime{Time: time.Now()},
+			Updated:           xero.XeroDateTime{Time: time.Now()},
 			Total:             20.00,
 			BankAccount:       "current",
 			LineItems: []xero.LineItem{
@@ -752,6 +750,7 @@ func Test08_BankTransactionsWithLineItemsQuery(t *testing.T) {
 	}
 }
 
+/*
 // printInvoiceLineItems is an invoice helper template print function.
 func printInvoiceLineItems(t *testing.T, invoice WRInvoice, lineItems []WRLineItem) {
 	t.Helper()
@@ -771,5 +770,9 @@ Invoice: {{ .Invoice.ID }} No {{ .Invoice.InvoiceNumber }} {{ .Invoice.Total }}
 		"Invoice":   invoice,
 		"LineItems": lineItems,
 	}
-	parsedTemplate.Execute(os.Stdout, data)
+	err := parsedTemplate.Execute(os.Stdout, data)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
+*/

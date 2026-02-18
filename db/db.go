@@ -190,19 +190,19 @@ func NewConnectionInTestMode(
 	// Load the schema definitions.
 	if err := testDB.InitSchema(testDB.sqlFS, "schema.sql"); err != nil {
 		_ = testDB.Close()
-		return nil, fmt.Errorf("Failed to initialize schema for test database: %w", err)
+		return nil, fmt.Errorf("failed to initialize schema for test database: %w", err)
 	}
 
 	// Load the test data.
 	data, err := fs.ReadFile(testDB.sqlFS, "load_data.sql")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read file for loading data for test DB: %w", err)
+		return nil, fmt.Errorf("failed to read file for loading data for test DB: %w", err)
 	}
 	_, err = testDB.Exec(string(data))
 	if err != nil {
 		_ = testDB.Close()
 		testDB.log.Error(fmt.Sprintf("Failed to load data for test database: %v", err))
-		return nil, fmt.Errorf("Failed to load data for test database: %w", err)
+		return nil, fmt.Errorf("failed to load data for test database: %w", err)
 	}
 
 	// Prepare the functions and named statements.
@@ -211,14 +211,6 @@ func NewConnectionInTestMode(
 		testDB.log.Error(fmt.Sprintf("could not prepare named statements: %v", err))
 		return nil, fmt.Errorf("could not prepare named statements: %v", err)
 	}
-
-	// Run a rough smoke test if desired.
-	/*
-		err = _donations_smoke_test(testDB)
-		if err != nil {
-			return nil, fmt.Errorf("smoke test failed: %v", err)
-		}
-	*/
 
 	return testDB, nil
 
@@ -348,8 +340,10 @@ func (db *DB) logQuery(name string, stmt *parameterizedStmt, args map[string]any
 	)
 }
 
-func _donations_smoke_test(testDB *DB) error {
-	// Messy smoke test for donations
+/*
+// _donations_smoke_test is a simple smoke test for querying donation records.
+func (testDB *DB) _donations_smoke_test() error {
+
 	fmt.Println("getting 3 donations")
 	type D2 struct {
 		Donation
@@ -369,3 +363,4 @@ func _donations_smoke_test(testDB *DB) error {
 	}
 	return nil
 }
+*/

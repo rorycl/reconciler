@@ -15,11 +15,6 @@ import (
 
 var registerOnce sync.Once
 
-// regexpFunc is a function to be registered with sqlite.FunctionImpl.
-func regexpFunc(pattern, s string) (bool, error) {
-	return regexp.MatchString(pattern, s)
-}
-
 // RegisterFunctions registers the custom Go function with the sqlite
 // driver. Refer to the sqlite `func_test.go` test for further examples.
 func RegisterFunctions() {

@@ -20,7 +20,9 @@ func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() // no-op after commit.
+	defer func() {
+		_ = tx.Rollback() // no-op after commit.
+	}()
 
 	stmt := db.accountUpsertStmt
 
@@ -140,7 +142,9 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() // no-op after a commit.
+	defer func() {
+		_ = tx.Rollback() // no-op after commit.
+	}()
 
 	for _, inv := range invoices {
 
@@ -304,7 +308,9 @@ func (db *DB) BankTransactionsUpsert(ctx context.Context, transactions []xero.Ba
 		db.log.Error(fmt.Sprintf("bankTransactionUpsert: transaction start error: %v", err))
 		return err
 	}
-	defer tx.Rollback() // no-op after a commit.
+	defer func() {
+		_ = tx.Rollback() // no-op after commit.
+	}()
 
 	for _, tr := range transactions {
 
