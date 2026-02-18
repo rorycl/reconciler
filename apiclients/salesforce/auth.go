@@ -72,7 +72,7 @@ func getNewTokenFromWeb(ctx context.Context, cfg *config.Config) (*oauth2.Token,
 			errChan <- fmt.Errorf("did not receive authorization code in callback")
 			return
 		}
-		fmt.Fprintln(w, "Authorization successful! You can close this window.")
+		_, _ = fmt.Fprintln(w, "Authorization successful! You can close this window.")
 		codeChan <- code
 	})
 
@@ -228,7 +228,9 @@ func LoadTokenCacheFromFile(path string) (*TokenCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	cache := &TokenCache{}
 	err = json.NewDecoder(f).Decode(cache)
 	return cache, err
@@ -241,7 +243,9 @@ func SaveTokenCacheToFile(cache *TokenCache, path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to cache oauth token: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	return json.NewEncoder(f).Encode(cache)
 }
 

@@ -88,7 +88,7 @@ func testBatching[T any](
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(testContent[callCount-1])
+		_, _ = w.Write(testContent[callCount-1])
 	})
 
 	return getFunc(client)
@@ -152,7 +152,7 @@ func testPatch(
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(response)
+		_, _ = w.Write(response)
 	})
 
 	return getFunc(client)
@@ -210,9 +210,9 @@ func TestBatchUpdateOpportunityRefs_Succeed(t *testing.T) {
 
 	var (
 		// allOrNone is the atomic failure flag.
-		allOrNone bool            = false
-		ctx       context.Context = context.Background()
-		errorID   string          = ""
+		allOrNone = false
+		ctx       = context.Background()
+		errorID   = ""
 	)
 
 	getBatchUpdate := func(client *Client) error {
@@ -237,9 +237,9 @@ func TestBatchUpdateOpportunityRefs_Fail(t *testing.T) {
 
 	var (
 		// allOrNone is the atomic failure flag.
-		allOrNone bool            = false
-		ctx       context.Context = context.Background()
-		errorID   string          = "b"
+		allOrNone = false
+		ctx       = context.Background()
+		errorID   = "b"
 	)
 
 	var capturedResponse CollectionsUpdateResponse

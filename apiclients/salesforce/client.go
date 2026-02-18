@@ -104,7 +104,7 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 	var pageNo int
 	for {
 		pageNo++
-		c.log.Debug("GetOpportunities: page %d: url %s", pageNo, requestURL)
+		c.log.Debug(fmt.Sprintf("GetOpportunities: page %d: url %s", pageNo, requestURL))
 
 		req, err := c.newRequest(ctx, "GET", requestURL, nil)
 		if err != nil {
@@ -243,7 +243,9 @@ func (c *Client) do(req *http.Request, v any) (*http.Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
