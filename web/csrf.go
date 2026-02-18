@@ -31,8 +31,8 @@ func enforceCSRF(next http.Handler) http.Handler {
 
 		// Reject if browser/agent does not support Sec-Fetch-Site or Origin.
 		if r.Header.Get("Sec-Fetch-Site") == "" && r.Header.Get("Origin") == "" {
+			log.Printf("Rejected request from %s: missing Sec-Fetch-Site and/or Origin headers", r.RemoteAddr)
 			http.Error(w, "Agent or browser not supported.", http.StatusForbidden)
-			log.Printf("Rejected request from %s: missing Sec-Fetch-Site and Origin headers", r.RemoteAddr)
 			return
 		}
 
