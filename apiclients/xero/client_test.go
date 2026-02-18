@@ -149,10 +149,8 @@ func TestGetInvoices_PaginationAndTermination(t *testing.T) {
 // BankTransaction API pagination and termination.
 func TestGetBankTransactions_PaginationAndTermination(t *testing.T) {
 
-	allAccountsRegexp := regexp.MustCompile("^[0-9]+")
-
 	getBankTransactionsFunc := func(client *APIClient) ([]BankTransaction, error) {
-		return client.GetBankTransactions(context.Background(), time.Now(), time.Time{}, allAccountsRegexp)
+		return client.GetBankTransactions(context.Background(), time.Now(), time.Time{}, nil)
 	}
 
 	bankTransactions, err := testPagination(
