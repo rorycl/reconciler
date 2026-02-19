@@ -108,19 +108,30 @@ func NewConnection(
 		return nil, fmt.Errorf("mount error: %v", err)
 	}
 
-	// dataSource is the default setting for file-based databases.
+	// DataSource is the default setting for file-based databases.
 	dataSource := fmt.Sprintf("%s?_dataSource=foreign_keys(1)&_dataSource=journal_mode(WAL)", dbPath)
 
-	// for in-memory test databases, check the necessary cached setting is used.
+	// For in-memory databases, force the dataSource path.
 	if strings.Contains(dbPath, ":memory:") {
-		if !strings.Contains(dbPath, "?cache=shared") {
-			return nil, fmt.Errorf("in-memory connection %q must contain '?cache=shared'", dbPath)
-		}
-		dataSource = fmt.Sprintf("%s&dataSource=foreign_keys(1)&_dataSource=journal_mode(WAL)", dbPath)
+		dataSource = "file:memdb1?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
 	}
 	dbDB, err := sql.Open("sqlite", dataSource)
 	if err != nil {
 		return nil, err
+	}
+
+	// Set connection pool settings.
+	if strings.Contains(dataSource, ":memory:") {
+		// Ensure at least one connection is always kept open.
+		dbDB.SetMaxIdleConns(1)
+		// Ensure the connection doesn't expire.
+		dbDB.SetConnMaxLifetime(0)
+		// Enable if locking issues.
+		// dbDB.SetMaxOpenConns(1)
+	} else {
+		// For file-based connections.
+		dbDB.SetMaxIdleConns(2)
+		dbDB.SetMaxOpenConns(10)
 	}
 
 	// RegisterFunctions registers the custom REXEXP function. This can
@@ -165,6 +176,11 @@ func NewConnection(
 	if err != nil {
 		db.log.Error(fmt.Sprintf("could not prepare named statements: %v", err))
 		return nil, fmt.Errorf("could not prepare named statements: %w", err)
+	}
+
+	_, err = db.Queryx("select * from accounts")
+	if err != nil {
+		return nil, fmt.Errorf("accounts smoke test select error: %v", err)
 	}
 
 	return db, nil
