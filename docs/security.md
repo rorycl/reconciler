@@ -1,6 +1,6 @@
 # Reconciler Security
 
-**Revision A 18 February 2026**
+**Revision B 19 February 2026**
 
 The `Reconciler App` is a MIT-licensed desktop web app for helping
 charities reconcile their financial data between their financial and
@@ -11,6 +11,9 @@ local database to assist users to update a field in Salesforce donation
 records to match an identifier from Xero invoices or bank transactions.
 This process allows an organisation to bring the donation totals for
 Xero income into reconciliation with the related Salesforce donations.
+
+More information is provided at the project 
+[Github repository](https://github.com/rorycl/reconciler).
 
 This document sets out some of the security considerations of using this
 app. This document is written for a UK context.
@@ -30,16 +33,15 @@ app. This document is written for a UK context.
   firewall.
 
 * The app will only operate on the `127.0.0.1` or `localhost` address
-  for security reasons and should not be shared over the network.
+  for security reasons and must not be shared over the network.
 
-* The Reconciler app should be configured to store its OAuth2 platform
-  access token files and sqlite database on a filesystem with robust
-  protection against unauthorized access.
+* The Reconciler app should be configured to store its sqlite database
+  and configuration file on a filesystem with robust protection against
+  unauthorized access.
 
-* Users should ensure they logout of the Reconciler app to remove their
-  OAuth2 platform access tokens to protect against malicious use of the
-  tokens. Closing the application window or stopping the server does
-  **not** automatically remove this tokens.
+* Users should be aware that closing the app will require them to log in
+  again. After an two hours of inactivity the current OAuth2 tokens held
+  in memory will be deleted, also requiring the user to log in again.
 
 * Users should delete the local Reconciler app database when it is no
   longer needed.
@@ -47,10 +49,10 @@ app. This document is written for a UK context.
 ## Mode of operation
 
 Reconciler is provided as a compiled Go binary from the project
-repository at [github](https://github.com/rorycl/reconciler). The app is
-a cross-platform local webapp, designed to be run on a local desktop,
-and configured with a local configuration `yaml` file. An example
-configuration file is provided [here](../config/config.example.yaml).
+repository. The app is a cross-platform local webapp, to be run on a
+local desktop, and configured with a local configuration `yaml` file. An
+example configuration file is provided
+[here](../config/config.example.yaml).
 
 The app requires OAuth2 connection permissions to be created on the
 remote platforms. Separate guidance is available for configuring these
@@ -59,17 +61,16 @@ minimised and that PKCE verification is enforced.
 
 Users of the app should be required to authenticate with their own
 credentials via the browser. Only users who are able to successfully
-login to both remote platforms will be able to use the app. However,
-once authenticated, access persists on the local machine via stored
-tokens until the user explicitly logs out or the tokens expire.
+login to both remote platforms will be able to use the app. Access
+permission tokens are only held in memory on the local machine and
+closing the app or a 2 hour period of inactivity will require the user
+to log in again.
 
 Connection to each remote platform is done through OAuth2 connection
 flows using the credentials and scopes set out in the configuration
-file. Successful connections result in a token file for each service
-being saved to the relevant configuration file path. This token is
-automatically refreshed using the OAuth2 refresh process when
-applicable. The app ensures that tokens cannot be used more than 12
-hours after last use.
+file. Successful connections result in token file for each service being
+saved in memory. This token is automatically refreshed using the OAuth2
+refresh process when applicable. 
 
 After successful connection, the app connects to both platforms to
 retrieve or refresh data, which is stored in a local database at the
@@ -86,7 +87,7 @@ links`.
 
 For Salesforce, sparse information is retrieved from the Opportunities
 (also known as "Donations") object as configured by the
-`salesforce.query` SOQL query. 
+configured `salesforce.query` SOQL query. 
 
 After connection and data refresh, the app provides operations for
 searching Bank Transactions, Invoices and Donations, and then
@@ -97,9 +98,9 @@ record in Salesforce. This "linking" (or "unlinking") action is the only
 data changing action performed by the Reconciler app. The operations of
 the app are protected against cross-site request forgery (CSRF) attacks.
 
-Upon logging out the local json OAuth2 tokens are deleted. The database
-is retained to avoid having to resynchronise all records, in order to
-speed up future operations.
+Upon logging out the local json OAuth2 tokens are deleted from memory.
+The database is retained to avoid having to resynchronise all records,
+in order to speed up future operations.
 
 ## Security considerations
 
@@ -134,14 +135,13 @@ allows access to modern browsers supporting the `Sec-Fetch-Site` and
 
 Connections to the remote platforms are defined as `https` encrypted to
 protect the security of communications. The local machine using the
-Reconciler app should be on a network protected by a high-quality
-firewall.
+Reconciler app should be protected by a high-quality firewall.
 
 ### Filesystem security
 
 As presently set up, Reconciler draws its configuration from a
-configuration file on disk, saves the OAuth2 token files to disk, and
-stores the remote records in a local sqlite database.
+configuration file on disk and stores the remote records in a local
+sqlite database.
 
 Access to the configuration file is unlikely to allow an attacker to
 cause damage, as each user is required to provide additional login
@@ -150,29 +150,13 @@ file and credentials should be protected. Any suspected leak of
 credentials should be met with the immediate suspension of the
 connection setup on the platforms.
 
-Access to the OAuth2 token files could allow an attacker to access the
-remote resources with the permissions of the user during the period of
-validity of the token (or its `refresh` component). It is **strongly**
-recommended that users always use the Log Out facility (at `/logout`) to
-remove these tokens after use. This will require them to re-connect to
-each platform using their personal credentials at next use. The token
-files should be stored on a filesystem with robust protection against
-unauthorized access.
-
-Failure to remove the tokens could allow other users to access the
-remote system with the permissions of the originating user.
-
-An attacker with currently valid OAuth2 tokens generated by another user
-could use these to modify, create and delete data on Salesforce with the
-permissions of the user using a custom applications or scripts.
-
 Access to the database on disk would allow an attacker to access the
 records in the system, including the Personally Identifiable Information
 (PII) therein relating to donations. While it is possible to run the
 database in memory this is likely to be inconvenient due to memory
 consumption and the time required to resynchronise all records. The
 database should be stored on a filesystem with robust protection against
-unauthorized and malicious access.
+unauthorized access.
 
 Users should delete the local Reconciler app database when it is no
 longer required.

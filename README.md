@@ -1,8 +1,11 @@
 # reconciler
 
 The `reconciler` app is a cross-platform desktop webapp for charities to
-reconcile their accounts and CRMS systems to align and audit donation
-income and records, presently focusing on Xero and Salesforce.
+reconcile their accounts and CRMS systems to search, align and audit
+donation income and records, presently focusing on Xero and Salesforce.
+
+> [!CAUTION]
+> Reconciler is in early Alpha and not recommended for production use.
 
 Reconciler draws records over OAuth2 secured API connections into a
 local database to assist users to update a field in Salesforce donation
@@ -36,6 +39,12 @@ custom field created on a Salesforce Non Profit Success Pack (NPSP)
 object. The example configuration file shows a Salesforce
 `Opportunity.Payout_Reference__c` as the linkage target. The linkage
 target object and field in Salesforce is customisable.
+
+## Security considerations
+
+Please refer to the separate [security
+documentation](./docs/security.md) for a discussion of the security
+mechanisms and considerations of the Reconciler app.
 
 ## Status
 
