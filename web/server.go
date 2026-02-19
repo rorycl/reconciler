@@ -75,17 +75,15 @@ var TemplatesEmbeddedFS embed.FS
 
 // WebApp is the configuration object for the web server.
 type WebApp struct {
-	log              *slog.Logger
-	cfg              *config.Config
-	db               *db.DB
-	staticFS         fs.FS // the fs holding the static web resources.
-	templateFS       fs.FS // the fs holding the web templates.
-	defaultStartDate time.Time
-	defaultEndDate   time.Time
-	server           *http.Server
-	sessions         *scs.SessionManager
-	accountsRegexp   *regexp.Regexp
-	inDevelopment    bool // in development mode
+	log            *slog.Logger
+	cfg            *config.Config
+	db             *db.DB
+	staticFS       fs.FS // the fs holding the static web resources.
+	templateFS     fs.FS // the fs holding the web templates.
+	server         *http.Server
+	sessions       *scs.SessionManager
+	accountsRegexp *regexp.Regexp
+	inDevelopment  bool // in development mode
 }
 
 // New initialises a WebApp. An error type is returned for future use.
@@ -95,13 +93,7 @@ func New(
 	db *db.DB,
 	staticFS fs.FS,
 	templateFS fs.FS,
-	start time.Time,
-	end time.Time,
 ) (*WebApp, error) {
-
-	if !end.IsZero() && start.After(end) {
-		return nil, fmt.Errorf("start date %s after end %s", start.Format("2006-01-2"), end.Format("2006-01-02"))
-	}
 
 	// Add settings for the http server.
 	server := &http.Server{
@@ -122,16 +114,14 @@ func New(
 	}
 
 	webApp := &WebApp{
-		log:              logger,
-		cfg:              cfg,
-		db:               db,
-		staticFS:         staticFS,
-		templateFS:       templateFS,
-		defaultStartDate: start,
-		defaultEndDate:   end,
-		server:           server,
-		sessions:         scsSessionStore,
-		accountsRegexp:   accountsRegexp,
+		log:            logger,
+		cfg:            cfg,
+		db:             db,
+		staticFS:       staticFS,
+		templateFS:     templateFS,
+		server:         server,
+		sessions:       scsSessionStore,
+		accountsRegexp: accountsRegexp,
 	}
 
 	// In-Development mode triggers a warning as it bypasses the API connection check
@@ -899,11 +889,11 @@ func (web *WebApp) handlePartialDonationsLinked() http.Handler {
 
 		donations, err := web.db.DonationsGet(
 			ctx,
-			web.defaultStartDate,
-			web.defaultEndDate,
-			"Linked", // linkage status
-			dfk,      // payout reference
-			"",       // searchstring
+			web.cfg.DataStartDate,
+			time.Now().AddDate(1, 6, 0), // add 18 months
+			"Linked",                    // linkage status
+			dfk,                         // payout reference
+			"",                          // searchstring
 			pageLen,
 			0, // form offset
 		)

@@ -28,6 +28,7 @@ func TestWebAppToRun(t *testing.T) {
 		Salesforce: config.SalesforceConfig{
 			TokenFilePath: "salesforce.json",
 		},
+		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
 	}
 
 	logger := slog.New(slog.NewTextHandler(
@@ -50,11 +51,7 @@ func TestWebAppToRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// testing data start and end dates
-	startDate := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
-
-	webApp, err := New(logger, cfg, db, staticFS, templatesFS, startDate, endDate)
+	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +74,7 @@ func TestWebAppAndShutdown(t *testing.T) {
 		Salesforce: config.SalesforceConfig{
 			TokenFilePath: "sf.json",
 		},
+		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
 	}
 
 	logger := slog.New(slog.NewTextHandler(
@@ -99,11 +97,7 @@ func TestWebAppAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// testing data start and end dates
-	startDate := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
-
-	webApp, err := New(logger, cfg, db, staticFS, templatesFS, startDate, endDate)
+	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
 	if err != nil {
 		t.Fatal(err)
 	}
