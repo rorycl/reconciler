@@ -284,19 +284,19 @@ func TokenIsValid(path string, expirationDuration time.Duration) bool {
 // This causes the TokenIsValid check to fail.
 //
 //	&oauth2.Token{
-//		AccessToken:"00DgL00000GE1HZ!AQEAQLfSAKItTlIlnlHXdspaJKhLFlgxDxbxDpaiGav_JvZSTH227U16WWqOil8Y7O.ZhbfaJ8GmuY1Bu58rkXCXXXXXXXXX",
+//		AccessToken:"xxxx",
 //		TokenType:"Bearer",
-//		RefreshToken:"5Aep861eN26Sp9j0R6usW_6CAZUnTI_3Now99RwZbU929ZCwAjRmSTEXHQdUigeK121uGSsEqoAW8xxxxxxxxxx",
+//		RefreshToken:"yyy",
 //		Expiry:time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC),
 //		ExpiresIn:0,
 //		raw:map[string]interface {}{
-//			"access_token":"00DgL00000GE1HZ!AQEAQLfSAKItTlIlnlHXdspaJKhLFlgxDxbxDpaiGav_JvZSTH227U16WWqOil8Y7O.ZhbfaJ8GmuY1Bu58rkXCxxxxxxxxx",
-//			"id":"https://login.salesforce.com/id/00DgL00000GE1HZUA1/005gL00000BOwSkQAL",
+//			"access_token":"xxx",
+//			"id":"https://login.salesforce.com/id/00DgL00000GE1HZUA1/uuuuuuuuuuuuuuuuuu",
 //			"instance_url":"https://orgfarm-xxxxxxxxxx-dev-ed.develop.my.salesforce.com",
 //			"issued_at":"1771257689412",
-//			"refresh_token":"5Aep861eN26Sp9j0R6usW_6CAZUnTI_3Now99RwZbU929ZCwAjRmSTEXHQdUigeK121uGSsEqoAW80Yxxxxxxxx",
+//			"refresh_token":"yyy",
 //			"scope":"refresh_token api",
-//			"signature":"ze9U3HZv46gm3wmLJ/JmlWgg2wGVvLh0Fxxxxxxxxxxx",
+//			"signature":"zzz",
 //			"token_type":"Bearer"
 //		},
 //			expiryDelta:0,
