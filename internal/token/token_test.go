@@ -110,7 +110,7 @@ func TestTokenNotExpired(t *testing.T) {
 	if got, want := validToken.InstanceURL, instanceURL; got != want {
 		t.Errorf("instance url got %q want %q", got, want)
 	}
-	if got, want := fmt.Sprintf("%s", validToken.Type), "salesforce-token"; got != want {
+	if got, want := fmt.Sprintf("%s", validToken.Type), "salesforce"; got != want {
 		t.Errorf("type got %s want %s", got, want)
 	}
 
@@ -241,5 +241,28 @@ func TestOAuth2TokenValidity(t *testing.T) {
 					tokenPrinter(thisToken.Token))
 			}
 		})
+	}
+}
+
+// TestFixSalesforceTokenExpiry tests fixing the invalid Salesforce token expiry time.
+func TestFixSalesforceTokenExpiry(t *testing.T) {
+	// ms, err := strconv.ParseInt("1278448384000", 10, 64)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// fmt.Println(time.UnixMilli(ms)) // 2010-07-06 23:33:04 +0100 BST
+
+	tok := ExtendedToken{
+		Token: &oauth2.Token{
+			AccessToken: "a-token",
+		},
+	}
+	tok.Token = tok.Token.WithExtra(map[string]any{"issued_at": "1278448384000"})
+	err := tok.fixSalesforceTokenExpiry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := tok.Token.Expiry.UTC(), time.Date(2010, 7, 6, 22, 33, 04, 0, time.UTC); got != want {
+		t.Errorf("got incorrectly fixed expiry %v want %v", got, want)
 	}
 }

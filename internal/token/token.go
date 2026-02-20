@@ -21,8 +21,8 @@ const (
 
 var tokenName = map[TokenType]string{
 	NoneToken:       "invalid",
-	XeroToken:       "xero-token",
-	SalesforceToken: "salesforce-token",
+	XeroToken:       "xero",
+	SalesforceToken: "salesforce",
 }
 
 // String returns the TokenType name string.
