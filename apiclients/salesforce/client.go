@@ -9,14 +9,18 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
+	"reconciler/apiclients/token"
 	"reconciler/config"
 
 	"golang.org/x/oauth2"
 )
+
+// SalesforceAPIVersionNumber sets out the currently supported
+// Salesforce API used for this client.
+const SalesforceAPIVersionNumber = "v65.0"
 
 // maxBatchUpdateCount is the maximum number of Salesforce records that
 // can be updated in one operation.
@@ -31,44 +35,14 @@ type Client struct {
 	log         *slog.Logger
 }
 
-// NewClient handles the OAuth2 flow to return an authenticated Salesforce client.
-func NewClient(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*Client, error) {
-
-	cache, err := LoadTokenCacheFromFile(cfg.Salesforce.TokenFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("no token file found at '%s'. Please run the 'login' command first", cfg.Salesforce.TokenFilePath)
-	}
-
-	tokenSource := cfg.Salesforce.OAuth2Config.TokenSource(ctx, cache.Token)
-	refreshedToken, err := tokenSource.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to refresh token: %w", err)
-	}
-
-	if logger != nil {
-		logger = slog.New(slog.NewTextHandler(
-			os.Stdout,
-			&slog.HandlerOptions{Level: slog.LevelDebug},
-		))
-	}
-
-	// Fix the Salesforce lack of an Expiry date.
-	fixSalesforceTokenExpiry(refreshedToken)
-
-	if refreshedToken.AccessToken != cache.Token.AccessToken {
-		logger.Info("Access token was refreshed. Saving new token.")
-		cache.Token = refreshedToken
-
-		// The instance_url does not change on refresh, so keep the old one.
-		if err := SaveTokenCacheToFile(cache, cfg.Salesforce.TokenFilePath); err != nil {
-			return nil, fmt.Errorf("failed to save refreshed token: %w", err)
-		}
-	}
-
-	oauthClient := oauth2.NewClient(ctx, tokenSource)
+// NewClient is provided a valid (refreshed where necessary) token and returns a
+// Salesforce client. It is the responsibility of the caller to ensure the provided
+// token is refreshed.
+func NewClient(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (*Client, error) {
+	oauthClient := oauth2.NewClient(ctx, et.Token)
 	return &Client{
 		httpClient:  oauthClient,
-		instanceURL: cache.InstanceURL,
+		instanceURL: et.InstanceURL,
 		apiVersion:  SalesforceAPIVersionNumber,
 		config:      *cfg,
 		log:         logger,
