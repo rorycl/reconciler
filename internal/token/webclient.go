@@ -94,7 +94,7 @@ func (twc *TokenWebClient) InitiateWebLogin() http.Handler {
 		// Generate random state.
 		b := make([]byte, 32)
 		if _, err := rand.Read(b); err != nil {
-			twc.errLogger.ServerError(w, r, errors.New("Failed to generate state"))
+			twc.errLogger.ServerError(w, r, errors.New("failed to generate state"))
 			return
 		}
 		state := base64.URLEncoding.EncodeToString(b)

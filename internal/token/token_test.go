@@ -110,7 +110,7 @@ func TestTokenNotExpired(t *testing.T) {
 	if got, want := validToken.InstanceURL, instanceURL; got != want {
 		t.Errorf("instance url got %q want %q", got, want)
 	}
-	if got, want := fmt.Sprintf("%s", validToken.Type), "salesforce"; got != want {
+	if got, want := validToken.Type.String(), "salesforce"; got != want {
 		t.Errorf("type got %s want %s", got, want)
 	}
 
@@ -270,7 +270,7 @@ func TestFixSalesforceTokenExpiry(t *testing.T) {
 func TestTokenNames(t *testing.T) {
 
 	tok := SalesforceToken
-	if got, want := fmt.Sprintf("%s", tok), "salesforce"; got != want {
+	if got, want := tok.String(), "salesforce"; got != want {
 		t.Errorf("unexepected token name got %q want %q", got, want)
 	}
 	if got, want := tok.SessionName(), "salesforce-session"; got != want {
