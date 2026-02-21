@@ -19,17 +19,18 @@ Xero income into reconciliation with the related Salesforce donations.
 
 The reconciliation concept centres on the use a unique key to link an
 accounting income record to one or many donations in the CRMS system. In
-Reconciler this linkage is known as the "DFK" or `distributed foreign
-key`.
+Reconciler this linkage is known as the `DFK` or `distributed foreign
+key` in reference to how databases typically relate tables of data using
+a [foreign key](https://en.wikipedia.org/wiki/Foreign_key).
 
 For example, a bank transaction in Xero recording an income payment from
-the JustGiving platform might be given a reference "JUST-GIVE-01122025".
+the JustGiving platform might be given a reference `JUST-GIVE-01122025`.
 The Reconciler app can be used to find the related donation (or
 "opportunity") records in Salesforce and add this reference to a chosen
 Salesforce object's target field. Reconciler shows if the total donation
 component of the Xero income (disregarding platform fees and so on)
 equals the total of related Salesforce donations using
-"JUST-GIVE-01122025" as the DFK. When the donation-related income total
+`JUST-GIVE-01122025` as the `DFK`. When the donation-related income total
 equals the sum of related donations, the income and related donations
 for this income can be considered reconciled.
 
@@ -66,10 +67,10 @@ the OAuth2 client details, the accounting account codes representing
 donation income, the CRMS target linkage/DFK object and field, the
 reconciliation start date, and other details.
 
-A local sqlite database is used to provide search capabilities.
-Connections to Xero are read-only, whereas only the target DFK field on
-the configured Salesforce object may be altered through Reconciler
-operations.
+A local sqlite database, which can run in memory, is used to provide
+search capabilities. Connections to Xero are read-only, whereas only the
+target DFK field on the configured Salesforce object may be altered
+through Reconciler operations.
 
 ## Licence
 
