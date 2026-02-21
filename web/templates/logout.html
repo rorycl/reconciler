@@ -11,11 +11,11 @@
     <div class="mt-2 space-y-6">
         <div class="p-4 border border border-4 rounded-md">
             <h3 class="font-semibold">Notice</h3>
-            <p class="text-sm text-slate-600 my-3">After logging out the connections to Xero and Salesforce will be deleted.</p>
+            <p class="text-sm text-slate-600 py-4">After logging out the connections to Xero and Salesforce will be deleted.</p>
             {{ if .MemoryDatabase }}
-            <p class="text-sm text-slate-600 mb-3">The in-memory database will also be deleted.</p>
+            <p class="text-sm text-slate-600 pb-4">The in-memory database will also be deleted.</p>
             {{ else }}
-            <p class="text-sm text-slate-600 mb-6">Consider removing the database <b>{{ .DBName }}</b> by hand.</p>
+            <p class="text-sm text-slate-600 pb-4">Consider removing the database <b>{{ .DBName }}</b> by hand.</p>
             {{ end }}
             <a href="/logout/confirmed" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
                 Log Out
