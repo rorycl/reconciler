@@ -18,7 +18,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"reconciler/internal"
+	mounts "reconciler/internal/mounts"
 	"strings"
 
 	"github.com/jmoiron/sqlx" // helper library
@@ -103,7 +103,7 @@ func NewConnection(
 	// mount the sql fs either using the embedded fs or via the provided path.
 	// The path is likely to need to be relative to "here" as ".." type paths are not
 	// accepted by fs mounting.
-	sqlFS, err := internal.NewFileMount("sql", SQLEmbeddedFS, sqlDir)
+	sqlFS, err := mounts.NewFileMount("sql", SQLEmbeddedFS, sqlDir)
 	if err != nil {
 		return nil, fmt.Errorf("mount error: %v", err)
 	}
