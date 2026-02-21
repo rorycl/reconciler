@@ -2,6 +2,7 @@ package xero
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,19 +13,34 @@ import (
 	"time"
 )
 
-// setup creates a test environment for running API client tests.
-// It returns a request multiplexer for registering handlers, the APIClient configured
-// to use the test server, and a teardown function to close the server.
-func setup(t *testing.T) (mux *http.ServeMux, client *APIClient, teardown func()) {
+// setup creates a test environment for running API client tests. It returns a request
+// multiplexer for registering handlers, the Client configured to use the test server,
+// and a teardown function to close the server.
+func setup(t *testing.T) (mux *http.ServeMux, client *Client, teardown func()) {
+
 	t.Helper()
+
 	mux = http.NewServeMux()
 	server := httptest.NewServer(mux)
+
 	accountsRegexp := regexp.MustCompile("")
-	client = NewAPIClient("fake-tenant-id", server.Client(), accountsRegexp, nil)
-	client.baseURL = server.URL // Override the default base URL.
+	logger := slog.New(slog.NewTextHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+
+	client = &Client{
+		httpClient:     server.Client(),
+		tenantID:       "fake-tenant-id",
+		baseURL:        server.URL,
+		accountsRegexp: accountsRegexp,
+		log:            logger,
+	}
+
 	teardown = func() {
 		server.Close()
 	}
+
 	return mux, client, teardown
 }
 
@@ -34,7 +50,7 @@ func testPagination[T any](
 	endpointPath string,
 	jsonFile string,
 	emptyResponseJSON string,
-	getFunc func(client *APIClient) (T, error),
+	getFunc func(client *Client) (T, error),
 ) (T, error) {
 
 	t.Helper()
@@ -82,7 +98,7 @@ func testNoPagination[T any](
 	t *testing.T,
 	endpointPath string,
 	jsonFile string,
-	getFunc func(client *APIClient) (T, error),
+	getFunc func(client *Client) (T, error),
 ) (T, error) {
 
 	t.Helper()
@@ -125,7 +141,7 @@ func TestGetInvoices_PaginationAndTermination(t *testing.T) {
 	// invoices.json has no line items
 	// allAccountsRegexp := regexp.MustCompile("^[0-9]+")
 
-	getInvoicesFunc := func(client *APIClient) ([]Invoice, error) {
+	getInvoicesFunc := func(client *Client) ([]Invoice, error) {
 		return client.GetInvoices(context.Background(), time.Now(), time.Time{}, nil)
 	}
 
@@ -149,7 +165,7 @@ func TestGetInvoices_PaginationAndTermination(t *testing.T) {
 // BankTransaction API pagination and termination.
 func TestGetBankTransactions_PaginationAndTermination(t *testing.T) {
 
-	getBankTransactionsFunc := func(client *APIClient) ([]BankTransaction, error) {
+	getBankTransactionsFunc := func(client *Client) ([]BankTransaction, error) {
 		return client.GetBankTransactions(context.Background(), time.Now(), time.Time{}, nil)
 	}
 
@@ -174,7 +190,7 @@ func TestGetBankTransactions_PaginationAndTermination(t *testing.T) {
 // pagination and termination.
 func TestGetAccounts_PaginationAndTermination(t *testing.T) {
 
-	getAccountsFunc := func(client *APIClient) ([]Account, error) {
+	getAccountsFunc := func(client *Client) ([]Account, error) {
 		return client.GetAccounts(context.Background(), time.Time{})
 	}
 

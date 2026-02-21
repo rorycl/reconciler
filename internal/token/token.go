@@ -150,7 +150,6 @@ func (et *ExtendedToken) fixSalesForceToken() error {
 // and oauth2.Config. The config.TokenSource func automatically refreshes tokens when
 // needed. The function returns whether refreshing occurred and any error.
 func (et *ExtendedToken) ReuseOrRefresh(ctx context.Context, config *oauth2.Config) (bool, error) {
-
 	var refreshed bool
 
 	tok := config.TokenSource(ctx, et.Token)
@@ -173,5 +172,4 @@ func (et *ExtendedToken) ReuseOrRefresh(ctx context.Context, config *oauth2.Conf
 		}
 	}
 	return refreshed, nil
-
 }

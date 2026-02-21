@@ -9,16 +9,23 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
+	"reconciler/internal/token"
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
+// baseURL is the Xero base API url.
 const baseURL = "https://api.xero.com/api.xro/2.0"
 
-// APIClient is a wrapper for making authenticated calls to the Xero API.
-type APIClient struct {
+// connectionsURL is the Xero API endpoint for connection authorization and a list of
+// tenants.
+var connectionsURL = "https://api.xero.com/connections"
+
+// Client is a wrapper for making authenticated calls to the Xero API.
+type Client struct {
 	httpClient     *http.Client
 	tenantID       string
 	baseURL        string
@@ -26,40 +33,33 @@ type APIClient struct {
 	log            *slog.Logger
 }
 
-// NewAPIClient creates a new Xero API client. If not httpClient is provided
-// http.DefaultClient is used. The accountsRegexp is used to filter
-func NewAPIClient(
+// NewClient is provided a valid (refreshed where necessary) token and returns a
+// Xero client. The provided token should be refreshed before provision.
+func NewClient(
+	ctx context.Context,
 	tenantID string,
-	httpClient *http.Client,
-	accountsRegexp *regexp.Regexp,
 	logger *slog.Logger,
-) *APIClient {
+	accountsRegexp *regexp.Regexp,
+	et *token.ExtendedToken,
+) (*Client, error) {
 
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
+	// Use a StaticTokenSource to stop automatic refresh.
+	ts := oauth2.StaticTokenSource(et.Token)
+	oauthClient := oauth2.NewClient(ctx, ts)
 
-	// Logger setup.
-	if logger == nil {
-		logger = slog.New(slog.NewTextHandler(
-			os.Stdout,
-			&slog.HandlerOptions{Level: slog.LevelDebug},
-		))
-	}
-
-	return &APIClient{
-		httpClient:     httpClient,
+	return &Client{
+		httpClient:     oauthClient,
 		tenantID:       tenantID,
 		baseURL:        baseURL,
 		accountsRegexp: accountsRegexp,
 		log:            logger,
-	}
+	}, nil
 }
 
 // GetBankTransactions fetches bank transactions from Xero, applying appropriate
 // filters.  The results are then filtered by those transactions having at least one
 // line item which matches the account code regexp.
-func (c *APIClient) GetBankTransactions(
+func (c *Client) GetBankTransactions(
 	ctx context.Context,
 	fromDate time.Time,
 	ifModifiedSince time.Time,
@@ -133,7 +133,7 @@ func (c *APIClient) GetBankTransactions(
 // GetInvoices fetches invoices from Xero, applying appropriate filters. The results are
 // then filtered by those invoices having at least one line item which matches the
 // account code regexp.
-func (c *APIClient) GetInvoices(
+func (c *Client) GetInvoices(
 	ctx context.Context,
 	fromDate time.Time,
 	ifModifiedSince time.Time,
@@ -201,7 +201,7 @@ func (c *APIClient) GetInvoices(
 
 // GetAccounts fetches accounts from Xero, applying appropriate filters.
 // There is no pagination.
-func (c *APIClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]Account, error) {
+func (c *Client) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]Account, error) {
 
 	requestURL := fmt.Sprintf("%s/Accounts", c.baseURL)
 
@@ -226,7 +226,7 @@ func (c *APIClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) 
 }
 
 // GetBankTransactionByID fetches a single bank transaction by its UUID.
-func (c *APIClient) GetBankTransactionByID(ctx context.Context, uuid string) (BankTransaction, error) {
+func (c *Client) GetBankTransactionByID(ctx context.Context, uuid string) (BankTransaction, error) {
 	requestURL := fmt.Sprintf("%s/BankTransactions/%s", c.baseURL, uuid)
 	req, err := c.newRequest(ctx, "GET", requestURL, time.Time{}, nil)
 	if err != nil {
@@ -249,7 +249,7 @@ func (c *APIClient) GetBankTransactionByID(ctx context.Context, uuid string) (Ba
 
 // UpdateBankTransactionReference performs a POST request to update a transaction's reference.
 // It returns the full, updated transaction object from the Xero API response.
-func (c *APIClient) UpdateBankTransactionReference(ctx context.Context, tx BankTransaction, reference string) (BankTransaction, error) {
+func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTransaction, reference string) (BankTransaction, error) {
 	tx.Reference = reference
 	payload := map[string][]BankTransaction{"BankTransactions": {tx}}
 	body, err := json.Marshal(payload)
@@ -280,7 +280,7 @@ func (c *APIClient) UpdateBankTransactionReference(ctx context.Context, tx BankT
 }
 
 // newRequest is a helper to create a new HTTP request with common headers.
-func (c *APIClient) newRequest(ctx context.Context, method, url string, ifModifiedSince time.Time, body []byte) (*http.Request, error) {
+func (c *Client) newRequest(ctx context.Context, method, url string, ifModifiedSince time.Time, body []byte) (*http.Request, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
@@ -307,7 +307,7 @@ func (c *APIClient) newRequest(ctx context.Context, method, url string, ifModifi
 // do is a helper to execute an HTTP request and decode the JSON
 // response. A nil `v` is supported for API calls not providing a
 // response, such as DELETE calls.
-func do[T any](c *APIClient, req *http.Request, v *T) (*http.Response, error) {
+func do[T any](c *Client, req *http.Request, v *T) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)

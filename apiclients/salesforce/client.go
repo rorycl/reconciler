@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"reconciler/apiclients/token"
 	"reconciler/config"
+	"reconciler/internal/token"
 
 	"golang.org/x/oauth2"
 )
@@ -36,10 +36,13 @@ type Client struct {
 }
 
 // NewClient is provided a valid (refreshed where necessary) token and returns a
-// Salesforce client. It is the responsibility of the caller to ensure the provided
-// token is refreshed.
+// Salesforce client.
 func NewClient(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (*Client, error) {
-	oauthClient := oauth2.NewClient(ctx, et.Token)
+
+	// Use a StaticTokenSource to stop automatic refresh.
+	ts := oauth2.StaticTokenSource(et.Token)
+	oauthClient := oauth2.NewClient(ctx, ts)
+
 	return &Client{
 		httpClient:  oauthClient,
 		instanceURL: et.InstanceURL,
