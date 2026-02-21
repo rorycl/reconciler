@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -37,7 +38,6 @@ type Client struct {
 // Xero client. The provided token should be refreshed before provision.
 func NewClient(
 	ctx context.Context,
-	tenantID string,
 	logger *slog.Logger,
 	accountsRegexp *regexp.Regexp,
 	et *token.ExtendedToken,
@@ -46,6 +46,15 @@ func NewClient(
 	// Use a StaticTokenSource to stop automatic refresh.
 	ts := oauth2.StaticTokenSource(et.Token)
 	oauthClient := oauth2.NewClient(ctx, ts)
+
+	// Retrieve the tenantID.
+	tenantID, err := getTenantID(ctx, oauthClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine tenant ID: %w", err)
+	}
+	if tenantID == "" {
+		return nil, errors.New("tenant ID is empty")
+	}
 
 	return &Client{
 		httpClient:     oauthClient,
