@@ -53,7 +53,6 @@ type WebConfig struct {
 type XeroConfig struct {
 	ClientID             string `yaml:"client_id"`
 	ClientSecret         string `yaml:"client_secret"`
-	TokenFilePath        string `yaml:"token_file_path"`
 	TokenTimeout         string `yaml:"token_timeout"`
 	TokenTimeoutDuration time.Duration
 	PKCEEnabled          bool     `yaml:"pkce_enabled"`
@@ -66,7 +65,6 @@ type SalesforceConfig struct {
 	LoginDomain          string `yaml:"login_domain"`
 	ClientID             string `yaml:"client_id"`
 	ClientSecret         string `yaml:"client_secret"`
-	TokenFilePath        string `yaml:"token_file_path"`
 	TokenTimeout         string `yaml:"token_timeout"`
 	TokenTimeoutDuration time.Duration
 	PKCEEnabled          bool     `yaml:"pkce_enabled"`
@@ -166,9 +164,6 @@ func validateAndPrepare(c *Config) error {
 	if xc.ClientSecret == "" {
 		return errors.New("xero.client_secret is missing")
 	}
-	if xc.TokenFilePath == "" {
-		return errors.New("xero.token_file_path is missing")
-	}
 	if xc.TokenTimeout == "" {
 		return errors.New("xero.token_timeout is missing")
 	}
@@ -206,9 +201,6 @@ func validateAndPrepare(c *Config) error {
 	}
 	if sc.LoginDomain == "" {
 		return errors.New("salesforce.login_domain is missing")
-	}
-	if sc.TokenFilePath == "" {
-		return errors.New("salesforce.token_file_path is missing")
 	}
 	if sc.TokenTimeout == "" {
 		return errors.New("salesforce.token_timeout is missing")
