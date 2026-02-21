@@ -266,3 +266,15 @@ func TestFixSalesforceTokenExpiry(t *testing.T) {
 		t.Errorf("got incorrectly fixed expiry %v want %v", got, want)
 	}
 }
+
+func TestTokenNames(t *testing.T) {
+
+	tok := SalesforceToken
+	if got, want := fmt.Sprintf("%s", tok), "salesforce"; got != want {
+		t.Errorf("unexepected token name got %q want %q", got, want)
+	}
+	if got, want := tok.SessionName(), "salesforce-session"; got != want {
+		t.Errorf("unexepected token session name got %q want %q", got, want)
+	}
+
+}

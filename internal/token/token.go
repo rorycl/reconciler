@@ -30,6 +30,11 @@ func (tt TokenType) String() string {
 	return tokenName[tt]
 }
 
+// SessionName returns the session name associated with a TokenType.
+func (tt TokenType) SessionName() string {
+	return fmt.Sprintf("%s-%s", tt, "session")
+}
+
 // ExtendedToken is an OAuth2 token with additional information.
 type ExtendedToken struct {
 	Type        TokenType     `json:"type"`
