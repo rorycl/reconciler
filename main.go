@@ -7,7 +7,7 @@ import (
 	"os"
 	"reconciler/config"
 	"reconciler/db"
-	"reconciler/internal"
+	mounts "reconciler/internal/mounts"
 	"reconciler/web"
 )
 
@@ -41,12 +41,12 @@ func runServer() {
 	}
 
 	// Mount the web static resources and template filesystems.
-	staticFS, err := internal.NewFileMount("static", web.StaticEmbeddedFS, "")
+	staticFS, err := mounts.NewFileMount("static", web.StaticEmbeddedFS, "")
 	if err != nil {
 		fmt.Println("static file mount error", err)
 		os.Exit(1)
 	}
-	templatesFS, err := internal.NewFileMount("templates", web.TemplatesEmbeddedFS, "")
+	templatesFS, err := mounts.NewFileMount("templates", web.TemplatesEmbeddedFS, "")
 	if err != nil {
 		fmt.Println("templates file mount error", err)
 		os.Exit(1)
