@@ -4,13 +4,7 @@
 
 {{ define "title" }}{{ .PageTitle }} - Charity Reconciler{{ end }}
 
-{{ define "nav" }}
-<div class="flex items-center space-x-4 text-sm font-medium">
-    <a href="/home" class="text-slate-500 border-b-2 border-transparent pb-1 hover:text-sky-700">Home</a>
-    <a href="/refresh" class="text-slate-500 border-b-2 border-transparent pb-1 hover:text-sky-700">Refresh</a>
-    <a href="/connect" class="text-slate-500 border-b-2 border-transparent pb-1 hover:text-sky-700">Logout</a>
-</div>
-{{ end }}
+{{ template "nav.html" . }}
 
 {{ define "content" }}
 <!-- Invoice Header Panel -->
