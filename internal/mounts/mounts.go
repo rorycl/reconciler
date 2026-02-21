@@ -1,3 +1,7 @@
+// package mounts provides abstracted filemounts to use as fs.FS filesystems in a
+// program. The package allows either the embedded file system to be used or, when
+// specified, the path to a directory on disk. The package takes care of mounting the
+// filesystem at the same level, something that does not happen by default.
 package internal
 
 import (
