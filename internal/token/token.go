@@ -74,7 +74,7 @@ func NewExtendedToken(typer TokenType, token *oauth2.Token) (*ExtendedToken, err
 // Tokens that expire after the expirationDuration will be considered invalid. This is
 // on the assumption that the validity period of tokens AND refresh tokens is known.
 func (et *ExtendedToken) IsValid(expirationDuration time.Duration) bool {
-	if et.Token == nil {
+	if et == nil {
 		return false
 	}
 	if et.Token.Expiry.IsZero() {
@@ -169,7 +169,6 @@ func (et *ExtendedToken) ReuseOrRefresh(ctx context.Context, config *oauth2.Conf
 	}
 	refreshed = true
 	et.Token = possibleNewToken
-	fmt.Printf("possible New Token %#v\n", possibleNewToken)
 
 	if et.Type == SalesforceToken {
 		if err := et.fixSalesForceToken(); err != nil {
