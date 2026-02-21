@@ -21,10 +21,6 @@ func TestConfig(t *testing.T) {
 		t.Errorf("config.Web.XeroCallBackAddr got %q want %q", got, want)
 	}
 
-	if got, want := config.Xero.PKCEEnabled, true; got != want {
-		t.Errorf("config.Xero.PKCEEnabled got %t want %t", got, want)
-	}
-
 	config.Web.ListenAddress = "127.0.0.2:9001"
 	if err := validateAndPrepare(config); err == nil {
 		t.Errorf("expected error for invalid address %q", config.Web.ListenAddress)

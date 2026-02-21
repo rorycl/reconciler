@@ -44,14 +44,13 @@ web:
 # Xero API settings
 #
 # These settings set out the OAuth2 connection settings to the remote
-# platform. PKCE code verification is strongly recommended.
+# platform. PKCE code verification is required
 #######################################################################
 
 xero:
   client_id: "XERO_CLIENT_ID"
   client_secret: "XERO_CLIENT_SECRET"
   token_file_path: "./xero_token.json"
-  pkce_enabled: true
 
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. An "8h" (8 hour)
@@ -70,7 +69,7 @@ xero:
 # Salesforce API settings
 #
 # These settings set out the OAuth2 connection settings to the remote
-# platform. PKCE code verification is strongly recommended.
+# platform. PKCE code verification is required.
 #
 # The SOQL donation retrieval query is specified, together with the
 # object and field name to target in distributed foreign key (DFK)
@@ -82,7 +81,6 @@ salesforce:
   client_id: "SALESFORCE_CONSUMER_KEY"
   client_secret: "SALESFORCE_CONSUMER_SECRET"
   token_file_path: "./sf_token.json"
-  pkce_enabled: true
 
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. This should match or be

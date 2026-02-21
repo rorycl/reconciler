@@ -55,7 +55,6 @@ type XeroConfig struct {
 	ClientSecret         string `yaml:"client_secret"`
 	TokenTimeout         string `yaml:"token_timeout"`
 	TokenTimeoutDuration time.Duration
-	PKCEEnabled          bool     `yaml:"pkce_enabled"`
 	Scopes               []string `yaml:"scopes"`
 	OAuth2Config         *oauth2.Config
 }
@@ -67,7 +66,6 @@ type SalesforceConfig struct {
 	ClientSecret         string `yaml:"client_secret"`
 	TokenTimeout         string `yaml:"token_timeout"`
 	TokenTimeoutDuration time.Duration
-	PKCEEnabled          bool     `yaml:"pkce_enabled"`
 	Scopes               []string `yaml:"scopes"`
 	OAuth2Config         *oauth2.Config
 	// SOQL settings.
