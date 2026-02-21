@@ -50,6 +50,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"reconciler/apiclients/salesforce"
@@ -206,6 +207,8 @@ func (web *WebApp) routes() http.Handler {
 	// Note that the OAuth2 handlers are in the apiclient modules.
 	r.Handle("/", web.handleRoot()).Methods("GET") // synonym for /connect
 	r.Handle("/connect", web.handleConnect()).Methods("GET")
+	r.Handle("/logout", web.handleLogout()).Methods("GET")
+	r.Handle("/logout/confirmed", web.handleLogoutConfirmed()).Methods("GET")
 
 	// Xero OAuth2 init and callback.
 	r.Handle("/xero/init", web.xeroWebClient.InitiateWebLogin()).Methods("GET")
@@ -309,6 +312,41 @@ func (web *WebApp) handleConnect() http.Handler {
 			"SFTokenIsValid":   sfToken.IsValid(sessionOKValidity),
 		}
 		web.render(w, r, templates, name, data)
+	})
+}
+
+// handleLogout serves the /logout endpoint.
+func (web *WebApp) handleLogout() http.Handler {
+
+	name := "logout.html"
+	tpls := []string{"base.html", "logout.html"}
+	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+
+	// Determine if an in-memory database is in use.
+	hasMemoryDB := strings.Contains(web.cfg.DatabasePath, ":memory:")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data := map[string]any{
+			"MemoryDatabase": hasMemoryDB,
+			"DBName":         web.cfg.DatabasePath,
+		}
+		web.render(w, r, templates, name, data)
+	})
+}
+
+// handleLogoutConfirmed serves the /logout/confirmed endpoint, which clears the session
+// and redirects to /connect.
+func (web *WebApp) handleLogoutConfirmed() http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		err := web.sessions.Clear(ctx)
+		if err != nil {
+			web.log.Error(fmt.Sprintf("Sesssion clear error: %v", err))
+		} else {
+			web.log.Info("Session cleared")
+		}
+		http.Redirect(w, r, "/connect", http.StatusFound)
 	})
 }
 
@@ -484,7 +522,7 @@ func (web *WebApp) handleHome() http.Handler {
 func (web *WebApp) handleInvoices() http.Handler {
 
 	name := "invoices.html"
-	tpls := []string{"base.html", "partial-listingTabs.html", "invoices.html"}
+	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "invoices.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -566,7 +604,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 func (web *WebApp) handleBankTransactions() http.Handler {
 
 	name := "bank_transactions.html"
-	tpls := []string{"base.html", "partial-listingTabs.html", "bank_transactions.html"}
+	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "bank_transactions.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -648,7 +686,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 func (web *WebApp) handleDonations() http.Handler {
 
 	name := "donations.html"
-	tpls := []string{"base.html", "partial-listingTabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "donations.html"}
+	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "donations.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -746,7 +784,7 @@ func (web *WebApp) handleDonations() http.Handler {
 func (web *WebApp) handleInvoiceDetail() http.Handler {
 
 	name := "invoice.html"
-	tpls := []string{"base.html", "partial-listingTabs.html", "partial-donations-tabs.html", "invoice.html"}
+	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-tabs.html", "invoice.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -809,7 +847,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 func (web *WebApp) handleBankTransactionDetail() http.Handler {
 
 	name := "bank-transaction.html"
-	tpls := []string{"base.html", "partial-listingTabs.html", "partial-donations-tabs.html", "bank-transaction.html"}
+	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-tabs.html", "bank-transaction.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
