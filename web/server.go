@@ -40,6 +40,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"html/template"
@@ -48,16 +49,19 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"regexp"
+	"time"
+
 	"reconciler/apiclients/salesforce"
 	"reconciler/apiclients/xero"
 	"reconciler/config"
 	"reconciler/db"
-	"regexp"
-	"time"
+	"reconciler/internal/token"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"golang.org/x/oauth2"
 )
 
 // pageLen is the number of items to show in a page listing.
@@ -83,7 +87,13 @@ type WebApp struct {
 	server         *http.Server
 	sessions       *scs.SessionManager
 	accountsRegexp *regexp.Regexp
-	inDevelopment  bool // in development mode
+
+	// web clients for oauth2
+	xeroWebClient *token.TokenWebClient
+	sfWebClient   *token.TokenWebClient
+
+	// in development mode
+	inDevelopment bool
 }
 
 // New initialises a WebApp. An error type is returned for future use.
@@ -100,18 +110,19 @@ func New(
 		Addr:              cfg.Web.ListenAddress,
 		ReadHeaderTimeout: time.Duration(240 * time.Second),
 		WriteTimeout:      time.Duration(240 * time.Second),
-		MaxHeaderBytes:    1 << 19, // 100k ish
+		MaxHeaderBytes:    1 << 17, // 125k ish
 	}
 
-	// Initialise in-memory session store.
+	// Initialise in-memory session store and custom gob types.
 	scsSessionStore := scs.New()
 	scsSessionStore.Lifetime = 12 * time.Hour
 
+	gob.Register(time.Time{})
+	gob.Register(token.ExtendedToken{})
+
 	// Compile the donation accounts filtering regexp
-	accountsRegexp, err := cfg.DonationAccountCodesAsRegex()
-	if err != nil {
-		panic(fmt.Sprintf("accounts Regexp did not compile: %v", err))
-	}
+	// (this is a safe assignment, checked at config ingestion).
+	accountsRegexp := cfg.DonationAccountCodesAsRegex()
 
 	webApp := &WebApp{
 		log:            logger,
@@ -123,6 +134,31 @@ func New(
 		sessions:       scsSessionStore,
 		accountsRegexp: accountsRegexp,
 	}
+
+	// Attach the sfWebClient constructors
+	sfWebClient, err := token.NewTokenWebClient(
+		token.SalesforceToken,
+		cfg.Salesforce.OAuth2Config,
+		scsSessionStore,
+		webApp,     // implements ServerError
+		"/connect", // the redirect url
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not make salesforce web oauth2 client: %v", err)
+	}
+	webApp.sfWebClient = sfWebClient
+
+	xeroWebClient, err := token.NewTokenWebClient(
+		token.XeroToken,
+		cfg.Xero.OAuth2Config,
+		scsSessionStore,
+		webApp,     // implements ServerError
+		"/connect", // the redirect url
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not make xero web oauth2 client: %v", err)
+	}
+	webApp.xeroWebClient = xeroWebClient
 
 	// In-Development mode triggers a warning as it bypasses the API connection check
 	// middleware.
@@ -168,12 +204,12 @@ func (web *WebApp) routes() http.Handler {
 	r.Handle("/connect", web.handleConnect()).Methods("GET")
 
 	// Xero OAuth2 init and callback.
-	r.Handle("/xero/init", xero.InitiateWebLogin(web.cfg, web.sessions)).Methods("GET")
-	r.Handle(web.cfg.Web.XeroCallBack, xero.WebLoginCallBack(web.cfg, web.sessions, web)).Methods("GET")
+	r.Handle("/xero/init", web.xeroWebClient.InitiateWebLogin()).Methods("GET")
+	r.Handle(web.cfg.Web.XeroCallBack, web.xeroWebClient.WebLoginCallBack()).Methods("GET")
 
 	// Salesforce OAuth2 init and callback.
-	r.Handle("/salesforce/init", salesforce.InitiateWebLogin(web.cfg, web.sessions)).Methods("GET")
-	r.Handle(web.cfg.Web.SalesforceCallBack, salesforce.WebLoginCallBack(web.cfg, web.sessions, web)).Methods("GET")
+	r.Handle("/salesforce/init", web.sfWebClient.InitiateWebLogin()).Methods("GET")
+	r.Handle(web.cfg.Web.SalesforceCallBack, web.sfWebClient.WebLoginCallBack()).Methods("GET")
 
 	// Refresh is the data refresh page.
 	r.Handle("/refresh", apisOK(web.handleRefresh())).Methods("GET")
@@ -222,12 +258,13 @@ func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !xero.TokenIsValid(web.cfg.Xero.TokenFilePath, web.cfg.Xero.TokenTimeoutDuration) {
+		ctx := r.Context()
+		if _, err := web.getTokenFromSession(ctx, token.XeroToken); err != nil {
 			web.log.Info("xero token is not valid, redirecting")
 			http.Redirect(w, r, "/connect?status=xero_token_invalid", http.StatusSeeOther)
 			return
 		}
-		if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.TokenTimeoutDuration) {
+		if _, err := web.getTokenFromSession(ctx, token.SalesforceToken); err != nil {
 			web.log.Info("saleforce token is not valid, redirecting")
 			http.Redirect(w, r, "/connect?status=sf_token_invalid", http.StatusSeeOther)
 			return
@@ -256,13 +293,15 @@ func (web *WebApp) handleConnect() http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		xeroTokenIsValid := xero.TokenIsValid(web.cfg.Xero.TokenFilePath, web.cfg.Xero.TokenTimeoutDuration)
-		sfTokenIsValid := salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.TokenTimeoutDuration)
+		ctx := r.Context()
+
+		xeroToken, _ := web.getTokenFromSession(ctx, token.XeroToken)
+		sfToken, _ := web.getTokenFromSession(ctx, token.SalesforceToken)
 
 		data := map[string]any{
 			"Organisation":     web.cfg.Organisation,
-			"SFTokenIsValid":   sfTokenIsValid,
-			"XeroTokenIsValid": xeroTokenIsValid,
+			"XeroTokenIsValid": xeroToken.IsValid(sessionOKValidity),
+			"SFTokenIsValid":   sfToken.IsValid(sessionOKValidity),
 		}
 		web.render(w, r, templates, name, data)
 	})
@@ -328,6 +367,10 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 
 		ctx := r.Context()
 
+		// Retrieve the oauth2 tokens from the session
+		xeroToken, _ := web.getTokenFromSession(ctx, token.XeroToken)
+		sfToken, _ := web.getTokenFromSession(ctx, token.SalesforceToken)
+
 		// Determine if refreshing needs to occur. If it does, set the refresh time to 2
 		// minutes before the last refresh to deal with any slow updates on the remote
 		// platform. This uses the fact that an empty call for the refreshed-datetime
@@ -346,7 +389,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		web.log.Info(fmt.Sprintf("Refresh last refresh: %s", lastRefresh.Format(time.DateTime)))
 
 		// Connect the Xero client.
-		xeroClient, err := xero.NewClient(ctx, web.cfg, web.log)
+		xeroClient, err := xero.NewClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
 		if err != nil {
 			// Todo: consider redirect to /connect.
 			web.ServerError(w, r, fmt.Errorf("failed to create xero client: %w", err))
@@ -395,7 +438,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 
 		// Retrieve the Salesforce donations.
-		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log)
+		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
 		if err != nil {
 			// consider redirect to /connect
 			logAndPrintErrorToWeb(w, "donations new client error: %v", err)
@@ -1142,18 +1185,12 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			}
 		}
 
+		// Retrieve the oauth2 tokens from the session
+		sfToken, _ := web.getTokenFromSession(ctx, token.SalesforceToken)
+
 		// Create the salesforce client and run a batch update.
-		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log)
+		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
 		if err != nil {
-			// Todo: decide if sfClient fails to always delete the current token.
-			/*
-				if !salesforce.TokenIsValid(web.cfg.Salesforce.TokenFilePath, web.cfg.Salesforce.Token....) {
-					...os.Remove...
-					web.log.Warn("handle Donations Link/Unlink detected an invalid token, redirecting to /connect")
-					http.Redirect(w, r, "/connect?error=sf_expired", http.StatusSeeOther)
-					return
-				}
-			*/
 			web.ServerError(w, r, fmt.Errorf("failed to create salesforce client for linking/unlinking: %w", err))
 			return
 		}
@@ -1272,4 +1309,50 @@ func (web *WebApp) getInvoiceOrBankTransactionDetails(ctx context.Context, typer
 	}
 	ref := *transaction.Reference
 	return ref, transaction.Date, nil
+}
+
+var ErrTokenMissingOrInvalid = errors.New("token missing or invalid")
+
+var sessionOKValidity = func() time.Duration {
+	td, _ := time.ParseDuration("1h")
+	return td
+}()
+
+// getTokenFromSession gets a Xero or Salesforce token from the session
+func (web *WebApp) getTokenFromSession(ctx context.Context, typer token.TokenType) (*token.ExtendedToken, error) {
+
+	// Get token from session.
+	et, ok := web.sessions.Get(ctx, typer.SessionName()).(token.ExtendedToken)
+	if !ok {
+		web.log.Info(fmt.Sprintf("%s token not found in session", typer))
+		return nil, ErrTokenMissingOrInvalid
+	}
+
+	if et.IsValid(sessionOKValidity) {
+		return &et, nil
+	}
+
+	// Try and refresh
+	var cfg *oauth2.Config
+	switch typer {
+	case token.SalesforceToken:
+		cfg = web.cfg.Salesforce.OAuth2Config
+	case token.XeroToken:
+		cfg = web.cfg.Xero.OAuth2Config
+	}
+	refreshed, err := et.ReuseOrRefresh(ctx, cfg)
+	if err != nil {
+		web.log.Warn(fmt.Sprintf("%s token error on refresh: %v", typer, err))
+		return nil, ErrTokenMissingOrInvalid
+	}
+	if !refreshed {
+		web.log.Warn(fmt.Sprintf("%s token could not be refreshed", typer))
+		return nil, ErrTokenMissingOrInvalid
+	}
+
+	// Update session
+	web.sessions.Put(ctx, typer.SessionName(), et)
+	web.log.Info(fmt.Sprintf("%s token updated in session", typer))
+
+	return &et, nil
 }
