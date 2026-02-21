@@ -17,4 +17,10 @@ bin
 # tmp files
 todo.txt
 
+# docs
+docs/*security_report*
+
+# tmp
+*swp
+
 
