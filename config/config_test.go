@@ -67,12 +67,11 @@ func TestConfigRegexp(t *testing.T) {
 	if got, want := c.DonationAccountCodesRegex(), "^(a|b|c)"; got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
-	if _, err := c.DonationAccountCodesAsRegex(); err != nil {
-		t.Errorf("unexpected c.DonationAccountCodesARegex error %v", err)
+	if c.DonationAccountCodesAsRegex() == nil {
+		t.Error("unexpected c.DonationAccountCodesARegex error")
 	}
 	c.DonationAccountPrefixes = []string{"(xn", "fail"}
-	if _, err := c.DonationAccountCodesAsRegex(); err == nil {
-		t.Errorf("expected c.DonationAccountCodesARegex error %v", err)
+	if c.DonationAccountCodesAsRegex() != nil {
+		t.Error("expected c.DonationAccountCodesARegex error")
 	}
-
 }

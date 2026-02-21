@@ -123,6 +123,10 @@ func validateAndPrepare(c *Config) error {
 	if len(c.DonationAccountPrefixes) < 1 {
 		return errors.New("at least one donation_account_prefix should be supplied")
 	}
+	// check the accounts regexp compiles.
+	if r := c.DonationAccountCodesAsRegex(); r == nil {
+		return fmt.Errorf("accounts regexp did not compile: %v", c.DonationAccountCodesRegex())
+	}
 
 	// Web
 	if c.Web.ListenAddress == "" {
@@ -257,7 +261,8 @@ func (c *Config) DonationAccountCodesRegex() string {
 }
 
 // DonationAccountCodesAsRegex returns the donation account prefixes as a
-// compiled regex version of DonationAccountCodesRegex.
-func (c *Config) DonationAccountCodesAsRegex() (*regexp.Regexp, error) {
-	return regexp.Compile(c.DonationAccountCodesRegex())
+// compiled regex version of DonationAccountCodesRegex. A nil regexp is an error.
+func (c *Config) DonationAccountCodesAsRegex() *regexp.Regexp {
+	r, _ := regexp.Compile(c.DonationAccountCodesRegex())
+	return r
 }
