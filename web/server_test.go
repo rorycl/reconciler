@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"reconciler/config"
 	"reconciler/db"
-	"reconciler/internal"
+	mounts "reconciler/internal/mounts"
 	"testing"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 // TestWebAppToRun is for running the web server in development.
@@ -22,12 +24,8 @@ func TestWebAppToRun(t *testing.T) {
 		Web: config.WebConfig{
 			ListenAddress: "127.0.0.1:8080",
 		},
-		Xero: config.XeroConfig{
-			TokenFilePath: "xero.json",
-		},
-		Salesforce: config.SalesforceConfig{
-			TokenFilePath: "salesforce.json",
-		},
+		Xero:          config.XeroConfig{},
+		Salesforce:    config.SalesforceConfig{},
 		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
 	}
 
@@ -42,11 +40,11 @@ func TestWebAppToRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staticFS, err := internal.NewFileMount("static", StaticEmbeddedFS, "")
+	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatesFS, err := internal.NewFileMount("templates", TemplatesEmbeddedFS, "")
+	templatesFS, err := mounts.NewFileMount("templates", TemplatesEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,15 +62,31 @@ func TestWebAppToRun(t *testing.T) {
 // TestWebAppAndShutdown tests bringing up the web server and then stopping it.
 func TestWebAppAndShutdown(t *testing.T) {
 
+	serverURL := "127.0.0.1:8000"
+
 	cfg := &config.Config{
 		Web: config.WebConfig{
-			ListenAddress: "127.0.0.1:8000",
+			ListenAddress: serverURL,
 		},
 		Xero: config.XeroConfig{
-			TokenFilePath: "xero.json",
+			OAuth2Config: &oauth2.Config{
+				RedirectURL: "/xero/callback",
+				Endpoint: oauth2.Endpoint{
+					AuthURL:  fmt.Sprintf("%s/oauth2/authorize", serverURL),
+					TokenURL: fmt.Sprintf("%s/oauth2/token", serverURL),
+				},
+				Scopes: []string{"accounting.transactions", "accounting.settings.read", "offline_access"},
+			},
 		},
 		Salesforce: config.SalesforceConfig{
-			TokenFilePath: "sf.json",
+			OAuth2Config: &oauth2.Config{
+				RedirectURL: "/sf/callback",
+				Endpoint: oauth2.Endpoint{
+					AuthURL:  fmt.Sprintf("%s/oauth2/authorize", serverURL),
+					TokenURL: fmt.Sprintf("%s/oauth2/token", serverURL),
+				},
+				Scopes: []string{"api", "refresh_token"},
+			},
 		},
 		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
 	}
@@ -88,11 +102,11 @@ func TestWebAppAndShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staticFS, err := internal.NewFileMount("static", StaticEmbeddedFS, "")
+	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatesFS, err := internal.NewFileMount("templates", TemplatesEmbeddedFS, "")
+	templatesFS, err := mounts.NewFileMount("templates", TemplatesEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
