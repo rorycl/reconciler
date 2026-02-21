@@ -1,14 +1,18 @@
-# Reconciler Security
+## Reconciler Security
 
-**Revision C 21 February 2026**
+**Revision C: 21 February 2026**
+
+### Introduction
 
 The `Reconciler App` is a MIT-licensed desktop web app for helping
 charities reconcile their financial data between their financial and
 CRMS systems, currently focusing on Salesforce and Xero.
 
-Reconciler App users are required to have individual logins
-to Salesforce and Xero to use the App for reconciliation. The
-Reconciler App draws records over OAuth2 secured API connections into
+Reconciler App users are required to have individual logins to
+Salesforce and Xero to use the App for reconciliation. Platform API
+access keys are additionally required.
+
+The App draws records over OAuth2 secured API connections into
 a local database to assist users to update a field in Salesforce
 donation records to match an identifier from Xero invoices or bank
 transactions. This process allows an organisation to bring the
@@ -20,15 +24,16 @@ the security considerations of using the App and is written for
 a UK context. More information is provided at the project [Github
 repository](https://github.com/rorycl/reconciler).
 
-## Key guidance
+### Key guidance
 
-* Users of the Reconciler App should be cognisant of their personal
-and organisational responsibilities relating to working with the
-Personally Identifiable Information (PII) data held in the system.
+* Users of the Reconciler App should be cognisant of their personal and
+  organisational responsibilities relating to working with the
+  Personally Identifiable Information (PII) data held in the system.
 
 * Platform OAuth2 connections must be configured with PKCE verification,
   minimum permissions and the requirement for users to log in with their
-  own credentials. User credentials with MFA are recommended.
+  own credentials. User credentials with Multi-Factor Authentication
+  (MFA) are recommended.
 
 * The App should be used on a machine protected by a firewall.
 
@@ -39,18 +44,18 @@ Personally Identifiable Information (PII) data held in the system.
   protection against unauthorized access.
 
 * The App should be configured either to use an in-memory database,
-  which is automatically deleted when the app is closed, or to store its
-  database on a filesystem with robust protection against unauthorized
-  access. For security an in-memory database is recommended.
+  which is deleted when the app is closed, or to store its database on a
+  filesystem with robust protection against unauthorized access. For
+  security an in-memory database is recommended.
 
 * Users should be aware that closing the App will require them to log in
   again. After two hours of inactivity the current OAuth2 tokens held in
   memory will be deleted, also requiring the user to log in again.
 
-* Users utilising an on-file database should delete the database when it
-  is no longer needed.
+* Users utilising a file-based database should be aware this may expose
+  PII and delete the database when it is no longer needed.
 
-## Mode of operation
+### Mode of operation
 
 Reconciler is provided as a compiled Go binary from the project
 repository. The App is a cross-platform local webapp, to be run
@@ -66,7 +71,7 @@ are minimised and that PKCE verification is enforced.
 Users of the App should be required to authenticate with their own
 credentials via the browser. Only users who are able to successfully
 login to both remote platforms will be able to use the App. Access
-permission tokens are only held in memory on the local machine and
+permission tokens are held only in memory on the local machine and
 closing the App or a two hour period of inactivity will delete the
 tokens, requiring the user to log in again.
 
@@ -83,12 +88,12 @@ insertion into the local database may take several minutes.
 For Xero, only read-only API connections are made. All accounts
 records are stored in the local database, as are all invoices and
 bank transactions which have donation-related line items as defined
-by the configuration `donation_account_prefixes`. In future Xero
+by the configuration `donation_account_prefixes`. (In future Xero
 `Organisation` info is also likely to be needed to construct Xero
-`deep links`.
+`deep links`.)
 
 For Salesforce, sparse information is retrieved from the Opportunities
-(also known as "Donations") object as configured by the configured
+(also known as "Donations") object as set out in the configured
 `salesforce.query` SOQL query.
 
 After connection and data refresh, the App provides operations
@@ -104,7 +109,7 @@ cross-site request forgery (CSRF) attacks.
 Upon logging out the local json OAuth2 tokens are deleted from memory.
 Any in-memory database is also deleted.
 
-## Security considerations
+### Security considerations
 
 Broadly the security considerations fall into three areas.
 
@@ -112,7 +117,7 @@ Broadly the security considerations fall into three areas.
 2. Filesystem security
 3. Platform data
 
-### Authentication, Authorization and Connection security
+#### Authentication, Authorization and Connection security
 
 Users of the Reconciler App should be cognisant of their personal
 and organisational responsibilities relating to working with the
@@ -141,7 +146,7 @@ Connections to the remote platforms are defined as `https` encrypted
 to protect the security of communications. The local machine using
 the Reconciler App should be protected by a high-quality firewall.
 
-### Filesystem security
+#### Filesystem security
 
 As presently set up, Reconciler draws its configuration from a
 configuration file on disk and stores the remote records either in a
@@ -153,21 +158,20 @@ cause damage, as each user is required to provide additional login
 credentials to access the platforms. Nevertheless, the configuration
 file and credentials should be protected. Any suspected leak of
 credentials should be met with the immediate suspension of the
-connection setup on the platforms.
+connection setups on the platforms.
 
-Access to any on disk database might allow an attacker to access the
+Access to any on-disk database might allow an attacker to access the
 records in the system, including the Personally Identifiable Information
-(PII) therein relating to donations. While it is possible to run the
-database in memory this is likely to be inconvenient due to memory
-consumption and the time required to resynchronise all records. The
-database should be stored on a filesystem with robust protection against
-unauthorized access.
+(PII) therein relating to donations. Where it is feasible to run the
+database in memory this is preferable from a security standpoint, at the
+cost of additional time to download all the necessary records on
+startup. Any file-based database should be stored on a filesystem with
+robust protection against unauthorized access.
 
 Users should delete any local App database when it is no longer
-required. For security, the use of an in-memory database is recommended
-which obviates this need by deleting the local database on closure.
+required. The use of an in-memory database obviates this need.
 
-### Platform Data
+#### Platform Data
 
 While the Reconciler App is designed to only update a single custom
 field in Salesforce, it is possible a malicious user who has access
