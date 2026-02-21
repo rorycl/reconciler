@@ -9,7 +9,8 @@ func TestConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := config.DatabasePath, "./reconciliation.db"; got != want {
+	// file possibility: "./reconciliation.db"
+	if got, want := config.DatabasePath, ":memory:"; got != want {
 		t.Errorf("got %s want %s", got, want)
 	}
 

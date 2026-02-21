@@ -13,8 +13,8 @@ organisation_name: "Your Organisation"
 # For security or speed the special path ":memory:" can be used. However
 # beware that the system will have to sync _all_ data each time it is
 # used if an in-memory database is used.
-database_path: "./reconciliation.db"
-# database_path: ":memory:?cache=shared"
+# database_path: "./reconciliation.db"
+database_path: ":memory:"
 
 # The data date start is the date from which information should be
 # synchronised into the local system to effect reconciliation between
@@ -49,8 +49,7 @@ web:
 
 xero:
   client_id: "XERO_CLIENT_ID"
-  client_secret: "XERO_CLIENT_SECRET"
-  token_file_path: "./xero_token.json"
+  client_secret: "" # should not be provided for Xero PKCE connections.
 
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. An "8h" (8 hour)
@@ -80,7 +79,6 @@ salesforce:
   login_domain: "test.salesforce.com"
   client_id: "SALESFORCE_CONSUMER_KEY"
   client_secret: "SALESFORCE_CONSUMER_SECRET"
-  token_file_path: "./sf_token.json"
 
   # The token timeout is the time at which the refresh token will no
   # longer be valid or a sensible timeout value. This should match or be
