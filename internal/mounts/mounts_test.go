@@ -2,7 +2,6 @@ package internal
 
 import (
 	"embed"
-	_ "embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -120,7 +119,7 @@ func TestMounts(t *testing.T) {
 				}
 				// Otherwise check the error string.
 				if got, want := err.Error(), tt.wantErr.Error(); !strings.Contains(got, want) {
-					fmt.Errorf("error got %q want substring %q", got, want)
+					t.Errorf("error got %q want substring %q", got, want)
 				}
 				return
 			}

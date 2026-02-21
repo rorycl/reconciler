@@ -185,6 +185,9 @@ func PrintFS(thisFS fs.FS) (string, error) {
 		}
 		if !topSeen { // verbatim root as "[d] ./ (./)"
 			_, err = printOutput.WriteString(fmt.Sprintf(tpl, "\n", "d", ".", "/", "."))
+			if err != nil {
+				return fmt.Errorf("printOutput error: %v", err)
+			}
 			topSeen = true
 			return nil
 		}
