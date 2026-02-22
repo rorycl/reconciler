@@ -4,13 +4,7 @@
 */
 
 CREATE TABLE IF NOT EXISTS system (
-    id INTEGER PRIMARY KEY  -- Assuming only one row with id=1 for the desktop app
-
-    -- oauth2 token information
-    ,sf_token TEXT          -- marshalled oauth2.Token
-    ,sf_instance_url TEXT
-    ,xero_token TEXT        -- marshalled oauth2.Token
-    ,xero_tenant_id TEXT
+    id INTEGER PRIMARY KEY  -- Enforce only one row with id=1 for desktop
 
     -- data refresh metadata
     ,sf_data_refreshed DATETIME
@@ -20,9 +14,25 @@ CREATE TABLE IF NOT EXISTS system (
 -- Ensure only one row for applicaton state.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_single_row ON system ((1));
 
+-- organisation holds selected Xero organisation information.
+CREATE TABLE IF NOT EXISTS organisation (
+    id                        INTEGER PRIMARY KEY -- Enforce only one row with id=1 for desktop
+    ,name                     TEXT
+    ,legal_name               TEXT 
+    ,organisation_type        TEXT 
+    ,financial_year_end_day   INTEGER  
+    ,financial_year_end_month INTEGER
+    ,timezone                 TEXT 
+    ,shortcode                TEXT 
+    ,organisation_id          TEXT 
+);
+
+-- Ensure only one row for organisation.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_single_org ON organisation ((1));
+
 -- bank transactions holds Xero bank transactions.
 CREATE TABLE IF NOT EXISTS bank_transactions (
-    id                  TEXT PRIMARY KEY -- Use TEXT for UUIDs is common in SQLite
+    id                   TEXT PRIMARY KEY -- Use TEXT for UUIDs
     ,type                TEXT
     ,status              TEXT
     ,reference           TEXT

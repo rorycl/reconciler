@@ -10,6 +10,42 @@ import (
 	"time"
 )
 
+// OrganisationUpsert upserts Xero account records.
+func (db *DB) OrganisationUpsert(ctx context.Context, org xero.Organisation) error {
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback() // no-op after commit.
+	}()
+
+	stmt := db.orgUpsertStmt
+
+	namedArgs := map[string]any{
+		"Name":                  org.Name,
+		"LegalName":             org.LegalName,
+		"OrganisationType":      org.OrganisationType,
+		"FinancialYearEndDay":   org.FinancialYearEndDay,
+		"FinancialYearEndMonth": org.FinancialYearEndMonth,
+		"Timezone":              org.Timezone,
+		"ShortCode":             org.ShortCode,
+		"OrganisationID":        org.OrganisationID,
+	}
+	if err := stmt.verifyArgs(namedArgs); err != nil {
+		db.log.Error(fmt.Sprintf("organisation upsert verify arguments error: %v", err))
+		return fmt.Errorf("organisation upsert verify arguments error: %w", err)
+	}
+	_, err = stmt.ExecContext(ctx, namedArgs)
+	if err != nil {
+		db.log.Error(fmt.Sprintf("failed to upsert organisation %s: %v", org.OrganisationID, err))
+		return fmt.Errorf("failed to upsert organisation %s: %w", org.OrganisationID, err)
+	}
+	db.log.Info("successfully upserted organisation")
+	return tx.Commit()
+}
+
 // AccountsUpsert upserts Xero account records.
 func (db *DB) AccountsUpsert(ctx context.Context, accounts []xero.Account) error {
 	if len(accounts) == 0 {

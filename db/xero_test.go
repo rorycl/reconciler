@@ -17,15 +17,57 @@ import (
 // Index:
 // These tests test each testDB.go database funcion.
 //
-// Test01 AccountsUpsert(ctx context.Context, accounts []xero.Account) error
-// Test02 InvoicesGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error)
-// Test03 InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
-// Test04 BankTransactionsGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error)
-// Test05 BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error
-// Test07 InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error)
-// Test08 BankTransactionWRGet(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error)
+// Test OrganisationUpsert(ctx context.Context, org xero.Organisation) error
+// Test AccountsUpsert(ctx context.Context, accounts []xero.Account) error
+// Test InvoicesGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]Invoice, error)
+// Test InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
+// Test BankTransactionsGet(ctx context.Context, reconciliationStatus string, dateFrom, dateTo time.Time, search string, limit, offset int) ([]BankTransaction, error)
+// Test BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error
+// Test InvoiceWRGet(ctx context.Context, invoiceID string) (WRInvoice, []WRLineItem, error)
+// Test BankTransactionWRGet(ctx context.Context, transactionID string) (WRTransaction, []WRLineItem, error)
 
-func Test01_AccountsUpsert(t *testing.T) {
+func Test_OrganisationUpsert(t *testing.T) {
+
+	testDB, closeDB := setupTestDB(t)
+	t.Cleanup(closeDB)
+	ctx := context.Background()
+
+	org := xero.Organisation{
+		Name:                  "abc",
+		LegalName:             "def",
+		OrganisationType:      "charity",
+		FinancialYearEndDay:   1,
+		FinancialYearEndMonth: 5,
+		Timezone:              "StrangeXeroString",
+		ShortCode:             "!NXpl!",
+		OrganisationID:        "709b07f5-100b-11f1-aab3-7404f143aa1c",
+	}
+
+	err := testDB.OrganisationUpsert(ctx, org)
+	if err != nil {
+		t.Errorf("unexpected organisation error: %v", err)
+	}
+
+	var count int
+	err = testDB.GetContext(ctx, &count, "SELECT COUNT(*) FROM organisation")
+	if err != nil || count != 1 {
+		t.Errorf("Expected to find 1 organisation after upsert, but got count %d, err: %v", count, err)
+	}
+
+	result, err := testDB.ExecContext(ctx, "DELETE FROM organisation")
+	if err != nil {
+		t.Errorf("unexpected error in organisation deletion: %v", err)
+	}
+	rowNo, err := result.RowsAffected()
+	if err != nil {
+		t.Fatalf("could not get rows affected: %v", err)
+	}
+	if got, want := int(rowNo), 1; got != want {
+		t.Errorf("Deleted count got %d want %d", got, want)
+	}
+}
+
+func Test_AccountsUpsert(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -84,8 +126,8 @@ func Test01_AccountsUpsert(t *testing.T) {
 	}
 }
 
-// Test02_InvoicesQuery tests searching the database invoice records.
-func Test02_InvoicesQuery(t *testing.T) {
+// Test_InvoicesQuery tests searching the database invoice records.
+func Test_InvoicesQuery(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -274,8 +316,8 @@ func Test02_InvoicesQuery(t *testing.T) {
 	}
 }
 
-// Test03_InvoicesUpsert tests upserting invoices.
-func Test03_InvoicesUpsert(t *testing.T) {
+// Test_InvoicesUpsert tests upserting invoices.
+func Test_InvoicesUpsert(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -345,8 +387,8 @@ func Test03_InvoicesUpsert(t *testing.T) {
 
 }
 
-// Test04_BankTransactionsQuery tests searching the database bank transactions.
-func Test04_BankTransactionsQuery(t *testing.T) {
+// Test_BankTransactionsQuery tests searching the database bank transactions.
+func Test_BankTransactionsQuery(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -512,9 +554,9 @@ func Test04_BankTransactionsQuery(t *testing.T) {
 	}
 }
 
-// Test05 BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error
+// Test BankTransactionsUpsert(ctx context.Context, transactions []xero.BankTransaction) error
 // Todo: remove bank account data except for name.
-func Test05_BankTransactionsUpsert(t *testing.T) {
+func Test_BankTransactionsUpsert(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -575,8 +617,8 @@ func Test05_BankTransactionsUpsert(t *testing.T) {
 
 }
 
-// Test07_InvoiceWithLineItemsQuery tests retrieving an invoice with line items.
-func Test07_InvoiceWithLineItemsQuery(t *testing.T) {
+// Test_InvoiceWithLineItemsQuery tests retrieving an invoice with line items.
+func Test_InvoiceWithLineItemsQuery(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)
@@ -677,9 +719,9 @@ func Test07_InvoiceWithLineItemsQuery(t *testing.T) {
 	}
 }
 
-// Test08_BankTransactionsWithLineItemsQuery tests retrieving a bank transactions with
+// Test_BankTransactionsWithLineItemsQuery tests retrieving a bank transactions with
 // line items.
-func Test08_BankTransactionsWithLineItemsQuery(t *testing.T) {
+func Test_BankTransactionsWithLineItemsQuery(t *testing.T) {
 
 	testDB, closeDB := setupTestDB(t)
 	t.Cleanup(closeDB)

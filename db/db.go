@@ -70,6 +70,7 @@ type DB struct {
 	log          *slog.Logger
 
 	// Prepared statements.
+	orgUpsertStmt     *parameterizedStmt
 	accountUpsertStmt *parameterizedStmt
 
 	invoicesGetStmt     *parameterizedStmt
@@ -243,6 +244,11 @@ func (db *DB) SetLogLevel(lvl slog.Level) {
 func (db *DB) prepareNamedStatements() error {
 	var err error
 
+	// Organisation.
+	db.orgUpsertStmt, err = db.prepNamedStatement(db.sqlFS, "organisation_upsert.sql")
+	if err != nil {
+		return fmt.Errorf("organisation upsert statement error: %w", err)
+	}
 	// Accounts.
 	db.accountUpsertStmt, err = db.prepNamedStatement(db.sqlFS, "account_upsert.sql")
 	if err != nil {
