@@ -440,9 +440,23 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 		web.log.Info("Xero client authenticated successfully.")
 
-		// Retrieve the Xero accounts, bank transactions and invoices.
+		// Retrieve the Xero organisation details, accounts, bank transactions and invoices.
 		// The following steps ideally would update the content at the end of the
 		// templates/refresh #data-refresh-updates div.
+
+		// Organisation -- also put org shortcode in session
+		organisation, err := xeroClient.GetOrganisation(ctx)
+		if err != nil {
+			logAndPrintErrorToWeb(w, "organisation retrieval error: %v", err)
+			return
+		}
+
+		if err := web.db.OrganisationUpsert(ctx, organisation); err != nil {
+			logAndPrintErrorToWeb(w, "failed to upsert organisation record: %v", err)
+			return
+		}
+
+		web.sessions.Put(ctx, "xero-shortcode", organisation.ShortCode)
 
 		// Accounts
 		accounts, err := xeroClient.GetAccounts(ctx, dataStartDate)
@@ -799,26 +813,25 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		}
 		invoiceID := vars["id"]
 
-		// Get salesforce instance url from the session (via OAuth2 token)
-		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
-
 		data := struct {
-			PageTitle string
-			Invoice   db.WRInvoice
-			LineItems []viewLineItem
-			ID        string
-			DFK       string // for Invoices, this is the Invoice Number
-			TabType   string
-			Typer     string
+			PageTitle     string
+			Invoice       db.WRInvoice
+			LineItems     []viewLineItem
+			ID            string
+			DFK           string // for Invoices, this is the Invoice Number
+			TabType       string
+			Typer         string
+			ShortCode     string
+			SFInstanceURL string
 			// Donation Search Dates
 			DonationSearchStart, DonationSearchEnd time.Time
-			SFInstanceURL                          string
 		}{
 			PageTitle:     fmt.Sprintf("Invoice %s", invoiceID),
 			ID:            invoiceID,
 			TabType:       "link", // by default the donations tab type is "link", not "find"
 			Typer:         "invoice",
-			SFInstanceURL: instanceURL,
+			ShortCode:     web.sessions.GetString(ctx, "xero-shortcode"),
+			SFInstanceURL: web.sessions.GetString(ctx, "salesforce-instance-url"),
 		}
 
 		var lineItems []db.WRLineItem
