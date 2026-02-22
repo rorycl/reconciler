@@ -160,7 +160,7 @@ func validateAndPrepare(c *Config) error {
 		return errors.New("xero.client_id is missing")
 	}
 	if xc.ClientSecret != "" {
-		return errors.New("xero.client_secret should not be provided for Xero PKCE connections.")
+		return errors.New("xero.client_secret should not be provided for Xero PKCE connections")
 	}
 	if xc.TokenTimeout == "" {
 		return errors.New("xero.token_timeout is missing")
