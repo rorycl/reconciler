@@ -276,7 +276,7 @@ func TestGetInvoices_APIError(t *testing.T) {
 func TestGetOrganisation(t *testing.T) {
 
 	getOrgFunc := func(client *Client) (Organisation, error) {
-		return client.getOrganisation(context.Background())
+		return client.GetOrganisation(context.Background())
 	}
 
 	org, err := testNoPagination(

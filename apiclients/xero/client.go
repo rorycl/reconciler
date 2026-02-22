@@ -290,7 +290,7 @@ func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTran
 
 // GET https://api.xero.com/api.xro/2.0/Organisation
 // Retrieve organisation info, primarily for the short code.
-func (c *Client) getOrganisation(ctx context.Context) (Organisation, error) {
+func (c *Client) GetOrganisation(ctx context.Context) (Organisation, error) {
 
 	requestURL := fmt.Sprintf("%s/Organisation", c.baseURL)
 	req, err := c.newRequest(ctx, "GET", requestURL, time.Time{}, nil)
