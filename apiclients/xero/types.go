@@ -83,6 +83,24 @@ type Connection struct {
 	TenantName string `json:"tenantName"`
 }
 
+// OrganisationsResponse is the top-level structure of an Organisation API response.
+type OrganisationsResponse struct {
+	Organisations []Organisation `json:"Organisations"`
+}
+
+// Organisation represents the organisation details. The ShortCode is needed for deep
+// linking. This is a partial marshalling of the available data only.
+type Organisation struct {
+	Name                  string `json:"Name"`
+	LegalName             string `json:"LegalName"`
+	OrganisationType      string `json:"OrganisationType"`
+	FinancialYearEndDay   int    `json:"FinancialYearEndDay"`
+	FinancialYearEndMonth int    `json:"FinancialYearEndMonth"`
+	Timezone              string `json:"Timezone"`
+	ShortCode             string `json:"ShortCode"`
+	OrganisationID        string `json:"organisationID"`
+}
+
 // BankTransactionsResponse is the top-level structure of the API response.
 type BankTransactionsResponse struct {
 	BankTransactions []BankTransaction `json:"BankTransactions"`

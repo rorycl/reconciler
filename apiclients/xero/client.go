@@ -288,6 +288,31 @@ func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTran
 	return response.BankTransactions[0], nil
 }
 
+// GET https://api.xero.com/api.xro/2.0/Organisation
+// Retrieve organisation info, primarily for the short code.
+func (c *Client) getOrganisation(ctx context.Context) (Organisation, error) {
+
+	requestURL := fmt.Sprintf("%s/Organisation", c.baseURL)
+	req, err := c.newRequest(ctx, "GET", requestURL, time.Time{}, nil)
+	if err != nil {
+		return Organisation{}, err
+	}
+
+	var response OrganisationsResponse
+	if _, err := do(c, req, &response); err != nil {
+		c.log.Error(fmt.Sprintf("getOrganisation: failed to retrieve record: %v", err))
+		return Organisation{}, err
+	}
+
+	if len(response.Organisations) == 0 {
+		c.log.Error("getOrganisation: failed to retrieve record/s")
+		return Organisation{}, errors.New("no organisation found")
+	}
+	c.log.Info("getOrgansisation successful")
+	return response.Organisations[0], nil
+
+}
+
 // newRequest is a helper to create a new HTTP request with common headers.
 func (c *Client) newRequest(ctx context.Context, method, url string, ifModifiedSince time.Time, body []byte) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -346,9 +371,6 @@ func do[T any](c *Client, req *http.Request, v *T) (*http.Response, error) {
 
 	return resp, nil
 }
-
-// GET https://api.xero.com/api.xro/2.0/Organisation
-// func getOrgansisation tbc : retrieve organisation info including short code.
 
 // getTenantID fetches the list of connections and returns the first TenantID found.
 // Todo: check suitability of choosing the first connection.

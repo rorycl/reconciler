@@ -272,8 +272,33 @@ func TestGetInvoices_APIError(t *testing.T) {
 	}
 }
 
+// TestGetOrganisation verifies the Organisation API call.
+func TestGetOrganisation(t *testing.T) {
+
+	getOrgFunc := func(client *Client) (Organisation, error) {
+		return client.getOrganisation(context.Background())
+	}
+
+	org, err := testNoPagination(
+		t,
+		"/Organisation",      // endpoint
+		"organisations.json", // json file to serve
+		getOrgFunc,           // the api function to call
+	)
+	if err != nil {
+		t.Fatalf("testNoPagination returned an unexpected error: %v", err)
+	}
+
+	if got, want := org.ShortCode, "!D-pl!"; got != want {
+		t.Errorf("got ShortCode %s organisationID, want %s", got, want)
+	}
+	if got, want := org.OrganisationID, "938df673-e41d-4731-b0bf-33206287936c"; got != want {
+		t.Errorf("got organisationID %s organisationID, want %s", got, want)
+	}
+}
+
 // TestLineItemHasWantedAccount checks if an invoice or bank-transaction has a line item
-// (which is commen to both) which matches the account regexp.
+// (which is common to both types) which matches the account regexp.
 func TestLineItemHasWantedAccount(t *testing.T) {
 
 	lis := []LineItem{

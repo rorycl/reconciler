@@ -64,3 +64,17 @@ func TestInvoicesType(t *testing.T) {
 		t.Errorf("got %d invoices, want %d", got, want)
 	}
 }
+
+func TestOrganisationsType(t *testing.T) {
+	b, err := os.ReadFile("testdata/organisations.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var o OrganisationsResponse
+	if err := json.Unmarshal(b, &o); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(o.Organisations), 1; got != want {
+		t.Errorf("got %d organisations, want %d", got, want)
+	}
+}
