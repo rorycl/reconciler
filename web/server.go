@@ -617,8 +617,8 @@ func (web *WebApp) handleInvoices() http.Handler {
 // handleBankTransactions serves the /bank-transactions bank transactions list.
 func (web *WebApp) handleBankTransactions() http.Handler {
 
-	name := "bank_transactions.html"
-	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "bank_transactions.html"}
+	name := "bank-transactions.html"
+	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "bank-transactions.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

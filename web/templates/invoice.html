@@ -21,7 +21,9 @@
             <div>
                 <h3 class="text-xs text-slate-800 font-semibold">Number</h3>
                 <p class="pb-2 border-b-2 border-dotted border-slate-400"><span class="pr-2">{{ .Invoice.InvoiceNumber }}</span>
-                    <a href="https://go.xero.com/app/{{ .ShortCode }}/invoicing/view/{{ .Invoice.ID }}" class="text-xs text-sky-700 font-semibold hover:underline">view in Xero</a>
+                    <a href="https://go.xero.com/app/{{ .ShortCode }}/invoicing/view/{{ .Invoice.ID }}"
+                       target="_blank"
+                       class="text-xs text-sky-700 font-semibold hover:underline">view in Xero</a>
                 </p>
             </div>
             <div>
