@@ -538,6 +538,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 	name := "invoices.html"
 	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "invoices.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+	dataStartDate := web.cfg.DataStartDate
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -559,18 +560,20 @@ func (web *WebApp) handleInvoices() http.Handler {
 		// Prepare data for the template, allowing passing of validation
 		// errors back to the template if necessary.
 		data := struct {
-			PageTitle   string
-			Invoices    []db.Invoice
-			Form        *SearchForm
-			Validator   *Validator
-			Pagination  *Pagination
-			CurrentPage string
+			PageTitle     string
+			Invoices      []db.Invoice
+			Form          *SearchForm
+			Validator     *Validator
+			Pagination    *Pagination
+			CurrentPage   string
+			DataStartDate time.Time
 		}{
-			PageTitle:   "Invoices",
-			Form:        form,
-			Validator:   validator,
-			Pagination:  pagination,
-			CurrentPage: "invoices",
+			PageTitle:     "Invoices",
+			Form:          form,
+			Validator:     validator,
+			Pagination:    pagination,
+			CurrentPage:   "invoices",
+			DataStartDate: dataStartDate,
 		}
 
 		// Render template with errors and return if the form is invalid.
@@ -620,6 +623,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 	name := "bank-transactions.html"
 	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "bank-transactions.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+	dataStartDate := web.cfg.DataStartDate
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -647,12 +651,14 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			Validator        *Validator
 			Pagination       *Pagination
 			CurrentPage      string
+			DataStartDate    time.Time
 		}{
-			PageTitle:   "Bank Transactions",
-			Form:        form,
-			Validator:   validator,
-			Pagination:  pagination,
-			CurrentPage: "bank-transactions",
+			PageTitle:     "Bank Transactions",
+			Form:          form,
+			Validator:     validator,
+			Pagination:    pagination,
+			CurrentPage:   "bank-transactions",
+			DataStartDate: dataStartDate,
 		}
 
 		// Render template with errors and return if the form is invalid.
@@ -702,6 +708,7 @@ func (web *WebApp) handleDonations() http.Handler {
 	name := "donations.html"
 	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "donations.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+	dataStartDate := web.cfg.DataStartDate
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -736,6 +743,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			PageType      string
 			GetURL        string
 			SFInstanceURL string
+			DataStartDate time.Time
 		}{
 			PageTitle:     "Donations",
 			Form:          form,
@@ -746,6 +754,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			PageType:      "direct", // indirect pages are htmx pages that have an hx target
 			GetURL:        "/donations",
 			SFInstanceURL: instanceURL,
+			DataStartDate: dataStartDate,
 		}
 
 		// Render template with errors and return if the form is invalid.
