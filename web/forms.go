@@ -105,21 +105,26 @@ type SearchForm struct {
 
 // defaultDateToAndFrom sets the default dateFrom and dateTo dates.
 // Todo: set this from settings.
-func defaultDateToAndFrom() (time.Time, time.Time) {
+func defaultDateToAndFrom(s, e *time.Time) (time.Time, time.Time) {
 	now := time.Now().UTC()
 	year := now.Year()
-	if now.Month() < time.April {
-		year--
+	var df, dt time.Time
+	if s == nil {
+		df = time.Date(year-1, time.April, 1, 0, 0, 0, 0, time.UTC)
+	} else {
+		df = *s
 	}
-
-	df := time.Date(year, time.April, 1, 0, 0, 0, 0, time.UTC)
-	dt := time.Date(year+1, time.March, 31, 0, 0, 0, 0, time.UTC)
+	if e == nil {
+		dt = time.Date(year+1, time.April, 1, 0, 0, 0, 0, time.UTC)
+	} else {
+		dt = *e
+	}
 	return df, dt
 }
 
 // NewSearchForm creates a SearchForm with defaults.
-func NewSearchForm() *SearchForm {
-	dateFrom, dateTo := defaultDateToAndFrom()
+func NewSearchForm(startDate, endDate *time.Time) *SearchForm {
+	dateFrom, dateTo := defaultDateToAndFrom(startDate, endDate)
 	return &SearchForm{
 		ReconciliationStatus: "NotReconciled",
 		DateFrom:             dateFrom,
@@ -162,8 +167,8 @@ type SearchDonationsForm struct {
 }
 
 // NewSearchDonationsForm creates a SearchDonationsForm with defaults.
-func NewSearchDonationsForm() *SearchDonationsForm {
-	dateFrom, dateTo := defaultDateToAndFrom()
+func NewSearchDonationsForm(startDate, endDate *time.Time) *SearchDonationsForm {
+	dateFrom, dateTo := defaultDateToAndFrom(startDate, endDate)
 	return &SearchDonationsForm{
 		LinkageStatus: "NotLinked",
 		DateFrom:      dateFrom,

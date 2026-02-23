@@ -20,10 +20,17 @@ func newRequest(t *testing.T, urlString string) *http.Request {
 	return r
 }
 
+func ptrTime(ti time.Time) *time.Time {
+	return &ti
+}
+
 // TestSearchForm tests the SearchForm behaviour
 func TestSearchForm(t *testing.T) {
 
-	defaultDateFrom, defaultDateTo := defaultDateToAndFrom()
+	defaultDateFrom, defaultDateTo := defaultDateToAndFrom(
+		ptrTime(time.Date(2025, time.April, 1, 0, 0, 0, 0, time.UTC)),
+		nil,
+	)
 
 	tests := []struct {
 		name           string
@@ -151,7 +158,7 @@ func TestSearchForm(t *testing.T) {
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 			simulatedRequest := newRequest(t, tt.inputURL)
-			form := NewSearchForm()
+			form := NewSearchForm(ptrTime(defaultDateFrom), ptrTime(defaultDateTo))
 			if err := DecodeURLParams(simulatedRequest, form); err != nil {
 				if tt.err != err {
 					t.Fatalf("unexpected error: %v", err)
