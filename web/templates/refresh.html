@@ -23,8 +23,10 @@
             <h3 class="font-semibold">Refresh Xero and Salesforce records</h3>
 
             <p class="pb-2 pt-4 text-sm mb-3">
-            This action will retrieve Xero accounts and donation-related bank transaction and
-            invoice records, and Salesdorce donation (opportunity) records to store locally.
+            This action will 
+            {{ if not .Refreshed }} retrieve {{ else }} update {{ end }}
+            Xero accounts, donation-related bank transactions and,
+            invoices, Salesdorce donation (opportunity) records and store them locally.
             </p>
 
             <p class="pb-2 text-sm mb-3">
@@ -46,8 +48,8 @@
                 Refresh
             </button>
             {{ else }}
-            <p class="text-sky-800 font-bold py-4">
-            Data was last refreshed at {{ .LastRefresh.Format "15:04" }}.
+            <p class="py-2">
+            Data was last refreshed at <span class="text-bold">{{ .LastRefresh.Format "15:04" }}</span>
             </p>
             <button hx-get="/refresh/update"
                     hx-target="#data-refresh-updates"
@@ -57,10 +59,16 @@
             >
                 Refresh Changed Records
             </button>
-            <button onclick="location.href='/home'"
-                    class="bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors"
-            >
-                Return to Home
+
+            <p class="pt-4">
+            Or return to the home page. 
+            </p>
+            <p class="pt-2 pb-2">
+                <a href="/home" class="inline-block border-2 border-sky-700 text-sky-700 font-bold py-1 px-3 rounded hover:bg-indigo-100 transition-colors">
+                    Home
+                </a>
+            </p>
+
             </button>
             {{ end }}
 

@@ -44,10 +44,12 @@
         </div>
     </div>
     {{ if and (.XeroTokenIsValid) (.SFTokenIsValid) }}
-    <div class="prose pt-4">
-        <p class="pb-4">Please continue to the data refresh page.</p>
+    <div class="prose py-2">
+        <p class="py-2">
+        You are connected. Continue to data refresh.
+        </p>
         <p class="pb-4">
-            <a href="/refresh" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
+            <a href="/refresh" class="inline-block border-2 border-sky-700 text-sky-700 font-bold py-1 px-3 rounded hover:bg-indigo-100 transition-colors">
                 Refresh
             </a>
         </p>
