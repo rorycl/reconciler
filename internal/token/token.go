@@ -154,26 +154,24 @@ func (et *ExtendedToken) fixSalesForceToken() error {
 // ReuseOrRefresh attempts to use or refresh an ExtendedToken using the provided context
 // and oauth2.Config. The config.TokenSource func automatically refreshes tokens when
 // needed. The function returns whether refreshing occurred and any error.
-func (et *ExtendedToken) ReuseOrRefresh(ctx context.Context, config *oauth2.Config) (bool, error) {
-	var refreshed bool
+func (et *ExtendedToken) ReuseOrRefresh(ctx context.Context, config *oauth2.Config) error {
 
 	tok := config.TokenSource(ctx, et.Token)
 	possibleNewToken, err := tok.Token()
 	if err != nil {
-		return refreshed, fmt.Errorf("could not reuse or refresh token: %w", err)
+		return fmt.Errorf("could not reuse or refresh token: %w", err)
 	}
 
 	// Check if refreshing occured. If not, return early.
 	if possibleNewToken.AccessToken == et.Token.AccessToken {
-		return refreshed, nil
+		return nil
 	}
-	refreshed = true
 	et.Token = possibleNewToken
 
 	if et.Type == SalesforceToken {
 		if err := et.fixSalesForceToken(); err != nil {
-			return refreshed, fmt.Errorf("could not fix reused/new salesforce token: %w", err)
+			return fmt.Errorf("could not fix reused/new salesforce token: %w", err)
 		}
 	}
-	return refreshed, nil
+	return nil
 }
