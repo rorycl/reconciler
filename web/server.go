@@ -302,13 +302,20 @@ func (web *WebApp) handleConnect() http.Handler {
 
 		ctx := r.Context()
 
-		xeroToken, _ := web.getValidTokenFromSession(ctx, token.XeroToken)
-		sfToken, _ := web.getValidTokenFromSession(ctx, token.SalesforceToken)
+		var xeroTokenValid, sfTokenValid bool
+		_, err := web.getValidTokenFromSession(ctx, token.XeroToken)
+		if err == nil {
+			xeroTokenValid = true
+		}
+		_, err = web.getValidTokenFromSession(ctx, token.SalesforceToken)
+		if err == nil {
+			sfTokenValid = true
+		}
 
 		data := map[string]any{
 			"Organisation":     web.cfg.Organisation,
-			"XeroTokenIsValid": xeroToken.IsValid(sessionOKValidity),
-			"SFTokenIsValid":   sfToken.IsValid(sessionOKValidity),
+			"XeroTokenIsValid": xeroTokenValid,
+			"SFTokenIsValid":   sfTokenValid,
 		}
 		web.render(w, r, templates, name, data)
 	})
