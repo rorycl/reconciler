@@ -46,9 +46,22 @@
                 Refresh
             </button>
             {{ else }}
-            <p class="inline-block text-sky-800 font-bold py-2">
-            The data has successfully been refreshed!
+            <p class="text-sky-800 font-bold py-4">
+            Data was last refreshed at {{ .LastRefresh.Format "15:04" }}.
             </p>
+            <button hx-get="/refresh/update"
+                    hx-target="#data-refresh-updates"
+                    hx-indicator="#loading-spinner"
+                    class="bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors"
+                    _="on click toggle @disabled"
+            >
+                Refresh Changed Records
+            </button>
+            <button onclick="location.href='/home'"
+                    class="bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors"
+            >
+                Return to Home
+            </button>
             {{ end }}
 
             <!-- loading spinner (div should be hidden until button above is clicked) -->
@@ -62,16 +75,5 @@
 
         </div>
     </div>
-
-    {{ if .Refreshed }}
-    <div class="my-4 text-center">
-        <p class="text-sm text-slate-600 py-4 py-4">
-        Data has been refreshed within the last 15 minutes at {{ .LastRefresh.Format "15:04" }}.
-        </p>
-        <a href="/home" class="bg-green-600 text-white font-bold py-2 px-6 rounded hover:bg-green-700 transition-colors">
-            Continue to App
-        </a>
-    </div>
-    {{ end }}
 </div>
 {{ end }}

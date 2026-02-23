@@ -44,7 +44,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -366,14 +365,13 @@ func (web *WebApp) handleRefresh() http.Handler {
 
 		// Todo: Refresh data is best determined by database data freshness.
 		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
-		m15, _ := time.ParseDuration("15m")
+		m15, _ := time.ParseDuration("4h")
 		var refreshed bool
 		if time.Now().Add(-1 * m15).Before(lastRefresh) {
 			refreshed = true
 		} else {
 			refreshed = false
 		}
-		web.sessions.Put(ctx, "refreshed", refreshed)
 
 		data := map[string]any{
 			"DataStartDate":        dataStartDate,
@@ -394,125 +392,93 @@ func (web *WebApp) handleRefresh() http.Handler {
 func (web *WebApp) handleRefreshUpdates() http.Handler {
 
 	dataStartDate := web.cfg.DataStartDate
-
-	logAndPrintErrorToWeb := func(w io.Writer, format string, a ...any) {
-		web.log.Error(fmt.Sprintf(format, a...))
-	}
-
-	logAndPrintToWeb := func(w io.Writer, format string, a ...any) {
-		web.log.Info(fmt.Sprintf(format, a...))
-		// Writing output here doesn't work because it will be buffered.
-		// Todo: consider SSE solution.
-		// _, _ = fmt.Fprintf(w, format, a)
-	}
+	accountsRegexp := web.cfg.DonationAccountCodesAsRegex()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		ctx := r.Context()
 
 		// Retrieve the oauth2 tokens from the session
-		xeroToken, _ := web.getValidTokenFromSession(ctx, token.XeroToken)
-		sfToken, _ := web.getValidTokenFromSession(ctx, token.SalesforceToken)
-
-		// Determine if refreshing needs to occur. If it does, set the refresh time to 2
-		// minutes before the last refresh to deal with any slow updates on the remote
-		// platform. This uses the fact that an empty call for the refreshed-datetime
-		// session var will return a time.Time.IsZero() time.
-		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
-		refreshDeadline := time.Now().Add(-3 * time.Minute)
-		var refreshed bool
-		if refreshDeadline.After(lastRefresh) {
-			refreshed = false
-		} else {
-			refreshed = true
-			lastRefresh = lastRefresh.Add(-2 * time.Minute)
+		xeroToken, err := web.getValidTokenFromSession(ctx, token.XeroToken)
+		if err != nil {
+			// Todo: report errors to client.
+			web.log.Error(fmt.Sprintf("failed to refresh xero token: %v", err))
+			http.Redirect(w, r, "/refresh", http.StatusFound)
+			return
 		}
-		web.sessions.Put(ctx, "refreshed", refreshed)
-		web.log.Info(fmt.Sprintf("Refresh status: %t", refreshed))
+
+		sfToken, err := web.getValidTokenFromSession(ctx, token.SalesforceToken)
+		if err != nil {
+			// Todo: report errors to client.
+			web.log.Error(fmt.Sprintf("failed to refresh saleforce token: %v", err))
+			http.Redirect(w, r, "/refresh", http.StatusFound)
+			return
+		}
+
+		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
+		if !lastRefresh.IsZero() {
+			lastRefresh = lastRefresh.Add(-1 * time.Minute)
+		}
 		web.log.Info(fmt.Sprintf("Refresh last refresh: %s", lastRefresh.Format(time.DateTime)))
 
 		// Connect the Xero client.
 		xeroClient, err := xero.NewClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
 		if err != nil {
-			// Todo: consider redirect to /connect.
-			web.ServerError(w, r, fmt.Errorf("failed to create xero client: %w", err))
+			// Todo: report errors to client.
+			web.log.Error(fmt.Sprintf("failed to create xero client: %v", err))
+			http.Redirect(w, r, "/refresh", http.StatusFound)
 			return
 		}
 		web.log.Info("Xero client authenticated successfully.")
 
-		// Retrieve the Xero organisation details, accounts, bank transactions and invoices.
-		// The following steps ideally would update the content at the end of the
-		// templates/refresh #data-refresh-updates div.
-
-		// Organisation -- also put org shortcode in session
-		organisation, err := xeroClient.GetOrganisation(ctx)
-		if err != nil {
-			logAndPrintErrorToWeb(w, "organisation retrieval error: %v", err)
-			return
-		}
-
-		if err := web.db.OrganisationUpsert(ctx, organisation); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert organisation record: %v", err)
-			return
-		}
-
-		web.sessions.Put(ctx, "xero-shortcode", organisation.ShortCode)
-
-		// Accounts
-		accounts, err := xeroClient.GetAccounts(ctx, dataStartDate)
-		if err != nil {
-			logAndPrintErrorToWeb(w, "accounts retrieval error: %v", err)
-			return
-		}
-
-		if err := web.db.AccountsUpsert(ctx, accounts); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert account records: %v", err)
-			return
-		}
-
-		// Bank Transactions
-		transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh, web.accountsRegexp)
-		if err != nil {
-			logAndPrintErrorToWeb(w, "bank transaction retrieval error: %v", err)
-			return
-		}
-
-		if err = web.db.BankTransactionsUpsert(ctx, transactions); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert bank transactions: %v", err)
-			return
-		}
-
-		// Invoices
-		invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh, web.accountsRegexp)
-		if err != nil {
-			logAndPrintErrorToWeb(w, "invoices retrieval error: %v", err)
-			return
-		}
-
-		if err := web.db.InvoicesUpsert(ctx, invoices); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert invoices: %v", err)
-			return
-		}
-
-		// Retrieve the Salesforce donations.
+		// Connect the Salesforce client.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
 		if err != nil {
-			// consider redirect to /connect
-			logAndPrintErrorToWeb(w, "donations new client error: %v", err)
-			return
-		}
-		donations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefresh)
-		if err != nil {
-			logAndPrintErrorToWeb(w, "failed to retrieve donations: %v", err)
-			return
-		}
-		logAndPrintToWeb(w, "retrieved %d donations", len(donations))
-		if err := web.db.UpsertDonations(ctx, donations); err != nil {
-			logAndPrintErrorToWeb(w, "failed to upsert donations: %v", err)
+			// Todo: report errors to client.
+			web.log.Error(fmt.Sprintf("failed to create salesforce client: %v", err))
+			http.Redirect(w, r, "/refresh", http.StatusFound)
 			return
 		}
 
-		logAndPrintToWeb(w, "Refresh successfully completed.")
+		// Retrieve and upsert the Xero records.
+		infoMap, err := refreshXeroRecords(
+			ctx,
+			xeroClient,
+			web.db,
+			web.log,
+			dataStartDate,
+			lastRefresh,
+			accountsRegexp,
+		)
+		if err != nil {
+			// Todo: report errors to client.
+			web.log.Error(fmt.Sprintf("failed to refresh Xero records: %v", err))
+			http.Redirect(w, r, "/refresh", http.StatusFound)
+			return
+		}
+
+		// Set the xero shortcode in the session if applicable.
+		if shortCode, ok := infoMap["xero-shortcode"]; ok {
+			web.sessions.Put(ctx, "xero-shortcode", shortCode)
+		}
+
+		// Retrieve and upsert the Salesforce records.
+		err = refreshSalesforceRecords(
+			ctx,
+			sfClient,
+			web.db,
+			web.log,
+			dataStartDate,
+			lastRefresh,
+		)
+		if err != nil {
+			// Todo: report errors to client.
+			web.log.Error(fmt.Sprintf("failed to refresh Salesforce records: %v", err))
+			http.Redirect(w, r, "/refresh", http.StatusFound)
+			return
+		}
+
+		web.log.Info("Refresh successfully completed.")
 
 		// Update session information
 		web.sessions.Put(ctx, "refreshed", true)
@@ -544,7 +510,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 
 		ctx := r.Context()
 
-		form := NewSearchForm()
+		form := NewSearchForm(&web.cfg.DataStartDate, nil)
 		if err := DecodeURLParams(r, form); err != nil {
 			web.ServerError(w, r, err)
 			return
@@ -629,7 +595,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 
 		ctx := r.Context()
 
-		form := NewSearchForm()
+		form := NewSearchForm(&web.cfg.DataStartDate, nil)
 		if err := DecodeURLParams(r, form); err != nil {
 			web.ServerError(w, r, err)
 			return
@@ -714,7 +680,7 @@ func (web *WebApp) handleDonations() http.Handler {
 
 		ctx := r.Context()
 
-		form := NewSearchDonationsForm()
+		form := NewSearchDonationsForm(&web.cfg.DataStartDate, nil)
 		if err := DecodeURLParams(r, form); err != nil {
 			web.ServerError(w, r, err)
 			return
@@ -1057,7 +1023,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 		typer := vars["type"]
 		id := vars["id"]
 
-		form := NewSearchDonationsForm()
+		form := NewSearchDonationsForm(&web.cfg.DataStartDate, nil)
 		if err := DecodeURLParams(r, form); err != nil {
 			web.ServerError(w, r, err)
 		}
@@ -1393,10 +1359,6 @@ func (web *WebApp) getValidTokenFromSession(ctx context.Context, typer token.Tok
 		return nil, ErrTokenMissingOrInvalid
 	}
 
-	if et.IsValid(sessionOKValidity) {
-		return &et, nil
-	}
-
 	// Try and refresh the token.
 	var cfg *oauth2.Config
 	switch typer {
@@ -1405,13 +1367,9 @@ func (web *WebApp) getValidTokenFromSession(ctx context.Context, typer token.Tok
 	case token.XeroToken:
 		cfg = web.cfg.Xero.OAuth2Config
 	}
-	refreshed, err := et.ReuseOrRefresh(ctx, cfg)
+	err := et.ReuseOrRefresh(ctx, cfg)
 	if err != nil {
 		web.log.Warn(fmt.Sprintf("%s token error on refresh: %v", typer, err))
-		return nil, ErrTokenMissingOrInvalid
-	}
-	if !refreshed {
-		web.log.Warn(fmt.Sprintf("%s token could not be refreshed", typer))
 		return nil, ErrTokenMissingOrInvalid
 	}
 
