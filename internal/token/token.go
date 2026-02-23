@@ -70,23 +70,6 @@ func NewExtendedToken(typer TokenType, token *oauth2.Token) (*ExtendedToken, err
 	return et, nil
 }
 
-// IsValid checks if the token is valid or if a refresh token exists to get a new token.
-// Tokens that expire after the expirationDuration will be considered invalid. This is
-// on the assumption that the validity period of tokens AND refresh tokens is known.
-func (et *ExtendedToken) IsValid(expirationDuration time.Duration) bool {
-	if et == nil {
-		return false
-	}
-	if et.Token.Expiry.IsZero() {
-		return false
-	}
-	projectedExpiry := time.Now().UTC().Add(-1 * expirationDuration)
-	if !et.Token.Expiry.After(projectedExpiry) {
-		return false
-	}
-	return et.Token.Valid() || et.Token.RefreshToken != ""
-}
-
 // fixSalesforceTokenExpiry fixes the "IsZero" expiry of Saleforce's tokens.
 // sf tokens are something like the following. Annoyingly, the expiration time is set to
 // the Go zero time. This causes the TokenIsValid check to fail.
@@ -162,7 +145,7 @@ func (et *ExtendedToken) ReuseOrRefresh(ctx context.Context, config *oauth2.Conf
 		return fmt.Errorf("could not reuse or refresh token: %w", err)
 	}
 
-	// Check if refreshing occured. If not, return early.
+	// If no refresh occurred, return early.
 	if possibleNewToken.AccessToken == et.Token.AccessToken {
 		return nil
 	}

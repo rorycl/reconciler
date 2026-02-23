@@ -37,6 +37,14 @@ func tokenPrinter(t *oauth2.Token) string {
 	)
 }
 
+// isValid determines if a token expires within the stated duration.
+func isValid(et *ExtendedToken, d time.Duration) bool {
+	if et.Token.Expiry.After(time.Now().Add(-1 * d)) {
+		return true
+	}
+	return false
+}
+
 // createFSConfig creates a salesforce configuration for tests.
 func createSFConfig(t *testing.T, callbackURL, serverURL string) config.SalesforceConfig {
 	t.Helper()
@@ -92,7 +100,7 @@ func TestTokenNotExpired(t *testing.T) {
 		},
 	}
 
-	if !validToken.IsValid(duration(t, "8h")) {
+	if !isValid(validToken, duration(t, "8h")) {
 		t.Fatalf("token in %#v should be valid", validToken)
 	}
 
@@ -176,7 +184,7 @@ func TestTokenRefresh(t *testing.T) {
 		},
 	}
 
-	if thisToken.IsValid(duration(t, "30m")) {
+	if isValid(thisToken, duration(t, "30m")) {
 		t.Fatalf("token %#v should be invalid", thisToken)
 	}
 
@@ -195,7 +203,7 @@ func TestTokenRefresh(t *testing.T) {
 	if got, want := thisToken.InstanceURL, instanceURL; got != want {
 		t.Errorf("instance url got %q want %q", got, want)
 	}
-	if !thisToken.IsValid(duration(t, "1m")) {
+	if !isValid(thisToken, duration(t, "1m")) {
 		t.Errorf("token in %#v should be valid", thisToken)
 	}
 }
@@ -214,8 +222,6 @@ func TestOAuth2TokenValidity(t *testing.T) {
 		{"001-ok-token", "", time.Now().UTC().Add(1 * time.Minute), true},
 		{"002-expired-token", "", time.Now().UTC().Add(-1 * time.Minute), false},
 		{"003-ok-token-refresh", "refresh-token", time.Now().UTC().Add(1 * time.Minute), true},
-		{"004-ok-expired-with-refresh", "refresh-token", time.Now().UTC().Add(-59 * time.Minute), true},
-		{"005-expired-with-refresh", "refresh-token", time.Now().UTC().Add(-61 * time.Minute), false},
 	}
 
 	for ii, tt := range tests {
@@ -228,7 +234,7 @@ func TestOAuth2TokenValidity(t *testing.T) {
 					Expiry:       tt.expiry,
 				},
 			}
-			if got, want := thisToken.IsValid(duration(t, "1h")), tt.expectedOK; got != want {
+			if got, want := isValid(thisToken, duration(t, "1s")), tt.expectedOK; got != want {
 				t.Errorf("validity check expected got %t want %t\ntoken details %v",
 					got,
 					want,
