@@ -108,9 +108,12 @@ func TestTokenNotExpired(t *testing.T) {
 		Salesforce: createSFConfig(t, "/callback/sf", server.URL),
 	}
 
-	err := validToken.ReuseOrRefresh(context.Background(), cfg.Salesforce.OAuth2Config)
+	refreshed, err := validToken.ReuseOrRefresh(context.Background(), cfg.Salesforce.OAuth2Config)
 	if err != nil {
 		t.Fatalf("ReuseOrRefresh returned an error: %v", err)
+	}
+	if got, want := refreshed, false; got != want {
+		t.Errorf("refreshed got %t want %t", got, want)
 	}
 	if got, want := validToken.InstanceURL, instanceURL; got != want {
 		t.Errorf("instance url got %q want %q", got, want)
@@ -193,9 +196,12 @@ func TestTokenRefresh(t *testing.T) {
 	}
 
 	// Run NewClient.
-	err := thisToken.ReuseOrRefresh(context.Background(), cfg.Salesforce.OAuth2Config)
+	refreshed, err := thisToken.ReuseOrRefresh(context.Background(), cfg.Salesforce.OAuth2Config)
 	if err != nil {
 		t.Fatalf("ReuseOrRefresh returned an error: %v", err)
+	}
+	if got, want := refreshed, true; got != want {
+		t.Errorf("refreshed got %t want %t", got, want)
 	}
 	if !refreshCalled {
 		t.Error("expected token refresh endpoint to be called, but it wasn't")
