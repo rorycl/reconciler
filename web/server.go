@@ -804,6 +804,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 			TabType       string
 			Typer         string
 			ShortCode     string
+			CurrentPage   string
 			SFInstanceURL string
 			// Donation Search Dates
 			DonationSearchStart, DonationSearchEnd time.Time
@@ -813,6 +814,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 			TabType:       "link", // by default the donations tab type is "link", not "find"
 			Typer:         "invoice",
 			ShortCode:     web.sessions.GetString(ctx, "xero-shortcode"),
+			CurrentPage:   "invoice-detail",
 			SFInstanceURL: web.sessions.GetString(ctx, "salesforce-instance-url"),
 		}
 
@@ -868,6 +870,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 			DFK         string // for Transactions , this is the Reference
 			TabType     string
 			Typer       string
+			CurrentPage string
 			// Donation Search Dates
 			DonationSearchStart, DonationSearchEnd time.Time
 			SFInstanceURL                          string
@@ -876,6 +879,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 			ID:            transactionReference,
 			TabType:       "link", // by default the donations tab type is "link", not "find"
 			Typer:         "bank-transaction",
+			CurrentPage:   "transaction-detail",
 			SFInstanceURL: instanceURL,
 		}
 
@@ -1374,7 +1378,7 @@ func (web *WebApp) getValidTokenFromSession(ctx context.Context, typer token.Tok
 	case token.XeroToken:
 		cfg = web.cfg.Xero.OAuth2Config
 	}
-	err := et.ReuseOrRefresh(ctx, cfg)
+	refreshed, err := et.ReuseOrRefresh(ctx, cfg)
 	if err != nil {
 		web.log.Warn(fmt.Sprintf("%s token error on refresh: %v", typer, err))
 		return nil, ErrTokenMissingOrInvalid
@@ -1382,7 +1386,11 @@ func (web *WebApp) getValidTokenFromSession(ctx context.Context, typer token.Tok
 
 	// Update the session with the new token.
 	web.sessions.Put(ctx, typer.SessionName(), et)
-	web.log.Info(fmt.Sprintf("%s token updated in session", typer))
+	if refreshed {
+		web.log.Info(fmt.Sprintf("%s token refreshed in session", typer))
+	} else {
+		web.log.Info(fmt.Sprintf("%s token reused", typer))
+	}
 
 	return &et, nil
 }

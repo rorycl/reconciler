@@ -1,10 +1,10 @@
 {{ define "nav" }}
 {{ $focusStyle := "text-sky-700 border-b-2 border-sky-700 pb-1" }}
 {{ $unFocusStyle := "text-slate-500 border-b-2 border-transparent pb-1 hover:text-sky-700" }}
-{{ $focused := false }}
-{{ if .PageTitle }}{{ if eq .PageTitle "Invoices" }}{{ $focused = true }}{{ end }}{{ end }}
 <div class="flex items-center space-x-4 text-sm font-medium">
-    <a href="/home" class="{{ if $focused }}{{ $focusStyle }}{{ else }}{{ $unFocusStyle }}{{ end }}">Home</a>
+    <a href="/invoices" class="{{ if eq .CurrentPage "invoices" }}{{ $focusStyle }}{{ else }}{{ $unFocusStyle }}{{ end }}">Invoices</a>
+    <a href="/bank-transactions" class="{{ if eq .CurrentPage "bank-transactions" }}{{ $focusStyle }}{{ else }}{{ $unFocusStyle }}{{ end }}">Bank Transactions</a>
+    <a href="/donations" class="{{ if eq .CurrentPage "donations" }}{{ $focusStyle }}{{ else }}{{ $unFocusStyle }}{{ end }}">Donations</a>
     <a href="/refresh" class="{{ $unFocusStyle }}">Refresh</a>
     <a href="/logout" class="{{ $unFocusStyle }}">Logout</a>
 </div>

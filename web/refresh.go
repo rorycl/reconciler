@@ -14,9 +14,10 @@ import (
 // refreshXeroRecords retrieves the Xero organisation details, accounts, bank
 // transactions and invoices (depending on lastUpdate) and inserts these in the
 // database. If lastUpdate is time.IsZero, all records are provided. Otherwise, only
-// update the invoices and bank transactions modified since lastUpdate.
+// the invoices and bank transactions modified since lastUpdate are updated.
 //
-// Information requiring to be returned can be added to the returnMap.
+// Information requiring to be returned can be added to the returnMap, for example
+// needed to update session information.
 func refreshXeroRecords(
 	ctx context.Context,
 	xeroClient *xero.Client,
@@ -30,7 +31,8 @@ func refreshXeroRecords(
 	fullUpdate := lastUpdate.IsZero()
 	returnMap := map[string]string{}
 
-	// Organisation -- also put org shortcode in session
+	// Organisation
+	// Note that the shortcode is needed in the session.
 	if fullUpdate {
 		organisation, err := xeroClient.GetOrganisation(ctx)
 		if err != nil {
@@ -78,7 +80,9 @@ func refreshXeroRecords(
 	return returnMap, nil
 }
 
-// refreshSalesforceRecords retrieves the Salesforce donation (opportunity) records.
+// refreshSalesforceRecords retrieves the Salesforce donation (opportunity) records. If
+// lastUpdate is time.IsZero() get all records, otherwise only get those modified since
+// lastUpdate.
 func refreshSalesforceRecords(
 	ctx context.Context,
 	sfClient *salesforce.Client,
