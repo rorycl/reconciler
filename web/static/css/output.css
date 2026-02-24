@@ -22,6 +22,8 @@
     --color-blue-100: oklch(93.2% 0.032 255.585);
     --color-indigo-100: oklch(93% 0.034 272.788);
     --color-indigo-300: oklch(78.5% 0.115 274.713);
+    --color-indigo-800: oklch(39.8% 0.195 277.366);
+    --color-indigo-950: oklch(25.7% 0.09 281.288);
     --color-slate-50: oklch(98.4% 0.003 247.858);
     --color-slate-100: oklch(96.8% 0.007 247.896);
     --color-slate-200: oklch(92.9% 0.013 255.508);
@@ -259,9 +261,6 @@
   .my-2 {
     margin-block: calc(var(--spacing) * 2);
   }
-  .my-4 {
-    margin-block: calc(var(--spacing) * 4);
-  }
   .me-2 {
     margin-inline-end: calc(var(--spacing) * 2);
   }
@@ -352,11 +351,17 @@
   .max-w-xs {
     max-width: var(--container-xs);
   }
+  .min-w-2\/10 {
+    min-width: calc(2/10 * 100%);
+  }
   .min-w-3\/8 {
     min-width: calc(3/8 * 100%);
   }
   .min-w-3\/10 {
     min-width: calc(3/10 * 100%);
+  }
+  .min-w-4\/10 {
+    min-width: calc(4/10 * 100%);
   }
   .min-w-full {
     min-width: 100%;
@@ -548,9 +553,6 @@
   .bg-green-100 {
     background-color: var(--color-green-100);
   }
-  .bg-green-600 {
-    background-color: var(--color-green-600);
-  }
   .bg-indigo-100 {
     background-color: var(--color-indigo-100);
   }
@@ -593,9 +595,6 @@
   .px-4 {
     padding-inline: calc(var(--spacing) * 4);
   }
-  .px-6 {
-    padding-inline: calc(var(--spacing) * 6);
-  }
   .py-0 {
     padding-block: calc(var(--spacing) * 0);
   }
@@ -634,6 +633,9 @@
   }
   .pb-4 {
     padding-bottom: calc(var(--spacing) * 4);
+  }
+  .pl-2 {
+    padding-left: calc(var(--spacing) * 2);
   }
   .text-center {
     text-align: center;
@@ -690,6 +692,9 @@
   .text-green-700 {
     color: var(--color-green-700);
   }
+  .text-indigo-950 {
+    color: var(--color-indigo-950);
+  }
   .text-red-500 {
     color: var(--color-red-500);
   }
@@ -698,9 +703,6 @@
   }
   .text-red-700 {
     color: var(--color-red-700);
-  }
-  .text-sky-600 {
-    color: var(--color-sky-600);
   }
   .text-sky-700 {
     color: var(--color-sky-700);
@@ -768,13 +770,6 @@
     &:hover {
       @media (hover: hover) {
         border-bottom-color: var(--color-slate-200);
-      }
-    }
-  }
-  .hover\:bg-green-700 {
-    &:hover {
-      @media (hover: hover) {
-        background-color: var(--color-green-700);
       }
     }
   }
