@@ -307,9 +307,12 @@ func (web *WebApp) handleConnect() http.Handler {
 		if err == nil {
 			xeroTokenValid = true
 		}
-		_, err = web.getValidTokenFromSession(ctx, token.SalesforceToken)
+		sfTok, err := web.getValidTokenFromSession(ctx, token.SalesforceToken)
 		if err == nil {
 			sfTokenValid = true
+		}
+		if sfTokenValid {
+			web.sessions.Put(ctx, "salesforce-instance-url", sfTok.InstanceURL)
 		}
 
 		data := map[string]any{
@@ -345,13 +348,17 @@ func (web *WebApp) handleLogout() http.Handler {
 func (web *WebApp) handleLogoutConfirmed() http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 		ctx := r.Context()
+
+		// Clear the session.
 		err := web.sessions.Clear(ctx)
 		if err != nil {
 			web.log.Error(fmt.Sprintf("Sesssion clear error: %v", err))
 		} else {
 			web.log.Info("Session cleared")
 		}
+
 		http.Redirect(w, r, "/connect", http.StatusFound)
 	})
 }
@@ -539,6 +546,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			Validator     *Validator
 			Pagination    *Pagination
 			CurrentPage   string
+			ShortCode     string
 			DataStartDate time.Time
 		}{
 			PageTitle:     "Invoices",
@@ -546,6 +554,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			Validator:     validator,
 			Pagination:    pagination,
 			CurrentPage:   "invoices",
+			ShortCode:     web.sessions.GetString(ctx, "xero-shortcode"),
 			DataStartDate: dataStartDate,
 		}
 
