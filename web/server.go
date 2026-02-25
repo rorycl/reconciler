@@ -461,6 +461,7 @@ func (web *WebApp) handleHome() http.Handler {
 // handleInvoices serves the /invoices list.
 func (web *WebApp) handleInvoices() http.Handler {
 
+	thisURL := "/invoices"
 	name := "invoices.html"
 	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "invoices.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
@@ -480,6 +481,17 @@ func (web *WebApp) handleInvoices() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 
+		// If the url is 'naked', redirect to the default.
+		if r.URL.RawQuery == "" {
+			urlParams, err := form.AsURLParams()
+			if err != nil {
+				web.ServerError(w, r, err)
+			}
+			redirectURL := thisURL + "?" + urlParams
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
 		// Determine the last refresh time of Xero data. Note this can be
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
@@ -495,18 +507,13 @@ func (web *WebApp) handleInvoices() http.Handler {
 			if err != nil {
 				web.ServerError(w, r, err)
 			}
-			redirectURL := "/invoices?" + urlParams
+			redirectURL := thisURL + "?" + urlParams
 
 			_, err = web.refreshXeroRecords(ctx)
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list invoices: refresh data error: %v", err))
 			}
-			http.Redirect(
-				w,
-				r,
-				redirectURL,
-				http.StatusSeeOther,
-			)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 		}
 
 		// Initialise pagination for default state.
@@ -579,6 +586,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 // handleBankTransactions serves the /bank-transactions bank transactions list.
 func (web *WebApp) handleBankTransactions() http.Handler {
 
+	thisURL := "/bank-transactions"
 	name := "bank-transactions.html"
 	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "bank-transactions.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
@@ -598,6 +606,17 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 
+		// If the url is 'naked', redirect to the default.
+		if r.URL.RawQuery == "" {
+			urlParams, err := form.AsURLParams()
+			if err != nil {
+				web.ServerError(w, r, err)
+			}
+			redirectURL := thisURL + "?" + urlParams
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
 		// Determine the last refresh time of Xero data. Note this can be
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
@@ -613,18 +632,14 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			if err != nil {
 				web.ServerError(w, r, err)
 			}
-			redirectURL := "/bank-transactions?" + urlParams
+			redirectURL := thisURL + "?" + urlParams
 
 			_, err = web.refreshXeroRecords(ctx)
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list bank-transactions: refresh data error: %v", err))
 			}
-			http.Redirect(
-				w,
-				r,
-				redirectURL,
-				http.StatusSeeOther,
-			)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
 		}
 
 		// Initialise pagination for default state.
@@ -695,6 +710,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 // handleDonations serves the /donations list of donations.
 func (web *WebApp) handleDonations() http.Handler {
 
+	thisURL := "/donations"
 	name := "donations.html"
 	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "donations.html"}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
@@ -714,6 +730,17 @@ func (web *WebApp) handleDonations() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 
+		// If the url is 'naked', redirect to the default.
+		if r.URL.RawQuery == "" {
+			urlParams, err := form.AsURLParams()
+			if err != nil {
+				web.ServerError(w, r, err)
+			}
+			redirectURL := thisURL + "?" + urlParams
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
 		// Determine the last refresh time of Salesforce data. Note this can be
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
@@ -729,18 +756,13 @@ func (web *WebApp) handleDonations() http.Handler {
 			if err != nil {
 				web.ServerError(w, r, err)
 			}
-			redirectURL := "/donations?" + urlParams
+			redirectURL := thisURL + "?" + urlParams
 
 			err = web.refreshSalesforceRecords(ctx)
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list donations: refresh data error: %v", err))
 			}
-			http.Redirect(
-				w,
-				r,
-				redirectURL,
-				http.StatusSeeOther,
-			)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 		}
 
 		// Initialise pagination for default state.
