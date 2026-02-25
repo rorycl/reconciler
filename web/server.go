@@ -53,7 +53,6 @@ import (
 	"time"
 
 	"reconciler/apiclients/salesforce"
-	"reconciler/apiclients/xero"
 	"reconciler/config"
 	"reconciler/db"
 	"reconciler/internal/token"
@@ -378,13 +377,17 @@ func (web *WebApp) handleRefresh() http.Handler {
 		ctx := r.Context()
 
 		// Todo: Refresh data is best determined by database data freshness.
-		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
-		m15, _ := time.ParseDuration("4h")
 		var refreshed bool
-		if time.Now().Add(-1 * m15).Before(lastRefresh) {
+		var lastRefresh time.Time
+		xeroLastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
+		sfLastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
+		if !xeroLastRefresh.IsZero() && !sfLastRefresh.IsZero() {
 			refreshed = true
-		} else {
-			refreshed = false
+			if xeroLastRefresh.Before(sfLastRefresh) {
+				lastRefresh = xeroLastRefresh
+			} else {
+				lastRefresh = sfLastRefresh
+			}
 		}
 
 		data := map[string]any{
@@ -405,65 +408,12 @@ func (web *WebApp) handleRefresh() http.Handler {
 // the time windows smaller.
 func (web *WebApp) handleRefreshUpdates() http.Handler {
 
-	dataStartDate := web.cfg.DataStartDate
-	accountsRegexp := web.cfg.DonationAccountCodesAsRegex()
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		ctx := r.Context()
 
-		// Retrieve the oauth2 tokens from the session
-		xeroToken, err := web.getValidTokenFromSession(ctx, token.XeroToken)
-		if err != nil {
-			// Todo: report errors to client.
-			web.log.Error(fmt.Sprintf("failed to refresh xero token: %v", err))
-			http.Redirect(w, r, "/refresh", http.StatusFound)
-			return
-		}
-
-		sfToken, err := web.getValidTokenFromSession(ctx, token.SalesforceToken)
-		if err != nil {
-			// Todo: report errors to client.
-			web.log.Error(fmt.Sprintf("failed to refresh saleforce token: %v", err))
-			http.Redirect(w, r, "/refresh", http.StatusFound)
-			return
-		}
-
-		lastRefresh := web.sessions.GetTime(ctx, "refreshed-datetime")
-		if !lastRefresh.IsZero() {
-			lastRefresh = lastRefresh.Add(-1 * time.Minute)
-		}
-		web.log.Info(fmt.Sprintf("Refresh last refresh: %s", lastRefresh.Format(time.DateTime)))
-
-		// Connect the Xero client.
-		xeroClient, err := xero.NewClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
-		if err != nil {
-			// Todo: report errors to client.
-			web.log.Error(fmt.Sprintf("failed to create xero client: %v", err))
-			http.Redirect(w, r, "/refresh", http.StatusFound)
-			return
-		}
-		web.log.Info("Xero client authenticated successfully.")
-
-		// Connect the Salesforce client.
-		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
-		if err != nil {
-			// Todo: report errors to client.
-			web.log.Error(fmt.Sprintf("failed to create salesforce client: %v", err))
-			http.Redirect(w, r, "/refresh", http.StatusFound)
-			return
-		}
-
 		// Retrieve and upsert the Xero records.
-		infoMap, err := refreshXeroRecords(
-			ctx,
-			xeroClient,
-			web.db,
-			web.log,
-			dataStartDate,
-			lastRefresh,
-			accountsRegexp,
-		)
+		infoMap, err := web.refreshXeroRecords(ctx)
 		if err != nil {
 			// Todo: report errors to client.
 			web.log.Error(fmt.Sprintf("failed to refresh Xero records: %v", err))
@@ -477,14 +427,7 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 
 		// Retrieve and upsert the Salesforce records.
-		err = refreshSalesforceRecords(
-			ctx,
-			sfClient,
-			web.db,
-			web.log,
-			dataStartDate,
-			lastRefresh,
-		)
+		err = web.refreshSalesforceRecords(ctx)
 		if err != nil {
 			// Todo: report errors to client.
 			web.log.Error(fmt.Sprintf("failed to refresh Salesforce records: %v", err))
@@ -493,10 +436,6 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		}
 
 		web.log.Info("Refresh successfully completed.")
-
-		// Update session information
-		web.sessions.Put(ctx, "refreshed", true)
-		web.sessions.Put(ctx, "refreshed-datetime", time.Now())
 
 		// Redirect to invoices
 		w.Header().Set("HX-Redirect", "/invoices")
@@ -534,6 +473,35 @@ func (web *WebApp) handleInvoices() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 
+		// Determine the last refresh time of Xero data. Note this can be
+		// time.Time.IsZero(), but it is unlikely since the user has already run a
+		// refresh to get to this handler.
+		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
+		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(10 * time.Second)
+
+		// If refresh is called and form is valid, do a xero data refresh then redirect
+		// back to the current page.
+		if validator.Valid() && form.Refresh {
+
+			// Make redirect url
+			urlParams, err := form.AsURLParams()
+			if err != nil {
+				web.ServerError(w, r, err)
+			}
+			redirectURL := "/invoices?" + urlParams
+
+			_, err = web.refreshXeroRecords(ctx)
+			if err != nil {
+				web.log.Error(fmt.Sprintf("list invoices: refresh data error: %v", err))
+			}
+			http.Redirect(
+				w,
+				r,
+				redirectURL,
+				http.StatusSeeOther,
+			)
+		}
+
 		// Initialise pagination for default state.
 		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
 
@@ -548,6 +516,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			CurrentPage   string
 			ShortCode     string
 			DataStartDate time.Time
+			LastRefreshed time.Duration
 		}{
 			PageTitle:     "Invoices",
 			Form:          form,
@@ -556,6 +525,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			CurrentPage:   "invoices",
 			ShortCode:     web.sessions.GetString(ctx, "xero-shortcode"),
 			DataStartDate: dataStartDate,
+			LastRefreshed: lastRefreshed,
 		}
 
 		// Render template with errors and return if the form is invalid.
@@ -621,6 +591,35 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 
+		// Determine the last refresh time of Xero data. Note this can be
+		// time.Time.IsZero(), but it is unlikely since the user has already run a
+		// refresh to get to this handler.
+		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
+		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(10 * time.Second)
+
+		// If refresh is called and form is valid, do a xero data refresh then redirect
+		// back to the current page.
+		if validator.Valid() && form.Refresh {
+
+			// Make redirect url
+			urlParams, err := form.AsURLParams()
+			if err != nil {
+				web.ServerError(w, r, err)
+			}
+			redirectURL := "/bank-transactions?" + urlParams
+
+			_, err = web.refreshXeroRecords(ctx)
+			if err != nil {
+				web.log.Error(fmt.Sprintf("list bank-transactions: refresh data error: %v", err))
+			}
+			http.Redirect(
+				w,
+				r,
+				redirectURL,
+				http.StatusSeeOther,
+			)
+		}
+
 		// Initialise pagination for default state.
 		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
 
@@ -634,6 +633,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			Pagination       *Pagination
 			CurrentPage      string
 			DataStartDate    time.Time
+			LastRefreshed    time.Duration
 		}{
 			PageTitle:     "Bank Transactions",
 			Form:          form,
@@ -641,6 +641,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			Pagination:    pagination,
 			CurrentPage:   "bank-transactions",
 			DataStartDate: dataStartDate,
+			LastRefreshed: lastRefreshed,
 		}
 
 		// Render template with errors and return if the form is invalid.
@@ -706,6 +707,35 @@ func (web *WebApp) handleDonations() http.Handler {
 		validator := NewValidator()
 		form.Validate(validator)
 
+		// Determine the last refresh time of Salesforce data. Note this can be
+		// time.Time.IsZero(), but it is unlikely since the user has already run a
+		// refresh to get to this handler.
+		lastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
+		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(10 * time.Second)
+
+		// If refresh is called and form is valid, do a salesforce data refresh then
+		// redirect back to the current page.
+		if validator.Valid() && form.Refresh {
+
+			// Make redirect url
+			urlParams, err := form.AsURLParams()
+			if err != nil {
+				web.ServerError(w, r, err)
+			}
+			redirectURL := "/donations?" + urlParams
+
+			err = web.refreshSalesforceRecords(ctx)
+			if err != nil {
+				web.log.Error(fmt.Sprintf("list donations: refresh data error: %v", err))
+			}
+			http.Redirect(
+				w,
+				r,
+				redirectURL,
+				http.StatusSeeOther,
+			)
+		}
+
 		// Initialise pagination for default state.
 		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
 
@@ -726,6 +756,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			GetURL        string
 			SFInstanceURL string
 			DataStartDate time.Time
+			LastRefreshed time.Duration
 		}{
 			PageTitle:     "Donations",
 			Form:          form,
@@ -737,6 +768,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			GetURL:        "/donations",
 			SFInstanceURL: instanceURL,
 			DataStartDate: dataStartDate,
+			LastRefreshed: lastRefreshed,
 		}
 
 		// Render template with errors and return if the form is invalid.
