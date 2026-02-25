@@ -21,13 +21,13 @@ func (web *WebApp) refreshXeroRecords(ctx context.Context) (map[string]string, e
 	dataStartDate := web.cfg.DataStartDate
 	accountsRegexp := web.cfg.DonationAccountCodesAsRegex()
 
-	sessDTKey := "xero-refreshed-datetime"
+	sessionRefreshKey := "xero-refreshed-datetime"
 	updateStart := time.Now()
 
 	// Get the last refreshed time.
-	lastRefresh := web.sessions.GetTime(ctx, sessDTKey)
+	lastRefresh := web.sessions.GetTime(ctx, sessionRefreshKey)
 	if !lastRefresh.IsZero() {
-		lastRefresh = lastRefresh.Add(-1 * time.Minute) // window for platform updates
+		lastRefresh = lastRefresh.Add(refreshDurationWindow) // window for platform updates
 	}
 	web.log.Info(fmt.Sprintf("Xero last refresh: %s", lastRefresh.Format(time.DateTime)))
 
@@ -96,25 +96,25 @@ func (web *WebApp) refreshXeroRecords(ctx context.Context) (map[string]string, e
 	web.log.Info(fmt.Sprintf("retrieved and upserted %d invoice records successfully", len(invoices)))
 
 	// Update the session key
-	web.sessions.Put(ctx, sessDTKey, updateStart)
+	web.sessions.Put(ctx, sessionRefreshKey, updateStart)
 
 	return returnMap, nil
 }
 
 // refreshSalesforceRecords retrieves the Salesforce donation (opportunity) records. If
-// lastRefresh is time.IsZero() get all records, otherwise only get those modified since
-// lastRefresh.
+// lastRefresh is time.IsZero() sfUpdate will simply get all records, otherwise only get
+// those modified since lastRefresh.
 func (web *WebApp) refreshSalesforceRecords(ctx context.Context) error {
 
 	dataStartDate := web.cfg.DataStartDate
 
-	sessDTKey := "sf-refreshed-datetime"
+	sessionRefreshKey := "sf-refreshed-datetime"
 	updateStart := time.Now()
 
 	// Get the last refreshed time.
-	lastRefresh := web.sessions.GetTime(ctx, sessDTKey)
+	lastRefresh := web.sessions.GetTime(ctx, sessionRefreshKey)
 	if !lastRefresh.IsZero() {
-		lastRefresh = lastRefresh.Add(-1 * time.Minute) // window for platform updates
+		lastRefresh = lastRefresh.Add(refreshDurationWindow) // window for platform updates
 	}
 	web.log.Info(fmt.Sprintf("Salesforce last refresh: %s", lastRefresh.Format(time.DateTime)))
 
@@ -143,7 +143,7 @@ func (web *WebApp) refreshSalesforceRecords(ctx context.Context) error {
 	web.log.Info(fmt.Sprintf("retrieved and upserted %d donations records successfully", len(donations)))
 
 	// Update the session key
-	web.sessions.Put(ctx, sessDTKey, updateStart)
+	web.sessions.Put(ctx, sessionRefreshKey, updateStart)
 
 	return nil
 }

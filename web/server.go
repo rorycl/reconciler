@@ -76,6 +76,13 @@ var StaticEmbeddedFS embed.FS
 //go:embed templates
 var TemplatesEmbeddedFS embed.FS
 
+// refreshDurationWindow is the duration window given for a remote platform to update
+// it's records.
+var refreshDurationWindow = time.Duration(1000000000 * 15) // 15s
+
+// refreshTrucation is the user-oriented refresh rounding duration.
+var refreshTruncation = time.Duration(1000000000 * 10) // 10s
+
 // WebApp is the configuration object for the web server.
 type WebApp struct {
 	log            *slog.Logger
@@ -477,7 +484,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
-		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(10 * time.Second)
+		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(refreshTruncation)
 
 		// If refresh is called and form is valid, do a xero data refresh then redirect
 		// back to the current page.
@@ -595,7 +602,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
-		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(10 * time.Second)
+		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(refreshTruncation)
 
 		// If refresh is called and form is valid, do a xero data refresh then redirect
 		// back to the current page.
@@ -711,7 +718,7 @@ func (web *WebApp) handleDonations() http.Handler {
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
-		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(10 * time.Second)
+		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(refreshTruncation)
 
 		// If refresh is called and form is valid, do a salesforce data refresh then
 		// redirect back to the current page.
@@ -1278,7 +1285,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			return
 		}
 
-		timeStamp := time.Now()
+		sfLastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
 
 		// Update the donations. If it is an unlink action, update the dfk with "", else
 		// the actual dfk from the bank transaction or invoice.
@@ -1291,7 +1298,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 		// Upsert the updated opportunities.
 		// The refresh window is rough; double upserts shouldn't be a major issue.
-		updatedDonations, err := sfClient.GetOpportunities(ctx, dataStartDate, timeStamp.Add(-2*time.Minute))
+		updatedDonations, err := sfClient.GetOpportunities(ctx, dataStartDate, sfLastRefresh.Add(refreshDurationWindow))
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to upsert the linked opportunities: %v", err))
 			return
