@@ -183,6 +183,8 @@ func TestSearchForm(t *testing.T) {
 // TestAsURLParams tests encoding to parameters.
 func TestAsURLParams(t *testing.T) {
 
+	// xero url
+
 	want := `date-from=2025-06-01&date-to=2025-07-01&page=1&search=search+string&status=NotReconciled`
 
 	sf := &SearchForm{
@@ -200,6 +202,28 @@ func TestAsURLParams(t *testing.T) {
 	if got != want {
 		t.Errorf("in AsURLParams got:\n%v\nwant:\n:%v\n", got, want)
 	}
+
+	// salesforce url
+
+	want = `date-from=2025-06-01&date-to=2025-07-01&page=1&payout-reference=payout-ref&search=search+string&status=All`
+
+	sdf := &SearchDonationsForm{
+		LinkageStatus:   "All",
+		DateFrom:        time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		DateTo:          time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC),
+		PayoutReference: "payout-ref",
+		SearchString:    "search string",
+		Page:            1,
+		Refresh:         true,
+	}
+	got, err = sdf.AsURLParams()
+	if err != nil {
+		t.Fatalf("unexpected salesforce AsURLParams error: %v", err)
+	}
+	if got != want {
+		t.Errorf("in salesforce AsURLParams got:\n%v\nwant:\n:%v\n", got, want)
+	}
+
 }
 
 // TestURLParse tests the validQuery function.

@@ -170,13 +170,22 @@ func (f *SearchForm) Offset() int {
 // SearchDonationsForm represents the URL query parameter filters for
 // donations.
 type SearchDonationsForm struct {
-	LinkageStatus   string    `schema:"status"`
-	DateFrom        time.Time `schema:"date-from"`
-	DateTo          time.Time `schema:"date-to"`
-	PayoutReference string    `schema:"payout-reference"`
-	SearchString    string    `schema:"search"`
-	Page            int       `schema:"page"`
-	Refresh         bool      `schema:"refresh"`
+	LinkageStatus   string    `schema:"status" url:"status"`
+	DateFrom        time.Time `schema:"date-from" url:"date-from" layout:"2006-01-02"`
+	DateTo          time.Time `schema:"date-to" url:"date-to" layout:"2006-01-02"`
+	PayoutReference string    `schema:"payout-reference" url:"payout-reference"`
+	SearchString    string    `schema:"search" url:"search"`
+	Page            int       `schema:"page" url:"page"`
+	Refresh         bool      `schema:"refresh" url:"-"`
+}
+
+// AsURLParams encodes a SearchForm as parameters for after the "?" in a url
+func (s *SearchDonationsForm) AsURLParams() (string, error) {
+	v, err := query.Values(s)
+	if err != nil {
+		return "", err // unlikely
+	}
+	return v.Encode(), nil
 }
 
 // NewSearchDonationsForm creates a SearchDonationsForm with defaults.
