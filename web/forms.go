@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/google/go-querystring/query"
 	"github.com/gorilla/schema"
 )
 
@@ -96,11 +97,21 @@ func validMuxVars(vars map[string]string, keys ...string) (map[string]string, er
 // SearchForm represents the URL query parameter filters (invoices, bank
 // transactions, and so on.)
 type SearchForm struct {
-	ReconciliationStatus string    `schema:"status"`
-	DateFrom             time.Time `schema:"date-from"`
-	DateTo               time.Time `schema:"date-to"`
-	SearchString         string    `schema:"search"`
-	Page                 int       `schema:"page"`
+	ReconciliationStatus string    `schema:"status" url:"status"`
+	DateFrom             time.Time `schema:"date-from" url:"date-from" layout:"2006-01-02"`
+	DateTo               time.Time `schema:"date-to" url:"date-to" layout:"2006-01-02"`
+	SearchString         string    `schema:"search" url:"search"`
+	Page                 int       `schema:"page" url:"page"`
+	Refresh              bool      `schema:"refresh" url:"-"`
+}
+
+// AsURLParams encodes a SearchForm as parameters for after the "?" in a url
+func (s *SearchForm) AsURLParams() (string, error) {
+	v, err := query.Values(s)
+	if err != nil {
+		return "", err // unlikely
+	}
+	return v.Encode(), nil
 }
 
 // defaultDateToAndFrom sets the default dateFrom and dateTo dates.
@@ -130,6 +141,7 @@ func NewSearchForm(startDate, endDate *time.Time) *SearchForm {
 		DateFrom:             dateFrom,
 		DateTo:               dateTo,
 		Page:                 1, // 1-based pagination.
+		Refresh:              false,
 	}
 }
 
@@ -164,6 +176,7 @@ type SearchDonationsForm struct {
 	PayoutReference string    `schema:"payout-reference"`
 	SearchString    string    `schema:"search"`
 	Page            int       `schema:"page"`
+	Refresh         bool      `schema:"refresh"`
 }
 
 // NewSearchDonationsForm creates a SearchDonationsForm with defaults.
@@ -174,6 +187,7 @@ func NewSearchDonationsForm(startDate, endDate *time.Time) *SearchDonationsForm 
 		DateFrom:      dateFrom,
 		DateTo:        dateTo,
 		Page:          1, // 1-based pagination.
+		Refresh:       false,
 	}
 }
 
