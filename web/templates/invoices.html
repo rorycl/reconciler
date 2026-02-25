@@ -12,19 +12,29 @@
 <div class="space-y-6">
 
 <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-j00 text-sm text-slate-700">
-    <div class="mb-4 text-sm">
-        The data start date is <span class="font-bold">{{ .DataStartDate.Format "2 January 2006" }}</span>.
-        Xero data was last refreshed <span class="font-bold"> {{ .LastRefreshed }}</span> ago.
-        <span class="ml-2">
-        <a href="#"
-           hx-get=""
-           hx-vals='{"refresh": "true"}'
-           hx-target="body"
-           hx-push-url="true"
-           class="inline-block border-2 border-sky-700 text-sky-700 font-bold py-1 px-3 rounded hover:bg-indigo-100 transition-colors">
-            Refresh
-        </a>
-        </span>
+
+    <!-- Data start date and freshness info -->
+    <div class="mb-4 text-sm flex flex-col items-start md:flex-row md:items-center md:justify-between">                                                 
+        <!-- Left side content -->
+        <p>
+            The data start date is <span class="font-bold">{{ .DataStartDate.Format "2 January 2006" }}</span>.
+        </p>
+        <!-- Right side content, grouped together -->
+        <div class="mt-2 md:mt-0 flex items-center space-x-2">
+            <p>
+                Xero data was last refreshed <span class="font-bold">{{ .LastRefreshed }}</span> ago.
+            </p>
+            <span>
+                <a href="#"
+                   hx-get=""
+                   hx-vals='{"refresh": "true"}'
+                   hx-target="body"
+                   hx-push-url="true"
+                   class="inline-block border-2 border-sky-700 text-sky-700 font-bold py-1 px-3 rounded hover:bg-indigo-100 transition-colors">
+                    Refresh
+                </a>
+            </span>
+        </div>
     </div>
 
     <!-- Tabs -->
