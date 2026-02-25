@@ -12,7 +12,7 @@
             <h3 class="font-semibold">Notice</h3>
             <p class="text-sm text-slate-600 py-4">By proceeding, the connections to Xero and Salesforce will be removed.</p>
             {{ if .MemoryDatabase }}
-            <p class="text-sm text-slate-600 pb-4">The in-memory database will also be deleted.</p>
+            <p class="text-sm text-slate-600 pb-4">The in-memory database will be deleted on closing the app.</p>
             {{ else }}
             <p class="text-sm text-slate-600 pb-4">Consider removing the database <b>{{ .DBName }}</b>.</p>
             {{ end }}
