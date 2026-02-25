@@ -40,8 +40,8 @@ repository](https://github.com/rorycl/reconciler).
 * The App will only operate on the `127.0.0.1` or `localhost` address
   for security reasons and must not be shared over the network.
 
-* The App's configuration file should kept on a filesystem with robust
-  protection against unauthorized access.
+* The App's configuration file should be kept on a filesystem with
+  robust protection against unauthorized access.
 
 * The App should be configured either to use an in-memory database,
   which is deleted when the app is closed, or to store its database on a
@@ -85,16 +85,15 @@ Generally data is only retrieved from the configuration
 `data_date_start` where applicable. The initial data retrieval and
 insertion into the local database may take several minutes.
 
-For Xero, only read-only API connections are made. All accounts
-records are stored in the local database, as are all invoices and
-bank transactions which have donation-related line items as defined
-by the configuration `donation_account_prefixes`. (In future Xero
-`Organisation` info is also likely to be needed to construct Xero
-`deep links`.)
+For Xero, only read-only API connections are made. All records detailing
+each account type are retrieved and stored in the local database
+together with key details about the organisation. All invoices and bank
+transactions which have donation-related line items as defined by the
+configuration `donation_account_prefixes` are also retrieved and stored.
 
 For Salesforce, sparse information is retrieved from the Opportunities
 (also known as "Donations") object as set out in the configured
-`salesforce.query` SOQL query.
+`salesforce.query` SOQL query and stored in the local database.
 
 After connection and data refresh, the App provides operations
 for searching Bank Transactions, Invoices and Donations,
@@ -107,7 +106,7 @@ the Reconciler App. The operations of the App are protected against
 cross-site request forgery (CSRF) attacks.
 
 Upon logging out the local json OAuth2 tokens are deleted from memory.
-Any in-memory database is also deleted.
+Any in-memory database is also deleted on closing the app.
 
 ### Security considerations
 
@@ -124,7 +123,7 @@ and organisational responsibilities relating to working with the
 Personally Identifiable Information (PII) that may be held in the
 system. Since users of the Reconciler App will also be users of Xero
 and Salesforce the PII controls for these services should be equally
-Applied to the use of the Reconciler App.
+applied to the use of the Reconciler App.
 
 For each API connection a `client_id` and `client_secret` is needed,
 together with authentication through the user's login credentials
