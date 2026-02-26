@@ -180,11 +180,90 @@ func TestSearchForm(t *testing.T) {
 	}
 }
 
+// TestTabSearchDonationsForm tests invalid and valid TabSearchDonationsForm, which utilises
+// SearchDonationsForm.
+func TestTabSearchDonationsForm(t *testing.T) {
+
+	defaultDateFrom, defaultDateTo := defaultDateToAndFrom(
+		ptrTime(time.Date(2025, time.April, 1, 0, 0, 0, 0, time.UTC)),
+		nil,
+	)
+
+	tests := []struct {
+		name           string
+		inputURL       string
+		searchForm     *TabSearchDonationsForm
+		err            error      // top level errors
+		validationErrs *Validator // validation errors
+	}{
+		{
+			name:     "default",
+			inputURL: "http://127.0.0.1:8080/invoice/abcdef",
+			searchForm: &TabSearchDonationsForm{
+				Tab: "Search",
+				SearchDonationsForm: SearchDonationsForm{
+					LinkageStatus: "NotLinked",
+					DateFrom:      defaultDateFrom,
+					DateTo:        defaultDateTo,
+					Page:          1, // 1-based pagination.
+					Refresh:       false,
+				},
+			},
+			err: nil,
+			validationErrs: &Validator{
+				Errors: map[string]string{},
+			},
+		},
+		{
+			name:     "partial custom params",
+			inputURL: "http://127.0.0.1:8080/invoice/abcdef?tab=Linked&status=Linked&date-from=2024-11-15&page=3",
+			searchForm: &TabSearchDonationsForm{
+				Tab: "Linked",
+				SearchDonationsForm: SearchDonationsForm{
+					LinkageStatus: "Linked",
+					DateFrom:      time.Date(2024, 11, 15, 0, 0, 0, 0, time.UTC),
+					DateTo:        defaultDateTo,
+					Page:          3, // 1-based pagination.
+					Refresh:       false,
+				},
+			},
+			err: nil,
+			validationErrs: &Validator{
+				Errors: map[string]string{},
+			},
+		},
+	}
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
+			simulatedRequest := newRequest(t, tt.inputURL)
+			form := NewTabSearchDonationsForm(ptrTime(defaultDateFrom), ptrTime(defaultDateTo))
+			if err := DecodeURLParams(simulatedRequest, form); err != nil {
+				if tt.err != err {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+
+			validator := NewValidator()
+			form.Validate(validator)
+
+			if diff := cmp.Diff(form, tt.searchForm); diff != "" {
+				t.Errorf("unexpected searchform diff %s", diff)
+			}
+
+			if diff := cmp.Diff(validator, tt.validationErrs); diff != "" {
+				t.Errorf("unexpected validation diff %s", diff)
+			}
+		})
+	}
+
+}
+
 // TestAsURLParams tests encoding to parameters.
 func TestAsURLParams(t *testing.T) {
 
 	// xero url
-
 	want := `date-from=2025-06-01&date-to=2025-07-01&page=1&search=search+string&status=NotReconciled`
 
 	sf := &SearchForm{
@@ -204,7 +283,6 @@ func TestAsURLParams(t *testing.T) {
 	}
 
 	// salesforce url
-
 	want = `date-from=2025-06-01&date-to=2025-07-01&page=1&payout-reference=payout-ref&search=search+string&status=All`
 
 	sdf := &SearchDonationsForm{
@@ -223,7 +301,6 @@ func TestAsURLParams(t *testing.T) {
 	if got != want {
 		t.Errorf("in salesforce AsURLParams got:\n%v\nwant:\n:%v\n", got, want)
 	}
-
 }
 
 // TestURLParse tests the validQuery function.

@@ -567,7 +567,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			form.DateTo,
 			form.SearchString,
 			pageLen,
-			form.Offset(),
+			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
 			web.ServerError(w, r, err)
@@ -699,7 +699,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			form.DateTo,
 			form.SearchString,
 			pageLen,
-			form.Offset(),
+			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
 			web.ServerError(w, r, err)
@@ -843,7 +843,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			form.PayoutReference,
 			form.SearchString,
 			pageLen,
-			form.Offset(),
+			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
 			web.ServerError(w, r, err)
@@ -1211,7 +1211,7 @@ func (web *WebApp) handlePartialDonationsFind() http.Handler {
 			form.PayoutReference,
 			form.SearchString,
 			pageLen,
-			form.Offset(),
+			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
 			web.ServerError(w, r, err)
