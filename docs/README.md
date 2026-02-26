@@ -16,13 +16,13 @@ up the API connections.
 
 * **Security**  
   The security considerations of using the app are set out in the
-  [security document](https://github.com/rorycl/reconciler/docs/security.md).
+  [security document](https://github.com/rorycl/reconciler/blob/main/docs/security.md).
 
 * **Salesforce API configuration guide**  
-  A [guide](https://github.com/rorycl/reconciler/docs/salesforce_api_access_revc.pdf)
+  A [guide](https://github.com/rorycl/reconciler/blob/main/docs/salesforce_api_access_revc.pdf)
   or setting up Salesforce API access.
 
 * **Xero API configuration guide**  
-  A [guide](https://github.com/rorycl/reconciler/docs/xero_api_access_reva.pdf)
+  A [guide](https://github.com/rorycl/reconciler/blob/main/docs/xero_api_access_reva.pdf)
   or setting up Xero API access.
 
