@@ -57,7 +57,12 @@
                class="mt-1 block bg-white w-full rounded-md border-1 border-slate-400 shadow-sm p-1.5 focus:border-sky-500 focus:ring-sky-500">
     </div>
     <div class="md:col-span-1 flex space-x-2">
-        <a href="{{ .GetURL }}" class="w-full text-center bg-slate-500 text-white font-bold py-2 px-3 rounded hover:bg-slate-600 transition-colors">Reset</a>
+        <a href="#"
+           hx-get="{{ .GetURL }}"
+           hx-vals='{"reset": "true"}'
+           hx-target="body"
+           hx-push-url="true"
+           class="w-full text-center bg-slate-500 text-white font-bold py-2 px-3 rounded hover:bg-slate-600 transition-colors">Reset</a>
         <button type="submit" class="w-full bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">Search</button>
     </div>
 </form>

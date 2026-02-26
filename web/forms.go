@@ -103,6 +103,7 @@ type SearchForm struct {
 	SearchString         string    `schema:"search" url:"search"`
 	Page                 int       `schema:"page" url:"page"`
 	Refresh              bool      `schema:"refresh" url:"-"`
+	Reset                bool      `schema:"reset" url:"-"`
 }
 
 // AsURLParams encodes a SearchForm as parameters for after the "?" in a url
@@ -177,6 +178,7 @@ type SearchDonationsForm struct {
 	SearchString    string    `schema:"search" url:"search"`
 	Page            int       `schema:"page" url:"page"`
 	Refresh         bool      `schema:"refresh" url:"-"`
+	Reset           bool      `schema:"reset" url:"-"`
 }
 
 // AsURLParams encodes a SearchForm as parameters for after the "?" in a url
