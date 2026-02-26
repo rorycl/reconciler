@@ -476,18 +476,22 @@ func (web *WebApp) handleInvoices() http.Handler {
 			web.ServerError(w, r, err)
 			return
 		}
+		urlParams, err := form.AsURLParams()
+		if err != nil {
+			web.ServerError(w, r, err)
+		}
+		redirectURL := thisURL + "?" + urlParams
 
 		// Create a validator and validate the form.
 		validator := NewValidator()
 		form.Validate(validator)
 
-		// If the url is 'naked', redirect to the default.
+		// If the url is 'naked', redirect to the last saved url or default.
 		if r.URL.RawQuery == "" {
-			urlParams, err := form.AsURLParams()
-			if err != nil {
-				web.ServerError(w, r, err)
+			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
+				http.Redirect(w, r, savedURL, http.StatusSeeOther)
+				return
 			}
-			redirectURL := thisURL + "?" + urlParams
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 			return
 		}
@@ -502,18 +506,12 @@ func (web *WebApp) handleInvoices() http.Handler {
 		// back to the current page.
 		if validator.Valid() && form.Refresh {
 
-			// Make redirect url
-			urlParams, err := form.AsURLParams()
-			if err != nil {
-				web.ServerError(w, r, err)
-			}
-			redirectURL := thisURL + "?" + urlParams
-
 			_, err = web.refreshXeroRecords(ctx)
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list invoices: refresh data error: %v", err))
 			}
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
 		}
 
 		// Initialise pagination for default state.
@@ -579,6 +577,9 @@ func (web *WebApp) handleInvoices() http.Handler {
 			web.ServerError(w, r, err)
 		}
 
+		// Save the url.
+		web.sessions.Put(ctx, thisURL, redirectURL)
+
 		web.render(w, r, templates, name, data)
 	})
 }
@@ -601,6 +602,11 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			web.ServerError(w, r, err)
 			return
 		}
+		urlParams, err := form.AsURLParams()
+		if err != nil {
+			web.ServerError(w, r, err)
+		}
+		redirectURL := thisURL + "?" + urlParams
 
 		// Create a validator and validate the form.
 		validator := NewValidator()
@@ -608,11 +614,10 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 
 		// If the url is 'naked', redirect to the default.
 		if r.URL.RawQuery == "" {
-			urlParams, err := form.AsURLParams()
-			if err != nil {
-				web.ServerError(w, r, err)
+			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
+				http.Redirect(w, r, savedURL, http.StatusSeeOther)
+				return
 			}
-			redirectURL := thisURL + "?" + urlParams
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 			return
 		}
@@ -626,13 +631,6 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		// If refresh is called and form is valid, do a xero data refresh then redirect
 		// back to the current page.
 		if validator.Valid() && form.Refresh {
-
-			// Make redirect url
-			urlParams, err := form.AsURLParams()
-			if err != nil {
-				web.ServerError(w, r, err)
-			}
-			redirectURL := thisURL + "?" + urlParams
 
 			_, err = web.refreshXeroRecords(ctx)
 			if err != nil {
@@ -703,6 +701,9 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			web.ServerError(w, r, err)
 		}
 
+		// Save the url.
+		web.sessions.Put(ctx, thisURL, redirectURL)
+
 		web.render(w, r, templates, name, data)
 	})
 }
@@ -725,6 +726,11 @@ func (web *WebApp) handleDonations() http.Handler {
 			web.ServerError(w, r, err)
 			return
 		}
+		urlParams, err := form.AsURLParams()
+		if err != nil {
+			web.ServerError(w, r, err)
+		}
+		redirectURL := thisURL + "?" + urlParams
 
 		// Create a validator and validate the form.
 		validator := NewValidator()
@@ -732,11 +738,10 @@ func (web *WebApp) handleDonations() http.Handler {
 
 		// If the url is 'naked', redirect to the default.
 		if r.URL.RawQuery == "" {
-			urlParams, err := form.AsURLParams()
-			if err != nil {
-				web.ServerError(w, r, err)
+			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
+				http.Redirect(w, r, savedURL, http.StatusSeeOther)
+				return
 			}
-			redirectURL := thisURL + "?" + urlParams
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 			return
 		}
@@ -751,18 +756,12 @@ func (web *WebApp) handleDonations() http.Handler {
 		// redirect back to the current page.
 		if validator.Valid() && form.Refresh {
 
-			// Make redirect url
-			urlParams, err := form.AsURLParams()
-			if err != nil {
-				web.ServerError(w, r, err)
-			}
-			redirectURL := thisURL + "?" + urlParams
-
 			err = web.refreshSalesforceRecords(ctx)
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list donations: refresh data error: %v", err))
 			}
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
 		}
 
 		// Initialise pagination for default state.
@@ -841,6 +840,9 @@ func (web *WebApp) handleDonations() http.Handler {
 			web.log.Error(fmt.Sprintf("pagination error: %v", err))
 			http.Redirect(w, r, "/donations", http.StatusFound)
 		}
+
+		// Save the url.
+		web.sessions.Put(ctx, thisURL, redirectURL)
 
 		web.render(w, r, templates, name, data)
 	})
