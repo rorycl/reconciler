@@ -164,7 +164,7 @@ func (f *SearchForm) Validate(v *Validator) {
 }
 
 // Offset calculates the database offset for (1-based) pagination.
-func (f *SearchForm) Offset() int {
+func (f *SearchForm) Offset(pageLen int) int {
 	return (f.Page - 1) * pageLen
 }
 
@@ -220,7 +220,7 @@ func (f *SearchDonationsForm) Validate(v *Validator) {
 }
 
 // Offset calculates the database offset for (1-based) pagination.
-func (f *SearchDonationsForm) Offset() int {
+func (f *SearchDonationsForm) Offset(pageLen int) int {
 	return (f.Page - 1) * pageLen
 }
 
