@@ -482,10 +482,12 @@ func (web *WebApp) handleInvoices() http.Handler {
 		}
 		redirectURL := thisURL + "?" + urlParams
 
-		// Create a validator and validate the form.
-		validator := NewValidator()
-		form.Validate(validator)
-
+		// If the url is 'reset', clear the last saved url and redirect to default.
+		if r.URL.Query().Get("reset") == "true" {
+			_ = web.sessions.PopString(ctx, thisURL)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
 		// If the url is 'naked', redirect to the last saved url or default.
 		if r.URL.RawQuery == "" {
 			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
@@ -495,6 +497,10 @@ func (web *WebApp) handleInvoices() http.Handler {
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 			return
 		}
+
+		// Create a validator and validate the form.
+		validator := NewValidator()
+		form.Validate(validator)
 
 		// Determine the last refresh time of Xero data. Note this can be
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
