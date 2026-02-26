@@ -203,7 +203,7 @@ func NewSearchDonationsForm(startDate, endDate *time.Time) *SearchDonationsForm 
 }
 
 // Validate checks SearchDonationsForm fields and populates Validator with any
-// errors. Note tha the `Check` is like an assertion of truth, if that
+// errors. Note that the `Check` is like an assertion of truth, if that
 // fails, the provided message is recorded against the field.
 func (f *SearchDonationsForm) Validate(v *Validator) {
 
@@ -222,6 +222,48 @@ func (f *SearchDonationsForm) Validate(v *Validator) {
 // Offset calculates the database offset for (1-based) pagination.
 func (f *SearchDonationsForm) Offset(pageLen int) int {
 	return (f.Page - 1) * pageLen
+}
+
+// TabSearchDonationsForm represents the URL query parameter filters for
+// donations called from an Invoice or BankTransaction tab.
+type TabSearchDonationsForm struct {
+	Tab string `schema:"tab" url:"tab"`
+	SearchDonationsForm
+}
+
+// NewTabSearchDonationsForm creates a TabSearchDonationsForm with defaults.
+func NewTabSearchDonationsForm(startDate, endDate *time.Time) *TabSearchDonationsForm {
+	dateFrom, dateTo := defaultDateToAndFrom(startDate, endDate)
+	return &TabSearchDonationsForm{
+		Tab: "Search",
+		SearchDonationsForm: SearchDonationsForm{
+			LinkageStatus: "NotLinked",
+			DateFrom:      dateFrom,
+			DateTo:        dateTo,
+			Page:          1, // 1-based pagination.
+			Refresh:       false,
+		},
+	}
+}
+
+// Validate checks TabSearchDonationsForm fields and populates Validator with any
+// errors. Note tha the `Check` is like an assertion of truth. If that
+// fails, the provided message is recorded against the field.
+func (ts *TabSearchDonationsForm) Validate(v *Validator) {
+
+	allowedTabs := map[string]bool{"Search": true, "Linked": true}
+	v.Check(allowedTabs[ts.Tab], "tab", "Invalid tab value provided")
+
+	ts.SearchDonationsForm.Validate(v)
+}
+
+// AsURLParams encodes a TabSearchDonationsForm as parameters for after the "?" in a url
+func (ts *TabSearchDonationsForm) AsURLParams() (string, error) {
+	v, err := query.Values(ts)
+	if err != nil {
+		return "", err // unlikely
+	}
+	return v.Encode(), nil
 }
 
 // LinkOrUnlinkForm is a form for linking or unlinking donations in Salesforce to a Xero
