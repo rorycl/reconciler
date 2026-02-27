@@ -1,16 +1,13 @@
 {{- /* partial-donations-linked.html is a template for the donation linked tab on invoice and bank transaction detail pages */ -}}
 
-{{ template "partial-donations-tabs" . }}
-<div id="tab-content" 
-     class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none">
-
 <h3 class="text-l text-slate-800 font-semibold px-4 py-3">Linked Salesforce Donations</h3>
 
 <div id="donations-unlink-error"></div>
 
 {{- /* the unlink form targets: Typer: invoice or bank-transaction .ID: the invoice number or bank-transaction reference */ -}}
+<div id="donations-unlink-search">
 <form hx-post="/donations/{{ .Typer }}/{{ .ID }}/unlink"
-      hx-target="#donations-unlink-error"
+      hx-target="#donations-unlink-search"
       hx-swap="innerHTML">
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
     <table class="min-w-full divide-y divide-slate-300 text-xs">
@@ -41,6 +38,28 @@
     </table>
 </div> 
 </form>
-
-</div>  <!-- end tab-content -->
+</div>
 <!-- end of partial -->
+
+<!-- Pagination -->
+<div class="mt-4 pb-2 mb-2 text-center text-xs text-slate-800">
+    {{ $URL := .Pagination.PreviousURL }}
+    {{ if $URL }}
+        <a href="{{ $URL }}" 
+           class="px-3 py-1 border border-indigo-300 rounded hover:bg-indigo-100">&laquo; Prev</a>
+    {{ else }}
+        <span class="text-slate-400 cursor-not-allowed">&laquo; Prev</span>
+    {{ end }}
+
+    <span class="mx-4">
+    page {{ .Pagination.PageNo }} of {{ .Pagination.Pages }}
+    </span>
+
+    {{ $URL := .Pagination.NextURL }}
+    {{ if $URL }}
+        <a href="{{ $URL }}"
+           class="px-3 py-1 border border-indigo-300 rounded hover:bg-indigo-100">Next &raquo;</a>
+    {{ else }}
+        <span class="text-slate-400 cursor-not-allowed">Next &raquo;</span>
+    {{ end }}
+</div>

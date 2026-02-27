@@ -94,17 +94,25 @@
 <!-- donations zone wrapper -->
 <div id="donations-zone" class="mt-6">
 
-    {{ template "partial-donations-tabs" . }}
+{{ template "partial-donations-tabs" . }}
+<div id="tab-content" 
+     class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none">
 
-    <div id="tab-content"
-         class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none"
-         hx-get="/partials/donations-linked/bank-transaction/{{ .Transaction.ID }}"
-         hx-trigger="load"
-         hx-target="#donations-zone"                                           
-         hx-swap="innerHTML">
-        <!-- Loading spinner could go here -->
-        <p class="p-4">Loading linked donations...</p>
-    </div>
-</div>
+{{ if eq .TabFocus "unlink" }}
+{{/* the currently linked donations for unlinking */}}
+
+    {{ template "partial-donations-linked.html" . }}
+
+{{ else }}
+{{/* the currently unlinked donations for linking, with search form */}}
+
+    {{ template "partial-donations-searchform" . }}
+
+    {{ template "partial-donations-searchresults" . }}
+
+{{ end }}
+
+</div> <!-- end tab-content -->
+</div> 
 <!-- end of donations zone wrapper -->
 {{ end }}

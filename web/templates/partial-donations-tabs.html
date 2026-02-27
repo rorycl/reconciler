@@ -6,31 +6,23 @@
 <nav>
     <ul class="flex flex-wrap items-end text-sm font-medium text-center gap-2" role="tablist">
         <li class="me-2">
-            <a href="#"
-               {{- if ne .TabType "find" }}
+            <a href="/{{ .Typer }}/{{ .ID }}/unlink"
+               {{- if eq .TabFocus "unlink" }}
                class="{{ $activeClass }}"
                {{- else }}
                class="{{ $inactiveClass }}"
                {{- end }}
-               hx-get="/partials/donations-linked/{{ .Typer}}/{{ .ID }}?status=Linked"
-               hx-target="#donations-zone"
-               hx-swap="innerHTML"
                role="tab" aria-selected="true">
                 Linked Donations
             </a>
         </li>
         <li class="me-2">
-           <!-- Todo: fix verbatim date -->
-           <!-- Todo: probably a good idea to send a from date 1 month before the invoice for the default donations search in the invoice template data -->
-            <a href="#"
-               {{- if eq .TabType "find" }}
+            <a href="/{{ .Typer }}/{{ .ID }}/link"
+               {{- if eq .TabFocus "link" }}
                class="{{ $activeClass }}"
                {{- else }}
                class="{{ $inactiveClass }}"
                {{- end }}
-               hx-get="/partials/donations-find/{{ .Typer }}/{{ .ID }}?status=NotLinked&date-from={{ .DonationSearchStart.Format "2006-01-02" }}&date-to={{ .DonationSearchEnd.Format "2006-01-02" }}"
-               hx-target="#donations-zone"
-               hx-swap="innerHTML"
                role="tab" aria-selected="false">
                 Find Donations
             </a>
