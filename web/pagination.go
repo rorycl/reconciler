@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"strconv"
 )
@@ -72,9 +73,7 @@ func NewPagination(pageLen, totalRecords, currentPage int, query url.Values) (*P
 // buildURL generates a URL query string for a specific page.
 func (p *Pagination) buildURL(page int) string {
 	newQuery := make(url.Values, len(p.queryVals))
-	for k, v := range p.queryVals {
-		newQuery[k] = v
-	}
+	maps.Copy(newQuery, p.queryVals)
 
 	newQuery.Set("page", strconv.Itoa(page))
 	return "?" + newQuery.Encode()

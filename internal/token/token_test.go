@@ -162,7 +162,7 @@ func TestTokenRefresh(t *testing.T) {
 		// Respond with a new, valid token as JSON
 		w.Header().Set("Content-Type", "application/json")
 
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"access_token":  newAccessToken,
 			"token_type":    "Bearer",
 			"refresh_token": "new-refresh-token-if-returned",
