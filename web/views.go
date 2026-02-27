@@ -20,6 +20,8 @@ type viewDonation struct {
 	ModifiedDateStr string
 	ModifiedName    string
 	IsLinked        bool
+	LinkID          string
+	LinkTyper       string
 	RowCount        int
 }
 
@@ -31,6 +33,8 @@ func newViewDonations(donations []db.Donation) []viewDonation {
 		dv[i].Name = d.Name
 		dv[i].Amount = d.Amount
 		dv[i].IsLinked = d.IsLinked
+		dv[i].LinkID = d.LinkID
+		dv[i].LinkTyper = d.LinkTyper
 		dv[i].RowCount = d.RowCount
 		// de-pointer
 		if d.PayoutReference == nil {
