@@ -200,7 +200,7 @@ func TestTabSearchDonationsForm(t *testing.T) {
 			name:     "default",
 			inputURL: "http://127.0.0.1:8080/invoice/abcdef",
 			searchForm: &TabSearchDonationsForm{
-				Tab: "Search",
+				Tab: "Find",
 				SearchDonationsForm: SearchDonationsForm{
 					LinkageStatus: "NotLinked",
 					DateFrom:      defaultDateFrom,
@@ -232,12 +232,53 @@ func TestTabSearchDonationsForm(t *testing.T) {
 				Errors: map[string]string{},
 			},
 		},
+		{
+			name:     "partial custom params",
+			inputURL: "http://127.0.0.1:8080/invoice/abcdef?tab=XXX&status=Linked&date-from=2024-11-15&page=3",
+			searchForm: &TabSearchDonationsForm{
+				Tab: "XXX",
+				SearchDonationsForm: SearchDonationsForm{
+					LinkageStatus: "Linked",
+					DateFrom:      time.Date(2024, 11, 15, 0, 0, 0, 0, time.UTC),
+					DateTo:        defaultDateTo,
+					Page:          3, // 1-based pagination.
+					Refresh:       false,
+				},
+			},
+			err: nil,
+			validationErrs: &Validator{
+				Errors: map[string]string{
+					"tab": "Invalid tab value provided",
+				},
+			},
+		},
+		{
+			name:     "partial custom params",
+			inputURL: "http://127.0.0.1:8080/invoice/abcdef?tab=XXX&status=Invalid&date-from=2024-11-15&page=3",
+			searchForm: &TabSearchDonationsForm{
+				Tab: "XXX",
+				SearchDonationsForm: SearchDonationsForm{
+					LinkageStatus: "Invalid",
+					DateFrom:      time.Date(2024, 11, 15, 0, 0, 0, 0, time.UTC),
+					DateTo:        defaultDateTo,
+					Page:          3, // 1-based pagination.
+					Refresh:       false,
+				},
+			},
+			err: nil,
+			validationErrs: &Validator{
+				Errors: map[string]string{
+					"tab":    "Invalid tab value provided",
+					"status": "Invalid status value provided.",
+				},
+			},
+		},
 	}
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 			simulatedRequest := newRequest(t, tt.inputURL)
-			form := NewTabSearchDonationsForm(ptrTime(defaultDateFrom), ptrTime(defaultDateTo))
+			form := NewTabSearchDonationsForm(ptrTime(defaultDateFrom), ptrTime(defaultDateTo), "Find")
 			if err := DecodeURLParams(simulatedRequest, form); err != nil {
 				if tt.err != err {
 					t.Fatalf("unexpected error: %v", err)
@@ -297,6 +338,29 @@ func TestAsURLParams(t *testing.T) {
 	got, err = sdf.AsURLParams()
 	if err != nil {
 		t.Fatalf("unexpected salesforce AsURLParams error: %v", err)
+	}
+	if got != want {
+		t.Errorf("in salesforce AsURLParams got:\n%v\nwant:\n:%v\n", got, want)
+	}
+
+	// salesforce url with tab
+	want = `date-from=2025-06-01&date-to=2025-07-01&page=1&payout-reference=payout-ref&search=search+string&status=All&tab=Find`
+
+	tsdf := &TabSearchDonationsForm{
+		Tab: "Find",
+		SearchDonationsForm: SearchDonationsForm{
+			LinkageStatus:   "All",
+			DateFrom:        time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+			DateTo:          time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC),
+			PayoutReference: "payout-ref",
+			SearchString:    "search string",
+			Page:            1,
+			Refresh:         true,
+		},
+	}
+	got, err = tsdf.AsURLParams()
+	if err != nil {
+		t.Fatalf("unexpected salesforce with tab AsURLParams error: %v", err)
 	}
 	if got != want {
 		t.Errorf("in salesforce AsURLParams got:\n%v\nwant:\n:%v\n", got, want)

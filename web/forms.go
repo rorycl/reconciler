@@ -232,10 +232,13 @@ type TabSearchDonationsForm struct {
 }
 
 // NewTabSearchDonationsForm creates a TabSearchDonationsForm with defaults.
-func NewTabSearchDonationsForm(startDate, endDate *time.Time) *TabSearchDonationsForm {
+func NewTabSearchDonationsForm(startDate, endDate *time.Time, defaultTab string) *TabSearchDonationsForm {
 	dateFrom, dateTo := defaultDateToAndFrom(startDate, endDate)
+	if defaultTab == "" {
+		defaultTab = "Find"
+	}
 	return &TabSearchDonationsForm{
-		Tab: "Search",
+		Tab: defaultTab,
 		SearchDonationsForm: SearchDonationsForm{
 			LinkageStatus: "NotLinked",
 			DateFrom:      dateFrom,
@@ -251,7 +254,7 @@ func NewTabSearchDonationsForm(startDate, endDate *time.Time) *TabSearchDonation
 // fails, the provided message is recorded against the field.
 func (ts *TabSearchDonationsForm) Validate(v *Validator) {
 
-	allowedTabs := map[string]bool{"Search": true, "Linked": true}
+	allowedTabs := map[string]bool{"Find": true, "Linked": true}
 	v.Check(allowedTabs[ts.Tab], "tab", "Invalid tab value provided")
 
 	ts.SearchDonationsForm.Validate(v)
