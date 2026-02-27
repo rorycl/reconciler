@@ -224,51 +224,6 @@ func (f *SearchDonationsForm) Offset(pageLen int) int {
 	return (f.Page - 1) * pageLen
 }
 
-// TabSearchDonationsForm represents the URL query parameter filters for
-// donations called from an Invoice or BankTransaction tab.
-type TabSearchDonationsForm struct {
-	Tab string `schema:"tab" url:"tab"`
-	SearchDonationsForm
-}
-
-// NewTabSearchDonationsForm creates a TabSearchDonationsForm with defaults.
-func NewTabSearchDonationsForm(startDate, endDate *time.Time, defaultTab string) *TabSearchDonationsForm {
-	dateFrom, dateTo := defaultDateToAndFrom(startDate, endDate)
-	if defaultTab == "" {
-		defaultTab = "Find"
-	}
-	return &TabSearchDonationsForm{
-		Tab: defaultTab,
-		SearchDonationsForm: SearchDonationsForm{
-			LinkageStatus: "NotLinked",
-			DateFrom:      dateFrom,
-			DateTo:        dateTo,
-			Page:          1, // 1-based pagination.
-			Refresh:       false,
-		},
-	}
-}
-
-// Validate checks TabSearchDonationsForm fields and populates Validator with any
-// errors. Note tha the `Check` is like an assertion of truth. If that
-// fails, the provided message is recorded against the field.
-func (ts *TabSearchDonationsForm) Validate(v *Validator) {
-
-	allowedTabs := map[string]bool{"Find": true, "Linked": true}
-	v.Check(allowedTabs[ts.Tab], "tab", "Invalid tab value provided")
-
-	ts.SearchDonationsForm.Validate(v)
-}
-
-// AsURLParams encodes a TabSearchDonationsForm as parameters for after the "?" in a url
-func (ts *TabSearchDonationsForm) AsURLParams() (string, error) {
-	v, err := query.Values(ts)
-	if err != nil {
-		return "", err // unlikely
-	}
-	return v.Encode(), nil
-}
-
 // LinkOrUnlinkForm is a form for linking or unlinking donations in Salesforce to a Xero
 // Invoice or BankTransaction.
 type LinkOrUnlinkForm struct {
