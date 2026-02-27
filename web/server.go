@@ -243,12 +243,9 @@ func (web *WebApp) routes() http.Handler {
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
 	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.handleInvoiceDetail())).Methods("GET")
+	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.handleInvoiceDetail())).Methods("GET")
 	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.handleBankTransactionDetail())).Methods("GET")
-
-	// Partial pages.
-	// These are HTMX partials showing donation listings in "linked" and "find to link" modes.
-	r.Handle("/partials/donations-linked/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsLinked())).Methods("GET")
-	r.Handle("/partials/donations-find/{type:(?:invoice|bank-transaction)}/{id}", apisOK(web.handlePartialDonationsFind())).Methods("GET")
+	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.handleBankTransactionDetail())).Methods("GET")
 
 	// Donation linking/unlinking.
 	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.handleDonationsLinkUnlink())).Methods("POST")
@@ -371,7 +368,17 @@ func (web *WebApp) handleLogoutConfirmed() http.Handler {
 			web.log.Info("Session cleared")
 		}
 
-		http.Redirect(w, r, "/connect", http.StatusFound)
+		// Close the database and kill the session.
+		_ = web.db.Close()
+		time.Sleep(1 * time.Second)
+		web.log.Info("Logout completed")
+		if fl, ok := w.(http.Flusher); ok {
+			_, _ = fmt.Fprint(w, "Logout completed. Please restart the program.")
+			fl.Flush()
+		}
+
+		time.Sleep(1 * time.Second)
+		os.Exit(0)
 	})
 }
 
@@ -514,7 +521,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
-		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(refreshTruncation)
+		lastRefreshed := time.Since(lastRefresh).Truncate(refreshTruncation)
 
 		// If refresh is called and form is valid, do a xero data refresh then redirect
 		// back to the current page.
@@ -648,7 +655,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
-		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(refreshTruncation)
+		lastRefreshed := time.Since(lastRefresh).Truncate(refreshTruncation)
 
 		// If refresh is called and form is valid, do a xero data refresh then redirect
 		// back to the current page.
@@ -780,7 +787,7 @@ func (web *WebApp) handleDonations() http.Handler {
 		// time.Time.IsZero(), but it is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
-		lastRefreshed := time.Now().Sub(lastRefresh).Truncate(refreshTruncation)
+		lastRefreshed := time.Since(lastRefresh).Truncate(refreshTruncation)
 
 		// If refresh is called and form is valid, do a salesforce data refresh then
 		// redirect back to the current page.
@@ -806,11 +813,11 @@ func (web *WebApp) handleDonations() http.Handler {
 			PageTitle     string
 			ViewDonations []viewDonation
 			Form          *SearchDonationsForm
-			Typer         string // needed for the partial search results
+			ID            string // needed to match the invoice/bank transaction struct
+			Typer         string
 			Validator     *Validator
 			Pagination    *Pagination
 			CurrentPage   string
-			PageType      string
 			GetURL        string
 			SFInstanceURL string
 			DataStartDate time.Time
@@ -818,11 +825,11 @@ func (web *WebApp) handleDonations() http.Handler {
 		}{
 			PageTitle:     "Donations",
 			Form:          form,
-			Typer:         "direct",
+			ID:            "", // no data needed
+			Typer:         "donations",
 			Validator:     validator,
 			Pagination:    pagination,
 			CurrentPage:   "donations",
-			PageType:      "direct", // indirect pages are htmx pages that have an hx target
 			GetURL:        "/donations",
 			SFInstanceURL: instanceURL,
 			DataStartDate: dataStartDate,
@@ -868,7 +875,6 @@ func (web *WebApp) handleDonations() http.Handler {
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
 			web.log.Error(fmt.Sprintf("pagination error: %v", err))
-			http.Redirect(w, r, "/donations", http.StatusFound)
 		}
 
 		// Save the url.
@@ -879,10 +885,21 @@ func (web *WebApp) handleDonations() http.Handler {
 }
 
 // handleInvoiceDetail serves the detail page at /invoice/<id> for a single invoice.
+// Note that the func can also be invoked at `/invoice/<id>/<action>(link|unlink)`. The
+// former redirect to the latter's 'link' form by default.
 func (web *WebApp) handleInvoiceDetail() http.Handler {
 
 	name := "invoice.html"
-	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-tabs.html", "invoice.html"}
+	tpls := []string{
+		"base.html",
+		"nav.html",
+		"partial-listingTabs.html",
+		"partial-donations-tabs.html",
+		"partial-donations-linked.html",
+		"partial-donations-searchform.html",
+		"partial-donations-searchresults.html",
+		"invoice.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -897,45 +914,161 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		}
 		invoiceID := vars["id"]
 
+		// The 'action' route parameter is optional, but this handler reroutes to an
+		// "action" version of the url if it is empty.
+		action := "link"
+		if a, ok := mux.Vars(r)["action"]; ok {
+			action = a
+		}
+		baseURL := fmt.Sprintf("/invoice/%s/%s", invoiceID, action)
+
+		// Get the invoice details.
+		var invoice db.WRInvoice
+		var lineItems []db.WRLineItem
+		invoice, lineItems, err = web.db.InvoiceWRGet(ctx, invoiceID)
+		if err != nil && err != sql.ErrNoRows {
+			web.ServerError(w, r, err)
+			return
+		}
+		if err == sql.ErrNoRows {
+			web.notFound(w, r, fmt.Sprintf("invoice %q not found", invoiceID))
+			return
+		}
+
+		// Process the line items.
+		viewLineItems := newViewLineItems(lineItems)
+
+		// Determine the dates for retrieving donations.
+		startDate, endDate := donationSearchTimeSpan(invoice.Date)
+
+		// Initialise url parameter form and derive default url.
+		form := NewSearchDonationsForm(&startDate, &endDate)
+
+		// Derive the default url.
+		urlParams, err := form.AsURLParams()
+		if err != nil { // unlikely
+			web.log.Error(fmt.Sprintf("handleInvoiceDetail: default url error: %v", err))
+			web.ServerError(w, r, err)
+		}
+		defaultURL := baseURL + "?" + urlParams
+
+		// If the url has no 'action' path param or has the 'reset' query param, clear
+		// the last saved url and redirect to default.
+		if r.URL.Query().Get("reset") == "true" {
+			_ = web.sessions.PopString(ctx, baseURL)
+			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
+			return
+		}
+
+		// If the url is 'naked', redirect to either the saved or default.
+		if r.URL.RawQuery == "" {
+			if savedURL := web.sessions.GetString(ctx, baseURL); savedURL != "" {
+				http.Redirect(w, r, savedURL, http.StatusSeeOther)
+				return
+			}
+			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
+			return
+		}
+
+		// Decode the url params and construct the current url, interjecting if the
+		// action is "unlink" to get the related information.
+		if err := DecodeURLParams(r, form); err != nil {
+			web.ServerError(w, r, err)
+		}
+		if action == "unlink" {
+			form.DateFrom = web.cfg.DataStartDate
+			form.DateTo = time.Now().AddDate(1, 0, 0)
+			form.LinkageStatus = "Linked"
+			form.PayoutReference = invoice.InvoiceNumber
+		}
+		urlParams, err = form.AsURLParams()
+		if err != nil {
+			web.ServerError(w, r, err)
+		}
+		thisURL := baseURL + "?" + urlParams
+
+		// Save the url.
+		web.sessions.Put(ctx, baseURL, thisURL)
+
+		// Create a validator and validate the form.
+		validator := NewValidator()
+		form.Validate(validator)
+
+		// Get the donations if the form is valid
+		var donations []db.Donation
+		if validator.Valid() {
+			donations, err = web.db.DonationsGet(
+				ctx,
+				form.DateFrom,
+				form.DateTo,
+				form.LinkageStatus,
+				form.PayoutReference,
+				form.SearchString,
+				pageLen,
+				form.Offset(pageLen),
+			)
+			if err != nil && err != sql.ErrNoRows {
+				web.ServerError(w, r, err)
+				return
+			}
+		}
+
+		// Process donations into donationView type
+		viewDonations := newViewDonations(donations)
+
+		// Set pagination for number of donations. In case of an error, log
+		// and continue. Each donation has the search query row count as a
+		// field.
+		var recordsNo int
+		if len(viewDonations) == 0 {
+			recordsNo = 1
+		} else {
+			recordsNo = viewDonations[0].RowCount
+		}
+
+		// Todo: fix page number (here 1)
+		pagination, err := NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
+		if err != nil {
+			web.log.Error(fmt.Sprintf("pagination error: %v", err))
+		}
+
+		// Prepare data for the template.
 		data := struct {
 			PageTitle     string
 			Invoice       db.WRInvoice
 			LineItems     []viewLineItem
 			ID            string
 			DFK           string // for Invoices, this is the Invoice Number
-			TabType       string
 			Typer         string
 			ShortCode     string
 			CurrentPage   string
+			TabFocus      string
 			SFInstanceURL string
-			// Donation Search Dates
-			DonationSearchStart, DonationSearchEnd time.Time
+
+			// Donation data
+			ViewDonations []viewDonation
+			Form          *SearchDonationsForm
+			Validator     *Validator
+			Pagination    *Pagination
 		}{
 			PageTitle:     fmt.Sprintf("Invoice %s", invoiceID),
-			ID:            invoiceID,
-			TabType:       "link", // by default the donations tab type is "link", not "find"
+			Invoice:       invoice,
+			LineItems:     viewLineItems,
+			ID:            invoice.ID,
+			DFK:           invoice.InvoiceNumber,
 			Typer:         "invoice",
 			ShortCode:     web.sessions.GetString(ctx, "xero-shortcode"),
 			CurrentPage:   "invoice-detail",
+			TabFocus:      action,
 			SFInstanceURL: web.sessions.GetString(ctx, "salesforce-instance-url"),
+
+			ViewDonations: viewDonations,
+			Form:          form,
+			Validator:     validator,
+			Pagination:    pagination,
 		}
 
-		var lineItems []db.WRLineItem
-		data.Invoice, lineItems, err = web.db.InvoiceWRGet(ctx, invoiceID)
-		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
-		}
-		data.DonationSearchStart, data.DonationSearchEnd = donationSearchTimeSpan(data.Invoice.Date)
-
-		data.LineItems = newViewLineItems(lineItems)
-		data.DFK = data.Invoice.InvoiceNumber
-
-		// Return a 404 if no invoice was found.
-		if errors.Is(err, sql.ErrNoRows) {
-			web.notFound(w, r, fmt.Sprintf("Invoice: %q not found", invoiceID))
-			return
-		}
+		web.log.Debug(fmt.Sprintf("invoiceDetail: about to complete: %s", thisURL))
 
 		web.render(w, r, templates, name, data)
 	})
@@ -946,7 +1079,16 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 func (web *WebApp) handleBankTransactionDetail() http.Handler {
 
 	name := "bank-transaction.html"
-	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-tabs.html", "bank-transaction.html"}
+	tpls := []string{
+		"base.html",
+		"nav.html",
+		"partial-listingTabs.html",
+		"partial-donations-tabs.html",
+		"partial-donations-linked.html",
+		"partial-donations-searchform.html",
+		"partial-donations-searchresults.html",
+		"bank-transaction.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -959,287 +1101,172 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 			web.clientError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		transactionReference := vars["id"]
+		transactionID := vars["id"]
 
-		// Get salesforce instance url from the session (via OAuth2 token)
-		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
-
-		data := struct {
-			PageTitle   string
-			Transaction db.WRTransaction
-			LineItems   []viewLineItem
-			ID          string
-			DFK         string // for Transactions , this is the Reference
-			TabType     string
-			Typer       string
-			CurrentPage string
-			// Donation Search Dates
-			DonationSearchStart, DonationSearchEnd time.Time
-			SFInstanceURL                          string
-		}{
-			PageTitle:     fmt.Sprintf("Bank Transaction %s", transactionReference),
-			ID:            transactionReference,
-			TabType:       "link", // by default the donations tab type is "link", not "find"
-			Typer:         "bank-transaction",
-			CurrentPage:   "transaction-detail",
-			SFInstanceURL: instanceURL,
+		// The 'action' route parameter is optional, but this handler reroutes to an
+		// "action" version of the url if it is empty.
+		action := "link"
+		if a, ok := mux.Vars(r)["action"]; ok {
+			action = a
 		}
+		baseURL := fmt.Sprintf("/bank-transaction/%s/%s", transactionID, action)
 
+		// Get the transaction details.
+		var transaction db.WRTransaction
 		var lineItems []db.WRLineItem
-		data.Transaction, lineItems, err = web.db.BankTransactionWRGet(ctx, transactionReference)
+		transaction, lineItems, err = web.db.BankTransactionWRGet(ctx, transactionID)
 		if err != nil && err != sql.ErrNoRows {
 			web.ServerError(w, r, err)
 			return
 		}
-		data.DonationSearchStart, data.DonationSearchEnd = donationSearchTimeSpan(data.Transaction.Date)
-
-		data.LineItems = newViewLineItems(lineItems)
-		data.DFK = *data.Transaction.Reference
-		if data.DFK == "" {
-			data.DFK = missingTransactionReference
-		}
-
-		// Return a 404 if no bank transaction was found.
-		if errors.Is(err, sql.ErrNoRows) {
-			web.notFound(w, r, fmt.Sprintf("Bank Transaction: %q not found", transactionReference))
+		if err == sql.ErrNoRows {
+			web.notFound(w, r, fmt.Sprintf("transaction %q not found", transactionID))
 			return
 		}
 
-		web.render(w, r, templates, name, data)
-	})
-}
+		// Process the line items.
+		viewLineItems := newViewLineItems(lineItems)
 
-// handlePartialDonationsLinked is the partial htmx endpoint for rendering the list of
-// donations linked to an Invoice or Bank Transaction.
-func (web *WebApp) handlePartialDonationsLinked() http.Handler {
+		// Determine the dates for retrieving donations.
+		startDate, endDate := donationSearchTimeSpan(transaction.Date)
 
-	name := "partial-donations-linked.html"
-	tpls := []string{"partial-donations-tabs.html", "partial-donations-linked.html"}
-	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
+		// Initialise url parameter form and derive default url.
+		form := NewSearchDonationsForm(&startDate, &endDate)
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		ctx := r.Context()
-
-		// Extract url parameters.
-		vars, err := validMuxVars(mux.Vars(r), "type", "id")
-		if err != nil {
-			web.clientError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		typer := vars["type"]
-		id := vars["id"]
-
-		// Initialise pagination for default state.
-		pagination, _ := NewPagination(pageLen, 1, 1, r.URL.Query())
-
-		// retrieve the related invoice or bank transaction dfk and date
-		dfk, dater, err := web.getInvoiceOrBankTransactionDetails(ctx, typer, id)
-		if err != nil {
-			web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
-			return
-		}
-		donationSearchStart, donationSearchEnd := donationSearchTimeSpan(dater)
-
-		// Get salesforce instance url from the session (via OAuth2 token)
-		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
-
-		web.log.Info(fmt.Sprintf("donations linked for %s (%s) : dfk %s start %s end %s",
-			typer,
-			id,
-			dfk,
-			donationSearchStart.Format("2006-01-02"),
-			donationSearchEnd.Format("2006-01-02"),
-		))
-
-		// Prepare data for the template.
-		data := struct {
-			ID            string
-			Typer         string
-			DFK           string
-			ViewDonations []viewDonation
-			Pagination    *Pagination
-			TabType       string
-			SFInstanceURL string
-			// Donation Date Search parameters
-			DonationSearchStart, DonationSearchEnd time.Time
-		}{
-			ID:                  id,
-			Typer:               typer,
-			DFK:                 dfk,
-			Pagination:          pagination,
-			TabType:             "link",
-			SFInstanceURL:       instanceURL,
-			DonationSearchStart: donationSearchStart,
-			DonationSearchEnd:   donationSearchEnd,
-		}
-
-		donations, err := web.db.DonationsGet(
-			ctx,
-			web.cfg.DataStartDate,
-			time.Now().AddDate(1, 6, 0), // add 18 months
-			"Linked",                    // linkage status
-			dfk,                         // payout reference
-			"",                          // searchstring
-			pageLen,
-			0, // form offset
-		)
-		if err != nil && err != sql.ErrNoRows {
+		// Derive the default url.
+		urlParams, err := form.AsURLParams()
+		if err != nil { // unlikely
+			web.log.Error(fmt.Sprintf("handleTransactionDetail: default url error: %v", err))
 			web.ServerError(w, r, err)
+		}
+		defaultURL := baseURL + "?" + urlParams
+
+		// If the url has no 'action' path param or has the 'reset' query param, clear
+		// the last saved url and redirect to default.
+		if r.URL.Query().Get("reset") == "true" {
+			_ = web.sessions.PopString(ctx, baseURL)
+			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
 			return
 		}
 
-		// Process donations into donationView type
-		viewDonations := newViewDonations(donations)
-
-		// Set valid data from successful database call.
-		data.ViewDonations = viewDonations
-
-		// Set pagination for number of donations. In case of an error, log
-		// and continue. Each donation has the search query row count as a
-		// field.
-		var recordsNo int
-		if len(data.ViewDonations) == 0 {
-			recordsNo = 1
-		} else {
-			recordsNo = data.ViewDonations[0].RowCount
-		}
-		// Todo: fix url.query() if it doesn't have the "tab"
-		// Todo: fix page number (here 1)
-		data.Pagination, err = NewPagination(pageLen, recordsNo, 1, r.URL.Query())
-		if err != nil {
-			web.log.Error(fmt.Sprintf("pagination error: %v", err))
-		}
-
-		web.render(w, r, templates, name, data)
-	})
-}
-
-// handlePartialDonationsFind is the partial htmx endpoint for finding
-// donations to link to an Invoice or Bank Transaction.
-func (web *WebApp) handlePartialDonationsFind() http.Handler {
-
-	name := "partial-donations.html"
-	tpls := []string{"partial-donations-tabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "partial-donations.html"}
-	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		ctx := r.Context()
-
-		// Extract route parameters.
-		vars, err := validMuxVars(mux.Vars(r), "type", "id")
-		if err != nil {
-			web.clientError(w, err.Error(), http.StatusBadRequest)
+		// If the url is 'naked', redirect to either the saved or default.
+		if r.URL.RawQuery == "" {
+			if savedURL := web.sessions.GetString(ctx, baseURL); savedURL != "" {
+				http.Redirect(w, r, savedURL, http.StatusSeeOther)
+				return
+			}
+			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
 			return
 		}
-		typer := vars["type"]
-		id := vars["id"]
 
-		form := NewSearchDonationsForm(&web.cfg.DataStartDate, nil)
+		// Decode the url params and construct the current url, interjecting if the
+		// action is "unlink" to get the related information.
 		if err := DecodeURLParams(r, form); err != nil {
 			web.ServerError(w, r, err)
 		}
+
+		DFK := *transaction.Reference
+		if DFK == "" {
+			DFK = missingTransactionReference
+		}
+
+		if action == "unlink" {
+			form.DateFrom = web.cfg.DataStartDate
+			form.DateTo = time.Now().AddDate(1, 0, 0)
+			form.LinkageStatus = "Linked"
+			form.PayoutReference = DFK
+		}
+
+		urlParams, err = form.AsURLParams()
+		if err != nil {
+			web.ServerError(w, r, err)
+		}
+		thisURL := baseURL + "?" + urlParams
+
+		// Save the url.
+		web.sessions.Put(ctx, baseURL, thisURL)
 
 		// Create a validator and validate the form.
 		validator := NewValidator()
 		form.Validate(validator)
 
-		// Initialise pagination for default state.
-		pagination, _ := NewPagination(pageLen, 1, form.Page, r.URL.Query())
-
-		// retrieve the related invoice or bank transaction dfk and date
-		dfk, dater, err := web.getInvoiceOrBankTransactionDetails(ctx, typer, id)
-		if err != nil {
-			web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
-			return
-		}
-		donationSearchStart, donationSearchEnd := donationSearchTimeSpan(dater)
-
-		// Get salesforce instance url from the session (via OAuth2 token)
-		instanceURL := web.sessions.GetString(ctx, "salesforce-instance-url")
-
-		// Prepare data for the template, allowing passing of validation
-		// errors back to the template if necessary.
-		data := struct {
-			PageTitle     string
-			ID            string
-			Typer         string
-			DFK           string
-			ViewDonations []viewDonation
-			Form          *SearchDonationsForm
-			Validator     *Validator
-			Pagination    *Pagination
-			SFInstanceURL string
-
-			PageType string
-			GetURL   string
-			TabType  string
-
-			// Donation Date Search parameters
-			DonationSearchStart, DonationSearchEnd time.Time
-		}{
-			PageTitle:     "Donations",
-			ID:            id,
-			Typer:         typer,
-			DFK:           dfk,
-			Form:          form,
-			Validator:     validator,
-			Pagination:    pagination,
-			SFInstanceURL: instanceURL,
-
-			PageType: "indirect", // indirect pages are htmx pages that have an hx target
-			GetURL:   fmt.Sprintf("/partials/donations-find/%s/%s", typer, id),
-			TabType:  "find",
-
-			// Donation Date search parameters.
-			DonationSearchStart: donationSearchStart,
-			DonationSearchEnd:   donationSearchEnd,
+		// Get the donations if the form is valid
+		var donations []db.Donation
+		if validator.Valid() {
+			donations, err = web.db.DonationsGet(
+				ctx,
+				form.DateFrom,
+				form.DateTo,
+				form.LinkageStatus,
+				form.PayoutReference,
+				form.SearchString,
+				pageLen,
+				form.Offset(pageLen),
+			)
+			if err != nil && err != sql.ErrNoRows {
+				web.ServerError(w, r, err)
+				return
+			}
 		}
 
-		// Render template with errors and return if the form is invalid.
-		if !validator.Valid() {
-			web.render(w, r, templates, name, data)
-			return
-		}
-
-		donations, err := web.db.DonationsGet(
-			ctx,
-			form.DateFrom,
-			form.DateTo,
-			form.LinkageStatus,
-			form.PayoutReference,
-			form.SearchString,
-			pageLen,
-			form.Offset(pageLen),
-		)
-		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
-		}
-
-		// Process donations into donationView type.
+		// Process donations into donationView type
 		viewDonations := newViewDonations(donations)
-
-		// Set valid data from successful database call.
-		data.ViewDonations = viewDonations
 
 		// Set pagination for number of donations. In case of an error, log
 		// and continue. Each donation has the search query row count as a
 		// field.
 		var recordsNo int
-		if len(data.ViewDonations) == 0 {
+		if len(viewDonations) == 0 {
 			recordsNo = 1
 		} else {
-			recordsNo = data.ViewDonations[0].RowCount
+			recordsNo = viewDonations[0].RowCount
 		}
-		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
+
+		// Todo: fix page number (here 1)
+		pagination, err := NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			web.log.Warn(fmt.Sprintf("pagination error: %v", err))
+			web.log.Error(fmt.Sprintf("pagination error: %v", err))
 		}
+
+		// Prepare data for the template.
+		data := struct {
+			PageTitle     string
+			Transaction   db.WRTransaction
+			LineItems     []viewLineItem
+			ID            string
+			DFK           string // for transactions, this is the Reference
+			Typer         string
+			ShortCode     string
+			CurrentPage   string
+			TabFocus      string
+			SFInstanceURL string
+
+			// Donation data
+			ViewDonations []viewDonation
+			Form          *SearchDonationsForm
+			Validator     *Validator
+			Pagination    *Pagination
+		}{
+			PageTitle:     fmt.Sprintf("Bank Transaction %s", transaction.ID),
+			Transaction:   transaction,
+			LineItems:     viewLineItems,
+			ID:            transaction.ID,
+			DFK:           DFK,
+			Typer:         "bank-transaction",
+			ShortCode:     web.sessions.GetString(ctx, "xero-shortcode"),
+			CurrentPage:   "transaction-detail",
+			TabFocus:      action,
+			SFInstanceURL: web.sessions.GetString(ctx, "salesforce-instance-url"),
+
+			ViewDonations: viewDonations,
+			Form:          form,
+			Validator:     validator,
+			Pagination:    pagination,
+		}
+
+		web.log.Debug(fmt.Sprintf("transactionDetail: about to complete: %s", thisURL))
 
 		web.render(w, r, templates, name, data)
-
 	})
 }
 
@@ -1265,7 +1292,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		// Extract url parameters.
 		vars, err := validMuxVars(mux.Vars(r), "type", "id", "action")
 		if err != nil {
-			fmt.Printf("link/unlink error: invalid mux vars: %v", err)
+			web.log.Error(fmt.Sprintf("link/unlink error: invalid mux vars: %v", err))
 			web.htmxClientError(w, err.Error())
 			return
 		}
@@ -1330,7 +1357,13 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		}
 
 		// Retrieve the oauth2 tokens from the session
-		sfToken, _ := web.getValidTokenFromSession(ctx, token.SalesforceToken)
+		sfToken, err := web.getValidTokenFromSession(ctx, token.SalesforceToken)
+		if err != nil {
+			web.log.Info("sfToken empty, redirecting to connect")
+			w.Header().Set("HX-Redirect", "/connect")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
 		// Create the salesforce client and run a batch update.
 		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
@@ -1364,7 +1397,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 
 		// Redirect to the originator.
 		// Todo: set focus to either the "find" or "linked" donations tab.
-		redirectURL := fmt.Sprintf("/%s/%s", form.Typer, form.ID)
+		redirectURL := fmt.Sprintf("/%s/%s/%s", form.Typer, form.ID, form.Action)
 		w.Header().Set("HX-Redirect", redirectURL)
 		w.WriteHeader(http.StatusOK)
 
@@ -1402,7 +1435,7 @@ func (web *WebApp) clientError(w http.ResponseWriter, message string, status int
 		web.log.Warn(fmt.Sprintf("client error: status %d", status))
 		message = http.StatusText(status)
 	}
-	web.log.Warn("client error: %s (status %d)", message, status)
+	web.log.Warn(fmt.Sprintf("client error: %s (status %d)", message, status))
 	http.Error(w, message, status)
 }
 
@@ -1456,11 +1489,6 @@ func (web *WebApp) getInvoiceOrBankTransactionDetails(ctx context.Context, typer
 }
 
 var ErrTokenMissingOrInvalid = errors.New("token missing or invalid")
-
-var sessionOKValidity = func() time.Duration {
-	td, _ := time.ParseDuration("1h")
-	return td
-}()
 
 // getValidTokenFromSession gets a Xero or Salesforce token from the session.
 func (web *WebApp) getValidTokenFromSession(ctx context.Context, typer token.TokenType) (*token.ExtendedToken, error) {
