@@ -64,7 +64,7 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 
 	// Replace the placeholder in the query template with the generated WHERE clause.
 	finalSOQL := strings.Replace(c.config.Salesforce.Query, "{{.WhereClause}}", whereClause, 1)
-	c.log.Info(fmt.Sprintf("GetOpportunities sql: %s", finalSOQL))
+	c.log.Debug(fmt.Sprintf("GetOpportunities sql: %s", finalSOQL))
 
 	// Dump the final query for debugging purposes.
 	// _ = os.WriteFile("salesforce_query.log", []byte(finalSOQL), 0644)
@@ -180,15 +180,16 @@ func (c *Client) BatchUpdateOpportunityRefs(
 			var errors []string
 			for _, e := range result.Errors {
 				errors = append(errors, fmt.Sprintf("%s (%s)", e.Message, e.ErrorCode))
+				msg := fmt.Sprintf("BatchUpdateOpportunityRefs: failed to update donation %s: %s", result.ID, strings.Join(errors, ", "))
+				errorMessages = append(errorMessages, msg)
 			}
-			msg := fmt.Sprintf("BatchUpdateOpportunityRefs: failed to update donation %s: %s", result.ID, strings.Join(errors, ", "))
-			errorMessages = append(errorMessages, msg)
 		}
 	}
 
 	if len(errorMessages) > 0 {
 
 		c.log.Error("BatchUpdateOpportunityRefs: one or more donations failed to update")
+		c.log.Error(fmt.Sprintf("errors: %v", errorMessages))
 		return response, fmt.Errorf("one or more donations failed to update:\n- %s",
 			strings.Join(errorMessages, "\n- "))
 	}

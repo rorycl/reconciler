@@ -39,10 +39,7 @@ func tokenPrinter(t *oauth2.Token) string {
 
 // isValid determines if a token expires within the stated duration.
 func isValid(et *ExtendedToken, d time.Duration) bool {
-	if et.Token.Expiry.After(time.Now().Add(-1 * d)) {
-		return true
-	}
-	return false
+	return et.Token.Expiry.After(time.Now().Add(-1 * d))
 }
 
 // createFSConfig creates a salesforce configuration for tests.
