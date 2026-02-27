@@ -16,7 +16,7 @@ WITH variables AS (
         ,date('2026-03-31') AS DateTo  /* @param */
         -- All | Linked | NotLinked
         ,'All' AS LinkageStatus        /* @param */
-        ,'INV-2025-101' AS PayoutReference         /* @param */
+        ,'' AS PayoutReference         /* @param */
         ,'' AS TextSearch              /* @param */
         ,30 AS HereLimit               /* @param */
         ,0 AS HereOffset               /* @param */
@@ -32,7 +32,9 @@ WITH variables AS (
  */
 ,linked_invoices_or_transactions AS ( 
     SELECT
-        i.invoice_number AS ref
+        i.id AS ref_id
+        ,i.invoice_number AS ref
+        ,'invoice' AS ref_typer
     FROM
         invoices i
         ,variables v
@@ -53,7 +55,9 @@ WITH variables AS (
     UNION -- union the bank transactions to the invoices
 
     SELECT
-        b.reference AS ref
+        b.id AS ref_id
+        ,b.reference AS ref
+        ,'bank-transaction' AS ref_typer
     FROM
         bank_transactions b
         ,variables v
@@ -90,6 +94,9 @@ WITH variables AS (
             ELSE
                 FALSE
          END AS is_linked
+        ,COALESCE(lit.ref_id, '') AS link_id
+        ,COALESCE(lit.ref_typer, '') AS link_typer
+
         /* see www.sqlitetutorial.net/sqlite-json-functions/sqlite-json_extract-function/ */
         -- s.additional_fields_json  TEXT -- A JSON blob for all other fields
     FROM donations s

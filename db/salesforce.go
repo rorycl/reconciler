@@ -27,6 +27,8 @@ type Donation struct {
 	ModifiedDate    *time.Time `db:"last_modified_date"`
 	ModifiedName    *string    `db:"last_modified_by"`
 	IsLinked        bool       `db:"is_linked"`
+	LinkID          string     `db:"link_id"`
+	LinkTyper       string     `db:"link_typer"`
 	RowCount        int        `db:"row_count"`
 }
 
@@ -74,8 +76,10 @@ func (db *DB) DonationsGet(ctx context.Context, dateFrom, dateTo time.Time, link
 	}
 	// Return early if no rows were returned.
 	if len(donations) == 0 {
+		db.log.Info("DonationsGet : no rows")
 		return nil, sql.ErrNoRows
 	}
+	db.log.Info(fmt.Sprintf("DonationsGet : retrieved %d records", len(donations)))
 	return donations, nil
 }
 
