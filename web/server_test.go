@@ -34,17 +34,21 @@ func TestWebAppToRun(t *testing.T) {
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
 
-	accountCodes := "^(53|55|57)"
-	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", "", accountCodes, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	templatesFS, err := mounts.NewFileMount("templates", TemplatesEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlFS, err := mounts.NewFileMount("sql", db.SQLEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accountCodes := "^(53|55|57)"
+	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", sqlFS, accountCodes, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,17 +100,21 @@ func TestWebAppAndShutdown(t *testing.T) {
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
 
-	accountCodes := "^(53|55|57)"
-	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", "", accountCodes, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	templatesFS, err := mounts.NewFileMount("templates", TemplatesEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlFS, err := mounts.NewFileMount("sql", db.SQLEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accountCodes := "^(53|55|57)"
+	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", sqlFS, accountCodes, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
