@@ -46,10 +46,9 @@ func isValid(et *ExtendedToken, d time.Duration) bool {
 func createSFConfig(t *testing.T, callbackURL, serverURL string) config.SalesforceConfig {
 	t.Helper()
 	return config.SalesforceConfig{
-		LoginDomain:          serverURL,
-		ClientID:             "my-client-id",
-		ClientSecret:         "my-client-secret",
-		TokenTimeoutDuration: duration(t, "8h"),
+		LoginDomain:  serverURL,
+		ClientID:     "my-client-id",
+		ClientSecret: "my-client-secret",
 		OAuth2Config: &oauth2.Config{
 			RedirectURL: callbackURL,
 			Endpoint: oauth2.Endpoint{
