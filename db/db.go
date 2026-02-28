@@ -64,6 +64,7 @@ func (p *parameterizedStmt) verifyArgs(args map[string]any) error {
 // DB provides a wrapper around the sql.DB connection for application-specific db operations.
 type DB struct {
 	*sqlx.DB
+	Path         string
 	accountCodes string
 	sqlFS        fs.FS
 	log          *slog.Logger
@@ -144,6 +145,7 @@ func NewConnection(
 
 	// Wrap the standard library *sql.DB with sqlx.
 	db := &DB{
+		Path:         dbPath,
 		DB:           sqlx.NewDb(dbDB, "sqlite"),
 		accountCodes: accountCodes,
 		sqlFS:        sqlFS,
