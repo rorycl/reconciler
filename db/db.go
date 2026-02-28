@@ -18,7 +18,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	mounts "reconciler/internal/mounts"
 	"strings"
 
 	"github.com/jmoiron/sqlx" // helper library
@@ -96,18 +95,10 @@ type DB struct {
 // containing line items starting with those codes are returned.
 func NewConnection(
 	dbPath string,
-	sqlDir string,
+	sqlFS fs.FS,
 	accountCodes string,
 	logger *slog.Logger,
 ) (*DB, error) {
-
-	// mount the sql fs either using the embedded fs or via the provided path.
-	// The path is likely to need to be relative to "here" as ".." type paths are not
-	// accepted by fs mounting.
-	sqlFS, err := mounts.NewFileMount("sql", SQLEmbeddedFS, sqlDir)
-	if err != nil {
-		return nil, fmt.Errorf("mount error: %v", err)
-	}
 
 	// DataSource is the default setting for file-based databases.
 	dataSource := fmt.Sprintf("%s?_dataSource=foreign_keys(1)&_dataSource=journal_mode(WAL)", dbPath)
@@ -190,7 +181,7 @@ func NewConnection(
 // NewConnectionInTestMode runs a new connection in test mode, loading the test data.
 func NewConnectionInTestMode(
 	dbPath string,
-	sqlDir string,
+	sqlFS fs.FS,
 	accountCodes string,
 	logger *slog.Logger,
 ) (*DB, error) {
@@ -199,7 +190,7 @@ func NewConnectionInTestMode(
 		return nil, fmt.Errorf("db path %q invalid for test mode", dbPath)
 	}
 
-	testDB, err := NewConnection(dbPath, sqlDir, accountCodes, logger)
+	testDB, err := NewConnection(dbPath, sqlFS, accountCodes, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialise test database: %w", err)
 	}

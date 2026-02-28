@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	mounts "reconciler/internal/mounts"
 )
 
 func ptrTime(ti time.Time) *time.Time { return &ti }
@@ -24,16 +26,22 @@ func setupTestDB(t *testing.T) (*DB, func()) {
 	})
 
 	accountCodes := "^(53|55|57)"
-	sqlDir := "sql"
 
-	var err error
-	testDB, err := NewConnectionInTestMode("file::memory:?cache=shared", sqlDir, accountCodes, nil)
+	// mount the sql fs either using the embedded fs or via the provided path.
+	// The path is likely to need to be relative to "here" as ".." type paths are not
+	// accepted by fs mounting.
+	sqlFS, err := mounts.NewFileMount("sql", SQLEmbeddedFS, "sql")
+	if err != nil {
+		t.Fatalf("mount error: %v", err)
+	}
+
+	testDB, err := NewConnectionInTestMode("file::memory:?cache=shared", sqlFS, accountCodes, nil)
 	if err != nil {
 		t.Fatalf("in-memory test database opening error: %v", err)
 	}
 
-	// set log level to Debu
-	testDB.SetLogLevel(slog.LevelWarn)
+	// set log level to Info/Debug
+	testDB.SetLogLevel(slog.LevelInfo)
 
 	// closeDBFunc is a closure for running by the function consumer.
 	closeDBFunc := func() {
