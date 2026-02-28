@@ -56,7 +56,7 @@ func getPin() error {
 
 	select {
 	case <-time.After(10 * time.Second):
-		return errors.New("no code was input in 10 seconds. aborting.")
+		return errors.New("no code was input in 10 seconds. aborting")
 	case <-aChan:
 		break
 	}
