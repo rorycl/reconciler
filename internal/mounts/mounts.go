@@ -184,7 +184,7 @@ func PrintFS(thisFS fs.FS) (string, error) {
 			return err // propogate
 		}
 		if !topSeen { // verbatim root as "[d] ./ (./)"
-			_, err = printOutput.WriteString(fmt.Sprintf(tpl, "\n", "d", ".", "/", "."))
+			_, err := fmt.Fprintf(&printOutput, tpl, "\n", "d", ".", "/", ".")
 			if err != nil {
 				return fmt.Errorf("printOutput error: %v", err)
 			}
@@ -200,7 +200,7 @@ func PrintFS(thisFS fs.FS) (string, error) {
 			slash = string(os.PathSeparator)
 			typer = "d"
 		}
-		_, err = printOutput.WriteString(fmt.Sprintf(tpl, indent, typer, name, slash, path))
+		_, err = fmt.Fprintf(&printOutput, tpl, indent, typer, name, slash, path)
 		return err
 	})
 	return printOutput.String(), err
