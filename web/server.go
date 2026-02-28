@@ -193,7 +193,8 @@ func (web *WebApp) RestartRoutes() {
 // StartServer starts a WebApp.
 func (web *WebApp) StartServer() error {
 	web.server.Handler = web.routes()
-	web.log.Info(fmt.Sprintf("Starting server on %s", web.cfg.Web.ListenAddress))
+	// Print to the console, regardless of the log level.
+	fmt.Printf("Starting server on %s\n", web.cfg.Web.ListenAddress)
 	return web.server.ListenAndServe()
 }
 
