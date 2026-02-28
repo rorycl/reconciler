@@ -342,12 +342,12 @@ func (web *WebApp) handleLogout() http.Handler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	// Determine if an in-memory database is in use.
-	hasMemoryDB := strings.Contains(web.cfg.DatabasePath, ":memory:")
+	hasMemoryDB := strings.Contains(web.db.Path, ":memory:")
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]any{
 			"MemoryDatabase": hasMemoryDB,
-			"DBName":         web.cfg.DatabasePath,
+			"DBName":         web.db.Path,
 		}
 		web.render(w, r, templates, name, data)
 	})
