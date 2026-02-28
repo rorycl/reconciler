@@ -13,6 +13,8 @@ reconciliation.db*
 
 # binaries
 bin
+cmd/reconciler/reconciler
+cmd/reconciler-dev/reconciler-dev
 
 # tmp files
 todo.txt
