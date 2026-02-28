@@ -28,7 +28,7 @@ type Config struct {
 	DatabasePath            string   `yaml:"database_path"`
 	DataStartDateStr        string   `yaml:"data_date_start"`
 	DonationAccountPrefixes []string `yaml:"donation_account_prefixes"`
-	InDevelopmentMode       bool     `yaml:"development_mode"`
+	InDevelopmentMode       bool     `yaml:"-"`
 
 	// subsections
 	Web           WebConfig        `yaml:"web"`
@@ -51,23 +51,19 @@ type WebConfig struct {
 
 // XeroConfig holds Xero-specific settings.
 type XeroConfig struct {
-	ClientID             string `yaml:"client_id"`
-	ClientSecret         string `yaml:"client_secret"`
-	TokenTimeout         string `yaml:"token_timeout"`
-	TokenTimeoutDuration time.Duration
-	Scopes               []string `yaml:"scopes"`
-	OAuth2Config         *oauth2.Config
+	ClientID     string   `yaml:"client_id"`
+	ClientSecret string   `yaml:"client_secret"`
+	Scopes       []string `yaml:"-"`
+	OAuth2Config *oauth2.Config
 }
 
 // SalesforceConfig holds Salesforce-specific settings.
 type SalesforceConfig struct {
-	LoginDomain          string `yaml:"login_domain"`
-	ClientID             string `yaml:"client_id"`
-	ClientSecret         string `yaml:"client_secret"`
-	TokenTimeout         string `yaml:"token_timeout"`
-	TokenTimeoutDuration time.Duration
-	Scopes               []string `yaml:"scopes"`
-	OAuth2Config         *oauth2.Config
+	LoginDomain  string   `yaml:"login_domain"`
+	ClientID     string   `yaml:"client_id"`
+	ClientSecret string   `yaml:"client_secret"`
+	Scopes       []string `yaml:"-"`
+	OAuth2Config *oauth2.Config
 	// SOQL settings.
 	Query            string            `yaml:"query"`
 	FieldMappings    map[string]string `yaml:"field_mappings"`
@@ -162,15 +158,24 @@ func validateAndPrepare(c *Config) error {
 	if xc.ClientSecret != "" {
 		return errors.New("xero.client_secret should not be provided for Xero PKCE connections")
 	}
-	if xc.TokenTimeout == "" {
-		return errors.New("xero.token_timeout is missing")
+	// Restrictive read-only scopes.
+	xc.Scopes = []string{
+		"accounting.invoices.read",
+		"accounting.banktransactions.read",
+		"accounting.settings.read",
+		"offline_access",
 	}
-	if xc.TokenTimeoutDuration, err = time.ParseDuration(xc.TokenTimeout); err != nil {
-		return fmt.Errorf("could not parse xero.token_timeout %q: %w", xc.TokenTimeout, err)
+	// The above scopes are only valid from March 2, 2026 only.
+	// https://developer.xero.com/documentation/guides/oauth2/scopes/#organisation-scopes
+	// The following are the fallback scopes.
+	if time.Now().Before(time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)) {
+		xc.Scopes = []string{
+			"accounting.transactions",
+			"accounting.settings.read",
+			"offline_access",
+		}
 	}
-	if xc.TokenTimeoutDuration > time.Duration(12*time.Hour) {
-		return fmt.Errorf("xero.token_timeout duration of >12 hours not supported, got %v", xc.TokenTimeoutDuration)
-	}
+
 	if len(xc.Scopes) < 1 {
 		return errors.New("xero.scopes not defined")
 	}
@@ -200,29 +205,23 @@ func validateAndPrepare(c *Config) error {
 	if sc.LoginDomain == "" {
 		return errors.New("salesforce.login_domain is missing")
 	}
-	if sc.TokenTimeout == "" {
-		return errors.New("salesforce.token_timeout is missing")
-	}
-	if sc.TokenTimeoutDuration, err = time.ParseDuration(sc.TokenTimeout); err != nil {
-		return fmt.Errorf("could not parse salesforce.token_timeout %q: %w", sc.TokenTimeout, err)
-	}
-	if sc.TokenTimeoutDuration > time.Duration(16*time.Hour) {
-		return fmt.Errorf("salesforce.token_timeout duration of >16 hours not supported, got %v", sc.TokenTimeoutDuration)
-	}
 	if sc.Query == "" {
 		return errors.New("salesforce.query is missing")
 	}
-	if !strings.Contains(sc.Query, "{{.WhereClause}}") {
-		return errors.New("salesforce.query must contain '{{.WhereClause}}'")
+	if strings.Contains(strings.ToLower(sc.Query), "where") {
+		return errors.New("salesforce.query may not provide a WHERE clause. This is added by the program.")
 	}
+	sc.Query += "\n  WHERE {{.WhereClause}}"
 	if sc.LinkingObject == "" {
 		return errors.New("salesforce.linking_object is missing")
 	}
 	if sc.LinkingFieldName == "" {
 		return errors.New("salesforce.linking_field_name is missing")
 	}
-	if len(sc.Scopes) < 1 {
-		return errors.New("salesforce.scopes not defined")
+	// Required salesforce scopes.
+	sc.Scopes = []string{
+		"api",
+		"refresh_token",
 	}
 	if !slices.Contains(sc.Scopes, "api") {
 		return errors.New("salesforce.scopes does not contain 'api' scope")

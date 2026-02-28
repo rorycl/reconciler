@@ -28,31 +28,12 @@ func TestConfig(t *testing.T) {
 	}
 	config.Web.ListenAddress = "127.0.0.1:9001"
 
-	config.Xero.TokenTimeout = "11h"
-	if err := validateAndPrepare(config); err != nil {
-		t.Errorf("unexpected error for token timeout %v", err)
-	}
-
-	config.Xero.TokenTimeout = "13h"
+	q := config.Salesforce.Query
+	config.Salesforce.Query = `SELECT something FROM otherthing WHERE {{.WhereClause}}`
 	if err := validateAndPrepare(config); err == nil {
-		t.Errorf("expected error for token timeout %v", config.Xero.TokenTimeout)
+		t.Errorf("expected error for query with WHERE (%q)", config.Salesforce.Query)
 	}
-
-	config.Xero.TokenTimeout = "not valid"
-	if err := validateAndPrepare(config); err == nil {
-		t.Errorf("expected error for invalid token timeout %q", config.Xero.TokenTimeout)
-	}
-	config.Xero.TokenTimeout = "12h"
-
-	config.Salesforce.TokenTimeout = "17h"
-	if err := validateAndPrepare(config); err == nil {
-		t.Errorf("expected error for token timeout %v", config.Salesforce.TokenTimeout)
-	}
-
-	config.Salesforce.TokenTimeout = "not valid"
-	if err := validateAndPrepare(config); err == nil {
-		t.Errorf("expected error for invalid token timeout %q", config.Salesforce.TokenTimeout)
-	}
+	config.Salesforce.Query = q
 
 }
 
