@@ -3,17 +3,9 @@
 
 #######################################################################
 # General settings
-#######################################################################
 
 # The organisation name is the charity name.
 organisation_name: "My Organisation"
-
-# The database file path for the sqlite database.
-# For production an in-memory sqlite database is required. For
-# development an on-disk file may be used. Beware of the security
-# implications of keeping any database file on disk.
-# database_path: "./reconciliation.db"
-database_path: ":memory:"
 
 # The data date start is the date from which information should be
 # synchronised into the local system to effect reconciliation between
@@ -29,8 +21,6 @@ donation_account_prefixes:
 
 #######################################################################
 # Web server settings
-#######################################################################
-
 web:
   listen_address: "localhost:8080"
   xero_oauth2_callback: "/xero/callback"
@@ -41,8 +31,6 @@ web:
 #
 # These settings set out the OAuth2 connection settings to the remote
 # platform. PKCE code verification is required
-#######################################################################
-
 xero:
   client_id: "XERO_CLIENT_ID"
   client_secret: "" # should not be provided for Xero PKCE connections.
@@ -56,8 +44,6 @@ xero:
 # The SOQL donation retrieval query is specified, together with the
 # object and field name to target in distributed foreign key (DFK)
 # updates.
-#######################################################################
-
 salesforce:
   login_domain: "test.salesforce.com"
   client_id: "SALESFORCE_CONSUMER_KEY"

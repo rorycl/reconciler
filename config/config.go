@@ -25,7 +25,6 @@ const (
 // Config represents the entire application configuration.
 type Config struct {
 	Organisation            string   `yaml:"organisation_name"`
-	DatabasePath            string   `yaml:"database_path"`
 	DataStartDateStr        string   `yaml:"data_date_start"`
 	DonationAccountPrefixes []string `yaml:"donation_account_prefixes"`
 	InDevelopmentMode       bool     `yaml:"-"`
@@ -100,9 +99,6 @@ func validateAndPrepare(c *Config) error {
 	// General
 	if c.Organisation == "" {
 		return errors.New("organisation_name is missing")
-	}
-	if c.DatabasePath == "" {
-		return errors.New("database_path is missing")
 	}
 	if c.DataStartDateStr == "" {
 		return errors.New("date_range_start is missing")
@@ -209,7 +205,7 @@ func validateAndPrepare(c *Config) error {
 		return errors.New("salesforce.query is missing")
 	}
 	if strings.Contains(strings.ToLower(sc.Query), "where") {
-		return errors.New("salesforce.query may not provide a WHERE clause. This is added by the program.")
+		return errors.New("salesforce.query may not provide a WHERE clause which is added by the program")
 	}
 	sc.Query += "\n  WHERE {{.WhereClause}}"
 	if sc.LinkingObject == "" {
