@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	ShortUsage      = "A webapp for reconciling financial and CRMS system donations"
+	ShortUsage      = "A local webapp for reconciling financial and CRMS donations"
 	LongDescription = `
 The reconciler app is a local web server for creating OAuth2 API connections to an
 organisation's financial and CRMS systems for reconciling these with codes from the
-financial system. Please see the project readme for more information.
+financial system. Please see the project README for more information at
 https://github.com/rorycl/reconciler.`
 )
 
