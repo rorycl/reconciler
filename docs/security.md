@@ -97,11 +97,11 @@ Broadly the security considerations fall into three areas.
 
 #### Authentication, Authorization and Connection security
 
-For each API connection OAuth2 PKCE credentials are needing, together
-with authentication through the user's personal login credentials which
-*are recommended to be* MFA (multi-factor authentication) protected. Any
-user will need to have been authorized to access the remote resources in
-question.
+For each API connection OAuth2 PKCE credentials are needed, together
+with authentication through the user's personal login credentials.
+Consequently, all Reconciler users will need to have been setup
+individually as authorized users to each remote platform. These profiles
+*are recommended to be* MFA (multi-factor authentication) protected.
 
 The OAuth2 token issuance and refresh flow is an industry standard
 for remote platforms issuing short-lived access tokens for access
