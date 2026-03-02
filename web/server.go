@@ -422,6 +422,7 @@ func (web *WebApp) handleRefresh() http.Handler {
 			"Refreshed":            refreshed,
 			"LastRefresh":          lastRefresh,
 			"DonationAccountCodes": accountCodes,
+			"Message":              web.sessions.PopString(ctx, "message"),
 		}
 		web.render(w, r, templates, name, data)
 	})
@@ -443,7 +444,9 @@ func (web *WebApp) handleRefreshUpdates() http.Handler {
 		infoMap, err := web.refreshXeroRecords(ctx)
 		if err != nil {
 			// Todo: report errors to client.
-			web.log.Error(fmt.Sprintf("failed to refresh Xero records: %v", err))
+			msg := fmt.Sprintf("failed to refresh Xero records: %v", err)
+			web.log.Error(msg)
+			web.sessions.Put(ctx, "message", msg)
 			http.Redirect(w, r, "/refresh", http.StatusFound)
 			return
 		}

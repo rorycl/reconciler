@@ -17,6 +17,14 @@
         </p>
     </div>
 
+    {{ if .Message }}{{/* .Message has an interface value */}}
+    <div id="message"
+         class="pt-4 pb-2 px-4 border border border-4 rounded-md bg-amber-200">
+        <h3 class="font-semibold">Error</h3>
+        <p class="pb-2">{{.Message}}</p>
+    </div>
+    {{ end }}
+
     <div class="mt-2 space-y-6">
         <!-- Refresh Xero -->
         <div class="pt-4 pb-2 px-4 border border border-4 rounded-md">
