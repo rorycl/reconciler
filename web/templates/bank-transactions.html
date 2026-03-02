@@ -128,7 +128,7 @@
                             </span>
                         </td>
                         <td class="px-4 py-1 whitespace-nowrap">{{ .Date.Format "02/01/2006" }}</td>
-                        <td class="px-4 py-1">{{ .Reference }}</td>
+                        <td class="px-4 py-1">{{ .Reference }} {{ if .RefDupe }}<span class="pl-2 text-xs font-bold text-red-700">duplicate</span>{{ end }}</td>
                         <td class="px-4 py-1">{{ .Status }}</td>
                         <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .Total }}</td>
                         <td class="px-4 py-1 text-right font-mono">{{ printf "%.2f" .DonationTotal }}</td>
