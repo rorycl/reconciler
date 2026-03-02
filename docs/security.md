@@ -109,9 +109,9 @@ to platform resources. These tokens are held in App memory and are
 deleted on App closure or after a 2 hour inactivity timeout. The OAuth2
 process is further strengthened by using PKCE code verification.
 
-CSRF attacks against the App are mitigated by [CSRF
+CSRF attacks are mitigated by [CSRF
 protection](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
-built into the local webApp.
+built into the App.
 
 #### Filesystem security
 
