@@ -14,7 +14,7 @@ WITH variables AS (
         ,'^(53|55|57).*' AS AccountCodes /* @param */
         -- All | Reconciled | NotReconciled
         ,'All' AS ReconciliationStatus   /* @param */
-        ,'' AS TextSearch     /* @param */ 
+        ,'' AS TextSearch     /* @param */
         ,10 AS HereLimit                 /* @param */
         ,0 AS HereOffset                 /* @param */
 )
@@ -25,10 +25,6 @@ WITH variables AS (
         ,COUNT(*) AS counter
     FROM
         bank_transactions b
-    WHERE
-        b.reference IS NOT NULL
-        AND 
-        b.reference <> ''
     GROUP BY
         b.reference
     HAVING
@@ -92,18 +88,18 @@ crms_donation_totals AS (
             OR
             (
                 v.ReconciliationStatus = 'Reconciled'
-                 AND 
+                 AND
                  COALESCE(bdt.total_donation_amount, 0) = COALESCE(cdt.total_crms_amount, 0)
             )
             OR
             (
                 v.ReconciliationStatus = 'NotReconciled'
-                 AND 
+                 AND
                  COALESCE(bdt.total_donation_amount, 0) <> COALESCE(cdt.total_crms_amount, 0)
             )
         )
         AND
-        bdt.transaction_id IS NOT NULL 
+        bdt.transaction_id IS NOT NULL
         AND CASE
             WHEN v.TextSearch = '' THEN true
             ELSE LOWER(CONCAT(b.reference, ' ', b.contact)) REGEXP LOWER(v.TextSearch)
