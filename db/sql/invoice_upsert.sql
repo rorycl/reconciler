@@ -33,15 +33,15 @@ INSERT INTO invoices (
     ,contact
 )
 SELECT
-    v.InvoiceID    
-    ,v.Type         
-    ,v.Status       
+    v.InvoiceID
+    ,v.Type
+    ,v.Status
     ,v.InvoiceNumber
-    ,v.Reference    
-    ,v.Total        
-    ,v.AmountPaid   
-    ,v.Date         
-    ,v.Updated      
+    ,v.Reference
+    ,v.Total
+    ,v.AmountPaid
+    ,v.Date
+    ,v.Updated
     ,v.Contact
 FROM
     variables v

@@ -29,14 +29,14 @@ INSERT INTO bank_transaction_line_items (
     ,tax_amount
 )
 SELECT
-    v.LineItemID        
-    ,v.BankTransactionID 
-    ,v.Description       
-    ,v.Quantity          
-    ,v.UnitAmount        
-    ,v.LineAmount        
-    ,v.AccountCode       
-    ,v.TaxAmount         
+    v.LineItemID
+    ,v.BankTransactionID
+    ,v.Description
+    ,v.Quantity
+    ,v.UnitAmount
+    ,v.LineAmount
+    ,v.AccountCode
+    ,v.TaxAmount
 FROM
     variables v
 ;

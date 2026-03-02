@@ -11,7 +11,7 @@ WITH variables AS (
     SELECT
          'inv-002' AS InvoiceID /* @param */
 )
-DELETE FROM 
+DELETE FROM
     invoice_line_items
 WHERE
     invoice_id = (

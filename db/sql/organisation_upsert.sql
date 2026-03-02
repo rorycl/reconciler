@@ -33,21 +33,21 @@ INSERT INTO organisation (
 )
 SELECT
     v.ID  -- not a param
-    ,v.Name                 
-    ,v.LegalName            
-    ,v.OrganisationType     
-    ,v.FinancialYearEndDay  
+    ,v.Name
+    ,v.LegalName
+    ,v.OrganisationType
+    ,v.FinancialYearEndDay
     ,v.FinancialYearEndMonth
-    ,v.Timezone             
-    ,v.ShortCode            
-    ,v.OrganisationID       
+    ,v.Timezone
+    ,v.ShortCode
+    ,v.OrganisationID
 FROM
     variables v
 -- sqlite.org/lang_upsert.html PARSING AMBIGUITY
 WHERE
     true
 ON CONFLICT (id) DO UPDATE SET
-    id                        = excluded.id                               
+    id                        = excluded.id
     ,name                     = excluded.name
     ,legal_name               = excluded.legal_name
     ,organisation_type        = excluded.organisation_type

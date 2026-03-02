@@ -34,16 +34,16 @@ INSERT INTO accounts (
     ,updated_at
 )
 SELECT
-    v.AccountID    
-    ,v.Code         
-    ,v.Name         
-    ,v.Description  
-    ,v.Type         
-    ,v.TaxType      
-    ,v.Status       
+    v.AccountID
+    ,v.Code
+    ,v.Name
+    ,v.Description
+    ,v.Type
+    ,v.TaxType
+    ,v.Status
     ,v.SystemAccount
-    ,v.CurrencyCode 
-    ,v.Updated      
+    ,v.CurrencyCode
+    ,v.Updated
 FROM
     variables v
 -- sqlite.org/lang_upsert.html PARSING AMBIGUITY

@@ -1,6 +1,6 @@
 /*
  Reconciler app SQL
- donation_upsert.sql 
+ donation_upsert.sql
  Upsert a donation (salesforce opportunity) record.
 
  Note @param comments declare a template value for middleware replacement.

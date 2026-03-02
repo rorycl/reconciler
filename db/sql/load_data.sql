@@ -34,8 +34,8 @@ INSERT INTO "accounts" (id, code, name, description, type, status) VALUES
 
 -- -----------------------------------------------------------------------------
 -- Invoice scenario 1
--- A simple fully reconciled invoice 
--- * a single invoice line item (no platform fees) 
+-- A simple fully reconciled invoice
+-- * a single invoice line item (no platform fees)
 -- * a single salesforce donation
 -- -----------------------------------------------------------------------------
 INSERT INTO "invoices" (id, invoice_number, status, total, date, contact) VALUES
@@ -199,7 +199,7 @@ INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VAL
 INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-odd-01', 'Data Entry Error Donation', 50.00, datetime('2025-06-10'), 'INV-2025-101');
 
--- An unlinked donation 
+-- An unlinked donation
 INSERT INTO "donations" (id, name, amount, close_date, payout_reference_dfk) VALUES
 ('sf-opp-odd-02', 'Unlinked Donation', 75.00, datetime('2025-04-30'), null);
 

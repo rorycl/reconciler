@@ -30,7 +30,7 @@ WITH variables AS (
  * transactions to determine linkage (which is done in the `lit` LEFT
  * OUTER JOIN below.)
  */
-,linked_invoices_or_transactions AS ( 
+,linked_invoices_or_transactions AS (
     SELECT
         i.id AS ref_id
         ,i.invoice_number AS ref
@@ -40,7 +40,7 @@ WITH variables AS (
         ,variables v
     WHERE
         i.date BETWEEN date(v.DateFrom, '-60 day') AND date(v.DateTo, '+60 day')
-        AND 
+        AND
         i.invoice_number IS NOT NULL
         AND
         CASE
@@ -63,7 +63,7 @@ WITH variables AS (
         ,variables v
     WHERE
         b.date BETWEEN date(v.DateFrom, '-60 day') AND date(v.DateTo, '+60 day')
-        AND 
+        AND
         b.reference IS NOT NULL
         AND
         CASE
@@ -74,12 +74,12 @@ WITH variables AS (
             END
     GROUP BY
         b.reference
-) 
+)
 
 ,main AS (
     SELECT
-        s.id  
-        ,s.name 
+        s.id
+        ,s.name
         ,s.amount
         ,s.close_date
         ,s.payout_reference_dfk
@@ -103,11 +103,11 @@ WITH variables AS (
         LEFT OUTER JOIN linked_invoices_or_transactions lit ON (
             lit.ref = s.payout_reference_dfk
         )
-        , variables v 
+        , variables v
     WHERE
         s.close_date BETWEEN v.DateFrom AND v.DateTo
         AND
-        CASE 
+        CASE
             -- Searching by v.PayoutReference doesn't make sense if
             -- v.LinkageStatus = 'NotLinked. If porting to plpgsql, check
             -- for that as an error condition in the preamble.
@@ -152,5 +152,5 @@ LIMIT
     (SELECT variables.HereLimit FROM variables)
 OFFSET
     (SELECT variables.HereOffset FROM variables)
-    
+
 ;

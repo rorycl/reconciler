@@ -32,7 +32,7 @@ FROM (
         ,b.bank_account_id
         ,b.total
         ,COALESCE(
-                sum(li.line_amount) 
+                sum(li.line_amount)
                 FILTER (WHERE li.account_code REGEXP variables.AccountCodes)
                 OVER (PARTITION BY b.id)
          , 0) AS donation_total

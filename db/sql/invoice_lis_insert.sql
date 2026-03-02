@@ -29,14 +29,14 @@ INSERT INTO invoice_line_items (
     ,tax_amount
 )
 SELECT
-    v.LineItemID 
-    ,v.InvoiceID  
+    v.LineItemID
+    ,v.InvoiceID
     ,v.Description
-    ,v.Quantity   
-    ,v.UnitAmount 
-    ,v.LineAmount 
+    ,v.Quantity
+    ,v.UnitAmount
+    ,v.LineAmount
     ,v.AccountCode
-    ,v.TaxAmount  
+    ,v.TaxAmount
 FROM
     variables v
 ;

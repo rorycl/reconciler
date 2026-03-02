@@ -18,13 +18,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_single_row ON system ((1));
 CREATE TABLE IF NOT EXISTS organisation (
     id                        INTEGER PRIMARY KEY -- Enforce only one row with id=1 for desktop
     ,name                     TEXT
-    ,legal_name               TEXT 
-    ,organisation_type        TEXT 
-    ,financial_year_end_day   INTEGER  
+    ,legal_name               TEXT
+    ,organisation_type        TEXT
+    ,financial_year_end_day   INTEGER
     ,financial_year_end_month INTEGER
-    ,timezone                 TEXT 
-    ,shortcode                TEXT 
-    ,organisation_id          TEXT 
+    ,timezone                 TEXT
+    ,shortcode                TEXT
+    ,organisation_id          TEXT
 );
 
 -- Ensure only one row for organisation.

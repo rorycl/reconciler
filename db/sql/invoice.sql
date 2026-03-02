@@ -31,7 +31,7 @@ FROM (
         ,i.contact
         ,i.total
         ,COALESCE(
-            SUM(li.line_amount) 
+            SUM(li.line_amount)
             FILTER (WHERE li.account_code REGEXP variables.AccountCodes)
             OVER (PARTITION BY i.id)
          , 0) AS donation_total

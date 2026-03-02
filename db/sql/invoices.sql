@@ -74,13 +74,13 @@ crms_donation_totals AS (
             OR
             (
                 v.ReconciliationStatus = 'Reconciled'
-                 AND 
+                 AND
                  COALESCE(idt.total_donation_amount, 0) = COALESCE(cdt.total_crms_amount, 0)
             )
             OR
             (
                 v.ReconciliationStatus = 'NotReconciled'
-                 AND 
+                 AND
                  COALESCE(idt.total_donation_amount, 0) <> COALESCE(cdt.total_crms_amount, 0)
             )
         )
