@@ -110,5 +110,8 @@ func (a *App) RunWebServer() error {
 		a.log.Error(fmt.Sprintf("app web server init error: %v", err))
 		return fmt.Errorf("could not initialise web server: %w", err)
 	}
+	if a.inDevelopment {
+		webApp.SetInDevelopment()
+	}
 	return webApp.StartServer()
 }
