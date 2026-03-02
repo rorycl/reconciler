@@ -14,13 +14,20 @@
     <h3 class="text-l text-slate-800 font-semibold pb-3 pt-0">
         <a href="/bank-transactions" class="hover:underline">Bank Transactions</a> &raquo; Details for bank transaction {{ .Transaction.Reference }}
     </h3>
-    
+
     <!-- bank-transaction panel -->
     <div class="overflow-x-auto text-sm text-black rounded-md border border-slate-400 pt-4 px-4 mb-4 bg-slate-100">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4 mx-1">
             <div class="md:col-span-2">
                 <h3 class="text-xs text-slate-800 font-semibold">Reference</h3>
-                <p class="pb-2 border-b-2 border-dotted border-slate-400"><span class="pr-2">{{ .Transaction.Reference }}</span>
+                <p class="pb-2 border-b-2 border-dotted border-slate-400">
+                    <span class="pr-2">
+                    {{- if not .Transaction.Reference }}{{/* .Transaction.Reference is *string */}}
+                        &lt;Reference not set&gt;
+                    {{ else }}
+                        {{ .Transaction.Reference }}
+                    {{ end -}}
+                    </span>
                     <a href="https://go.xero.com/Bank/ViewTransaction.aspx?bankTransactionID={{ .ID }}"
                        target="_blank"
                        class="text-xs text-sky-700 font-semibold hover:underline">view in Xero</a>
@@ -53,7 +60,7 @@
             </div>
         </div>
 
-        <div class="border-2 border-slate-300 mb-3"> 
+        <div class="border-2 border-slate-300 mb-3">
         <table class="min-w-full divide-y divide-slate-300 text-xs text-slate-800 ">
             <thead class="bg-indigo-100">
                 <tr>
@@ -95,25 +102,42 @@
 <!-- donations zone wrapper -->
 <div id="donations-zone" class="mt-6">
 
+{{- if .Transaction.Reference }}
+
 {{ template "partial-donations-tabs" . }}
-<div id="tab-content" 
+<div id="tab-content"
      class="relative overflow-x-auto text-black border border-slate-400 rounded-md rounded-tr-lg rounded-b-md rounded-tl-none">
 
-{{ if eq .TabFocus "unlink" }}
-{{/* the currently linked donations for unlinking */}}
+    {{ if eq .TabFocus "unlink" }}
+    {{/* the currently linked donations for unlinking */}}
 
-    {{ template "partial-donations-linked.html" . }}
+        {{ template "partial-donations-linked.html" . }}
 
-{{ else }}
-{{/* the currently unlinked donations for linking, with search form */}}
+    {{ else }}
+    {{/* the currently unlinked donations for linking, with search form */}}
 
-    {{ template "partial-donations-searchform" . }}
+        {{ template "partial-donations-searchform" . }}
 
-    {{ template "partial-donations-searchresults" . }}
+        {{ template "partial-donations-searchresults" . }}
 
-{{ end }}
+    {{ end }}
 
 </div> <!-- end tab-content -->
-</div> 
+
+{{ else }}
+
+<div id="no-tabs"
+     class="p-1 -mt-2 mb-72 text-sm text-black ">
+    <p>No donations can be linked to this bank transaction as it has no reference. 
+    Click <a href="https://go.xero.com/Bank/ViewTransaction.aspx?bankTransactionID={{ .ID }}"
+             target="_blank"
+             class="text-sky-700 font-semibold hover:underline"
+             >here</a> to add a reference.
+    </p>
+</div>
+
+{{ end }} {{- /* end of .Transaction.Reference empty check */}}
+
+</div>
 <!-- end of donations zone wrapper -->
 {{ end }}
