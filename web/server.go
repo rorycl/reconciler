@@ -184,6 +184,12 @@ func New(
 	return webApp, nil
 }
 
+// SetInDevelopment is a development-mode switch for setting the web app in development
+// mode. This has no effect if called after the server has started.
+func (web *WebApp) SetInDevelopment() {
+	web.inDevelopment = true
+}
+
 // RestartRoutes reruns the route setup. This should only be used in development mode as
 // it may panic.
 func (web *WebApp) RestartRoutes() {
