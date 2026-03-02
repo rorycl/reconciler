@@ -154,22 +154,13 @@ func validateAndPrepare(c *Config) error {
 	if xc.ClientSecret != "" {
 		return errors.New("xero.client_secret should not be provided for Xero PKCE connections")
 	}
-	// Restrictive read-only scopes.
+	// Restrictive read-only scopes (for apps created from March 2, 2026).
+	// See https://developer.xero.com/documentation/guides/oauth2/scopes/#organisation-scopes
 	xc.Scopes = []string{
 		"accounting.invoices.read",
 		"accounting.banktransactions.read",
 		"accounting.settings.read",
 		"offline_access",
-	}
-	// The above scopes are only valid from March 2, 2026 only.
-	// https://developer.xero.com/documentation/guides/oauth2/scopes/#organisation-scopes
-	// The following are the fallback scopes.
-	if time.Now().Before(time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)) {
-		xc.Scopes = []string{
-			"accounting.transactions",
-			"accounting.settings.read",
-			"offline_access",
-		}
 	}
 
 	if len(xc.Scopes) < 1 {

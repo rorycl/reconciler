@@ -49,11 +49,6 @@ salesforce:
   client_id: "SALESFORCE_CONSUMER_KEY"
   client_secret: "SALESFORCE_CONSUMER_SECRET"
 
-  # These oauth2 scopes should not normally be changed
-  scopes:
-    - "api"
-    - "refresh_token"
-
   # The SOQL query to execute. 
   # Do not specify a "WHERE" clause. This is added automatically at
   # system start. Adding a "WHERE" clause will cause startup to fail.

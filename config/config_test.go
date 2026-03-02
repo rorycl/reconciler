@@ -77,7 +77,8 @@ func TestConfigDumpFile(t *testing.T) {
 			ClientID:     "XERO_CLIENT_ID",
 			ClientSecret: "",
 			Scopes: []string{ // p0
-				"accounting.transactions",
+				"accounting.invoices.read",
+				"accounting.banktransactions.read",
 				"accounting.settings.read",
 				"offline_access",
 			},
@@ -92,7 +93,8 @@ func TestConfigDumpFile(t *testing.T) {
 				},
 				RedirectURL: "http://localhost:8080/xero/callback",
 				Scopes: []string{ // p0
-					"accounting.transactions",
+					"accounting.invoices.read",
+					"accounting.banktransactions.read",
 					"accounting.settings.read",
 					"offline_access",
 				},

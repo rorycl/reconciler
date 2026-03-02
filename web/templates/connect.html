@@ -16,8 +16,17 @@
         <!-- Connect to Xero -->
         <div class="p-4 border border border-4 rounded-md">
             <h3 class="font-semibold">Connect to Xero</h3>
-            <p class="text-sm text-slate-600 mb-3">Authorize the app to read invoices and bank transactions.</p>
+            <p class="text-slate-600 text-sm mt-1 mb-3">Authorize the app to read invoices and bank transactions.</p>
             {{ if not .XeroTokenIsValid }}
+            <p class="text-slate-600 text-sm mb-3 -mt-2">
+                <span class="font-bold">Note:</span>
+                Xero connections require a Xero app defined on or after 2 March 2026. See 
+                <a class="hover:underline text-sky-700"
+                   href="https://developer.xero.com/documentation/guides/oauth2/scopes/#organisation-scopes">
+                    Xero's new granular scopes
+                </a>
+                for more information.
+            </p>
             <a href="/xero/init" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
                 Connect
             </a>
@@ -31,7 +40,7 @@
         <!-- Connect to Salesforce -->
         <div class="p-4 border border border-4 rounded-md">
             <h3 class="font-semibold">Connect to Salesforce</h3>
-            <p class="text-sm text-slate-600 mb-3">Authorize the app to read and update donation records.</p>
+            <p class="text-slate-600 text-sm mt-1 mb-3">Authorize the app to read and update donation records.</p>
             {{ if not .SFTokenIsValid }}
             <a href="/salesforce/init" class="inline-block bg-sky-600 text-white font-bold py-2 px-4 rounded hover:bg-sky-700 transition-colors">
                 Connect
