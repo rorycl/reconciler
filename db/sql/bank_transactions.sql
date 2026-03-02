@@ -9,14 +9,30 @@
 
 WITH variables AS (
     SELECT
-        date('2025-04-01') AS DateFrom   /* @param */
-        ,date('2026-03-31') AS DateTo    /* @param */
+        date('2024-04-01') AS DateFrom   /* @param */
+        ,date('2027-03-31') AS DateTo    /* @param */
         ,'^(53|55|57).*' AS AccountCodes /* @param */
         -- All | Reconciled | NotReconciled
-        ,'NotReconciled' AS ReconciliationStatus   /* @param */
+        ,'All' AS ReconciliationStatus   /* @param */
         ,'' AS TextSearch     /* @param */ 
         ,10 AS HereLimit                 /* @param */
         ,0 AS HereOffset                 /* @param */
+)
+
+,bank_transaction_unique_refs AS (
+    SELECT
+        b.reference
+        ,COUNT(*) AS counter
+    FROM
+        bank_transactions b
+    WHERE
+        b.reference IS NOT NULL
+        AND 
+        b.reference <> ''
+    GROUP BY
+        b.reference
+    HAVING
+        COUNT(*) > 1
 )
 
 ,bank_transaction_donation_totals AS (
@@ -54,6 +70,7 @@ crms_donation_totals AS (
     SELECT
         b.id
         ,b.reference
+        ,CASE WHEN uref.counter > 1 THEN TRUE ELSE FALSE END AS ref_dupe
         ,date
         ,b.contact
         ,b.status
@@ -65,6 +82,7 @@ crms_donation_totals AS (
     JOIN variables v ON b.date BETWEEN v.DateFrom AND v.DateTo
     LEFT JOIN bank_transaction_donation_totals bdt ON b.id = bdt.transaction_id
     LEFT JOIN crms_donation_totals cdt ON b.reference = cdt.payout_reference_dfk
+    LEFT JOIN bank_transaction_unique_refs uref ON b.reference = uref.reference
     WHERE
         b.status NOT IN ('DRAFT', 'DELETED', 'VOIDED')
         AND

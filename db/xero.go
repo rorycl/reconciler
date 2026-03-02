@@ -257,6 +257,7 @@ func (db *DB) InvoicesUpsert(ctx context.Context, invoices []xero.Invoice) error
 type BankTransaction struct {
 	ID            string    `db:"id"`
 	Reference     string    `db:"reference"`
+	RefDupe       bool      `db:"ref_dupe"` // duplicated references
 	Date          time.Time `db:"date"`
 	Contact       string    `db:"contact"`
 	BankAccountID string    `db:"bank_account_id"`
