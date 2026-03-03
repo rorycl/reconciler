@@ -4,16 +4,20 @@ import (
 	"context"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"reconciler/config"
 
 	"github.com/alexedwards/scs/v2"
+	"golang.org/x/oauth2"
 )
 
 // mock the WebServerError interface.
@@ -211,5 +215,62 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 	if got, want := sessionToken.Token.AccessToken, mockAccessToken; got != want {
 		t.Errorf("saved accessToken: got %q want %q", got, want)
 	}
+}
 
+func TestNewTokenWebClient(t *testing.T) {
+
+	cfg := &config.Config{
+		Salesforce: createSFConfig(
+			t,
+			"/salesforce/callback",
+			"https://something.com",
+		),
+	}
+
+	tests := []struct {
+		typer     TokenType
+		oauthCfg  *oauth2.Config
+		vs        ValueStorer
+		errLogger WebServerError
+		redirURL  string
+		err       error
+	}{
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), mockErrorLogger{t}, "/connect", nil},
+		{57, cfg.Salesforce.OAuth2Config, scs.New(), mockErrorLogger{t}, "/connect", errors.New("token type 57 invalid")},
+		{SalesforceToken, nil, scs.New(), mockErrorLogger{t}, "/connect", errors.New("nil oauthCfg provided")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, nil, mockErrorLogger{t}, "/connect", errors.New("nil ValueStorer")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), nil, "/connect", errors.New("nil WebServerError provided")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), mockErrorLogger{t}, "", errors.New("empty redirection URL")},
+	}
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
+			_, err := NewTokenWebClient(tt.typer, tt.oauthCfg, tt.vs, tt.errLogger, tt.redirURL)
+			if err != nil && tt.err == nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+			if err == nil && tt.err != nil {
+				t.Fatalf("expected error %v", tt.err)
+			}
+			if err != nil {
+				if got, want := err.Error(), tt.err.Error(); !strings.Contains(got, want) {
+					t.Errorf("got error %s did not contain expected %s", got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestWebClientStrMethods(t *testing.T) {
+
+	twc := &TokenWebClient{typer: XeroToken}
+	if got, want := twc.stateKey(), "xero-state"; got != want {
+		t.Errorf("got %q want %q (statekey)", got, want)
+	}
+	if got, want := twc.verifierKey(), "xero-verifier"; got != want {
+		t.Errorf("got %q want %q (verifier)", got, want)
+	}
+	if got, want := twc.SessionKey(), "xero-session"; got != want {
+		t.Errorf("got %q want %q (session)", got, want)
+	}
 }

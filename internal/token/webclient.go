@@ -46,6 +46,9 @@ func NewTokenWebClient(
 	errLogger WebServerError,
 	redirURL string, // eg "/connect"
 ) (*TokenWebClient, error) {
+	if !typer.Valid() {
+		return nil, fmt.Errorf("token type %d invalid", typer)
+	}
 	if oauthCfg == nil {
 		return nil, errors.New("nil oauthCfg provided to NewTokenWebClient")
 	}
@@ -78,6 +81,31 @@ func (twc *TokenWebClient) SessionKey() string {
 	return fmt.Sprintf("%s-%s", twc.typer, "session")
 }
 
+// InitiateLogin is the base method for initiating an OAuth2 flow. This can be used
+// directly by a cli client. It is wrapped by InitiateWebLogin.
+func (twc *TokenWebClient) InitiateLogin(ctx context.Context) (string, error) {
+
+	// Generate random state.
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", errors.New("failed to generate state")
+	}
+	state := base64.URLEncoding.EncodeToString(b)
+	twc.vs.Put(ctx, twc.stateKey(), state) // Save state to session
+
+	// Generate verifier.
+	verifier := oauth2.GenerateVerifier()
+	twc.vs.Put(ctx, twc.verifierKey(), verifier) // Save verifier to session
+
+	// Generate url.
+	authURL := twc.oauthCfg.AuthCodeURL(
+		state,
+		oauth2.AccessTypeOffline,
+		oauth2.S256ChallengeOption(verifier),
+	)
+	return authURL, nil
+}
+
 // InitiateWebLogin is an http.Handler for preparing a Salesforce OAuth2
 // flow from a web interface, which takes an OAuth2 config, ValueStorer (typically
 // session saver) interface and an idPrefix. The last is used for prefixing ValueStorer
@@ -91,24 +119,11 @@ func (twc *TokenWebClient) InitiateWebLogin() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Generate random state.
-		b := make([]byte, 32)
-		if _, err := rand.Read(b); err != nil {
-			twc.errLogger.ServerError(w, r, errors.New("failed to generate state"))
+		authURL, err := twc.InitiateLogin(ctx)
+		if err != nil {
+			twc.errLogger.ServerError(w, r, err)
 			return
 		}
-		state := base64.URLEncoding.EncodeToString(b)
-		twc.vs.Put(ctx, twc.stateKey(), state) // Save state to session
-
-		// Generate verifier.
-		verifier := oauth2.GenerateVerifier()
-		twc.vs.Put(ctx, twc.verifierKey(), verifier) // Save verifier to session
-
-		authURL := twc.oauthCfg.AuthCodeURL(
-			state,
-			oauth2.AccessTypeOffline,
-			oauth2.S256ChallengeOption(verifier),
-		)
 		http.Redirect(w, r, authURL, http.StatusSeeOther)
 	})
 }

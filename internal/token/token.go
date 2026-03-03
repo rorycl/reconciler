@@ -30,6 +30,11 @@ func (tt TokenType) String() string {
 	return tokenName[tt]
 }
 
+// Valid determines if a TokenType is Valid
+func (tt TokenType) Valid() bool {
+	return tt > NoneToken && tt <= SalesforceToken
+}
+
 // SessionName returns the session name associated with a TokenType.
 func (tt TokenType) SessionName() string {
 	return fmt.Sprintf("%s-%s", tt, "session")
