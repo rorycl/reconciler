@@ -113,7 +113,8 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 // https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/resources_sobject_describe.htm.
 //
 // The method replaces the data in the stated salesforce LinkingFieldName for salesforce
-// opportunity records with the provided IDs with the provided `reference`.
+// opportunity records on a per-IDRef basis, updating each Salesforce record ID with the
+// provided `reference`.
 //
 // Note that setting `allOrNone` to true makes the SOQL update atomic and the
 // transaction will fail in it's entirety if any single opportunity record cannot be
@@ -123,23 +124,22 @@ func (c *Client) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince
 // Requests".
 func (c *Client) BatchUpdateOpportunityRefs(
 	ctx context.Context,
-	reference string,
-	ids []string,
+	idRefs []IDRef,
 	allOrNone bool) (CollectionsUpdateResponse, error) {
 
 	urlTpl := "%s/services/data/%s/composite/sobjects"
 
-	if len(ids) > maxBatchUpdateCount {
-		c.log.Error("BatchUpdateOpportunityRefs: cannot update more than 200 records in a single batch")
-		return nil, fmt.Errorf("cannot update more than 200 records in a single batch")
+	if len(idRefs) > maxBatchUpdateCount {
+		c.log.Error(fmt.Sprintf("BatchUpdateOpportunityRefs: cannot update more than %d records in a single batch", maxBatchUpdateCount))
+		return nil, fmt.Errorf("cannot update more than %d records in a single batch", maxBatchUpdateCount)
 	}
 
 	// Build a slice of records.
-	donationsForUpdate := make([]map[string]any, len(ids))
-	for i, id := range ids {
+	donationsForUpdate := make([]map[string]any, len(idRefs))
+	for i, record := range idRefs {
 		donationsForUpdate[i] = map[string]any{
-			"id":                                 id,
-			c.config.Salesforce.LinkingFieldName: reference,
+			"id":                                 record.ID,
+			c.config.Salesforce.LinkingFieldName: record.Ref,
 			"attributes": map[string]string{
 				"type": c.config.Salesforce.LinkingObject,
 			},

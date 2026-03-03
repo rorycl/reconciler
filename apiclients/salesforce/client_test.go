@@ -215,8 +215,14 @@ func TestBatchUpdateOpportunityRefs_Succeed(t *testing.T) {
 		errorID   = ""
 	)
 
+	idRefs := []IDRef{
+		IDRef{"a", "ref-abc"},
+		IDRef{"b", "ref-abc"},
+		IDRef{"c", "ref-abc"},
+	}
+
 	getBatchUpdate := func(client *Client) error {
-		_, err := client.BatchUpdateOpportunityRefs(ctx, "ref-abc", []string{"a", "b", "c"}, allOrNone)
+		_, err := client.BatchUpdateOpportunityRefs(ctx, idRefs, allOrNone)
 		return err
 	}
 
@@ -242,10 +248,16 @@ func TestBatchUpdateOpportunityRefs_Fail(t *testing.T) {
 		errorID   = "b"
 	)
 
+	idRefs := []IDRef{
+		IDRef{"a", "ref-abc"},
+		IDRef{"b", "ref-abc"},
+		IDRef{"c", "ref-abc"},
+	}
+
 	var capturedResponse CollectionsUpdateResponse
 	getBatchUpdateWithResponse := func(client *Client) error {
 		var err error
-		capturedResponse, err = client.BatchUpdateOpportunityRefs(ctx, "ref-abc", []string{"a", "b", "c"}, allOrNone)
+		capturedResponse, err = client.BatchUpdateOpportunityRefs(ctx, idRefs, allOrNone)
 		return err
 	}
 

@@ -253,6 +253,13 @@ type ErrorDetail struct {
 	ErrorCode  string   `json:"errorCode"`
 }
 
+// IDRef is the structure for updating many locally provided donation
+// records identified ID with the paired DFK Reference.
+type IDRef struct {
+	ID  string
+	Ref string
+}
+
 var regexpIsTitle *regexp.Regexp = regexp.MustCompile("^[A-Z]")
 
 // enTitle turns a string into title case (e.g. "Title") if the first letter is not
