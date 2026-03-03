@@ -157,6 +157,7 @@ func (c *Client) BatchUpdateOpportunityRefs(
 		c.log.Error(fmt.Sprintf("BatchUpdateOpportunityRefs: failed to marshal batch request: %v", err))
 		return nil, fmt.Errorf("failed to marshal batch request: %w", err)
 	}
+	c.log.Debug(fmt.Sprintf("BatchUpdateOpportunityRefs body to be sent: %s", string(body)))
 
 	requestURL := fmt.Sprintf(urlTpl, c.instanceURL, c.apiVersion)
 	c.log.Debug(fmt.Sprintf("BatchUpdateOpportunityRefs: requestURL %s", requestURL))
