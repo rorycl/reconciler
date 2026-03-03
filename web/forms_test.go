@@ -393,3 +393,45 @@ func TestFormLinkOrUnlink(t *testing.T) {
 		})
 	}
 }
+
+// TestAsSalesforceIDRefs checks how a LinkOrUnlinkForm is converted into a slice of
+// salesforce.IDRef.
+func TestAsSalesforceIDRefs(t *testing.T) {
+
+	louf1 := &LinkOrUnlinkForm{
+		Action:      "link",
+		DonationIDs: []string{"don1", "don2", "don3"},
+	}
+	louf2 := &LinkOrUnlinkForm{
+		Action:      "link",
+		DonationIDs: []string{},
+	}
+	louf3 := &LinkOrUnlinkForm{
+		Action:      "unlink",
+		DonationIDs: []string{"don4", "don5", "don6"},
+	}
+	louf4 := new(LinkOrUnlinkForm)
+
+	for _, tt := range []*LinkOrUnlinkForm{louf1, louf2, louf3, louf4} {
+		idRefs := tt.AsSalesforceIDRefs("def")
+		if idRefs == nil {
+			if tt == nil {
+				continue
+			}
+			if tt.DonationIDs == nil {
+				continue
+			}
+			t.Fatalf("got unexepected nil idRefs for %#v", tt)
+		}
+		if got, want := len(idRefs), len(tt.DonationIDs); got != want {
+			t.Errorf("got %d want %d idrefs", got, want)
+		}
+		for _, rec := range idRefs {
+			if (tt.Action == "unlink" && rec.Ref != "") ||
+				(tt.Action == "link" && rec.Ref != "def") {
+				t.Errorf("unexpected ref for action %s in %#v", tt.Action, rec)
+			}
+		}
+	}
+
+}

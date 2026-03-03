@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"reconciler/apiclients/salesforce"
 	"reflect"
 	"time"
 
@@ -231,6 +232,23 @@ type LinkOrUnlinkForm struct {
 	ID          string   `schema:"id"`     // the invoice id or bank-transaction reference
 	Action      string   `schema:"action"` // "link" or "unlink"
 	DonationIDs []string `schema:"donation-ids"`
+}
+
+// AsSalesforceIDRefs expands a form into a slice of salesforce.IDRef suitable for
+// providing to the salesforce BatchUpdateOpportunityRefs client method.
+// An unlinking always sets the DFK ref to an empty string.
+func (loul *LinkOrUnlinkForm) AsSalesforceIDRefs(dfk string) []salesforce.IDRef {
+	if loul == nil || loul.DonationIDs == nil {
+		return nil
+	}
+	idRefs := make([]salesforce.IDRef, len(loul.DonationIDs))
+	if loul.Action == "unlink" {
+		dfk = ""
+	}
+	for i, sid := range loul.DonationIDs {
+		idRefs[i] = salesforce.IDRef{ID: sid, Ref: dfk}
+	}
+	return idRefs
 }
 
 // CheckLinkOrUnlinkForm coleects the postData and routeVars into a map for schema

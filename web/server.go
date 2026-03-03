@@ -1385,8 +1385,10 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		sfLastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
 
 		// Update the donations. If it is an unlink action, update the dfk with "", else
-		// the actual dfk from the bank transaction or invoice.
-		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, dfk, form.DonationIDs, false)
+		// the actual dfk from the bank transaction or invoice. The form contents (many
+		// salesforce IDs given the same DFK reference) must be translated to
+		// a slice of salesforce.IDRef, hence the use of form.AsSalesforceIDRefs.
+		_, err = sfClient.BatchUpdateOpportunityRefs(ctx, form.AsSalesforceIDRefs(dfk), false)
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to batch update salesforce records for linking/unlinking: %w", err))
 			return
