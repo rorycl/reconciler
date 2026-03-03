@@ -71,7 +71,7 @@ func BuildCLI(apper AppMaker, verifier func() error) *cli.Command {
 		Name:     "database",
 		Aliases:  []string{"d"},
 		Required: true,
-		Usage:    "':memory:' or path to database file (overrides config)",
+		Usage:    "':memory:' or path to database file",
 	}
 
 	fileArg := &cli.StringArg{
@@ -143,7 +143,7 @@ func BuildCLI(apper AppMaker, verifier func() error) *cli.Command {
 				c.String("staticPath"),   // staticPath
 				c.String("templatePath"), // templatePath
 				c.String("sqlPath"),      // sqlPath
-				c.String("database"),     // overrides config
+				c.String("database"),
 			)
 			if err != nil {
 				return err
