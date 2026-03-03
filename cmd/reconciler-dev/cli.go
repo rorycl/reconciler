@@ -46,7 +46,7 @@ func BuildCLI(apper AppMaker, verifier func() error) *cli.Command {
 	logLevelFlag := &cli.StringFlag{
 		Name:    "logLevel",
 		Aliases: []string{"l"},
-		Value:   "Error",
+		Value:   "Info",
 		Usage:   "slog logger debug level",
 	}
 	staticFlag := &cli.StringFlag{
