@@ -496,7 +496,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 
 		// Initialise url parameter form and derive url.
 		form := NewSearchForm(&web.cfg.DataStartDate, nil)
-		if err := DecodeURLParams(r, form); err != nil {
+		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
 			web.ServerError(w, r, err)
 			return
 		}
@@ -630,7 +630,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 
 		// Initialise url parameter form and derive url.
 		form := NewSearchForm(&web.cfg.DataStartDate, nil)
-		if err := DecodeURLParams(r, form); err != nil {
+		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
 			web.ServerError(w, r, err)
 			return
 		}
@@ -762,7 +762,7 @@ func (web *WebApp) handleDonations() http.Handler {
 
 		// Initialise url parameter form and derive url.
 		form := NewSearchDonationsForm(&web.cfg.DataStartDate, nil)
-		if err := DecodeURLParams(r, form); err != nil {
+		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
 			web.ServerError(w, r, err)
 			return
 		}
@@ -982,7 +982,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 
 		// Decode the url params and construct the current url, interjecting if the
 		// action is "unlink" to get the related information.
-		if err := DecodeURLParams(r, form); err != nil {
+		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
 			web.ServerError(w, r, err)
 		}
 		if action == "unlink" {
@@ -1171,7 +1171,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 
 		// Decode the url params and construct the current url, interjecting if the
 		// action is "unlink" to get the related information.
-		if err := DecodeURLParams(r, form); err != nil {
+		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
 			web.ServerError(w, r, err)
 		}
 

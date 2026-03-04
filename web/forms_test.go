@@ -20,24 +20,24 @@ func newRequest(t *testing.T, urlString string) *http.Request {
 	return r
 }
 
-func ptrTime(ti time.Time) *time.Time {
-	return &ti
-}
-
 // TestSearchForm tests the SearchForm behaviour
 func TestSearchForm(t *testing.T) {
 
 	defaultDateFrom, defaultDateTo := defaultDateToAndFrom(
-		ptrTime(time.Date(2025, time.April, 1, 0, 0, 0, 0, time.UTC)),
+		new(time.Date(2025, time.April, 1, 0, 0, 0, 0, time.UTC)),
 		nil,
 	)
 
 	tests := []struct {
-		name           string
-		inputURL       string
-		searchForm     *SearchForm
-		err            error      // top level errors
-		validationErrs *Validator // validation errors
+		name              string
+		inputURL          string
+		searchForm        *SearchForm
+		err               error      // top level errors
+		validationErrs    *Validator // validation errors
+		fieldNameForError string
+		fieldNameIsError  bool
+		offSetPageLen     int
+		offSetResult      int
 	}{
 		{
 			name:     "default",
@@ -52,6 +52,8 @@ func TestSearchForm(t *testing.T) {
 			validationErrs: &Validator{
 				Errors: map[string]string{},
 			},
+			offSetPageLen: 20,
+			offSetResult:  0, // database offset
 		},
 		{
 			name:     "defaults with page 2",
@@ -69,6 +71,27 @@ func TestSearchForm(t *testing.T) {
 					"date-to": "End date cannot be before the start date.",
 				},
 			},
+			offSetPageLen: 9,
+			offSetResult:  9, // database offset
+		},
+		{
+			name:     "defaults with page 3",
+			inputURL: "http://127.0.0.1:8080/invoices/?date-from=2025-06-01&date-to=2025-05-01&search=search string&page=3",
+			searchForm: &SearchForm{
+				ReconciliationStatus: "NotReconciled",
+				DateFrom:             time.Date(2025, time.June, 1, 0, 0, 0, 0, time.UTC),
+				DateTo:               time.Date(2025, time.May, 1, 0, 0, 0, 0, time.UTC),
+				SearchString:         "search string",
+				Page:                 3,
+			},
+			err: nil,
+			validationErrs: &Validator{
+				Errors: map[string]string{
+					"date-to": "End date cannot be before the start date.",
+				},
+			},
+			offSetPageLen: 9,
+			offSetResult:  18, // database offset
 		},
 		{
 			name:     "all fields specified",
@@ -84,6 +107,8 @@ func TestSearchForm(t *testing.T) {
 			validationErrs: &Validator{
 				Errors: map[string]string{},
 			},
+			fieldNameForError: "ReconciliationStatus",
+			fieldNameIsError:  false,
 		},
 		{
 			name:     "default status",
@@ -118,6 +143,8 @@ func TestSearchForm(t *testing.T) {
 					"date-to": "End date cannot be before the start date.",
 				},
 			},
+			fieldNameForError: "DateTo",
+			fieldNameIsError:  false,
 		},
 		{
 			name:     "invalid datefrom",
@@ -135,6 +162,8 @@ func TestSearchForm(t *testing.T) {
 					"date-from": "From date must be provided.",
 				},
 			},
+			fieldNameForError: "DateFrom",
+			fieldNameIsError:  false,
 		},
 		{
 			name:     "invalid status",
@@ -152,14 +181,18 @@ func TestSearchForm(t *testing.T) {
 					"status": "Invalid status value provided.",
 				},
 			},
+			fieldNameForError: "ReconciliationStatus",
+			fieldNameIsError:  false,
 		},
 	}
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
+
 			simulatedRequest := newRequest(t, tt.inputURL)
-			form := NewSearchForm(ptrTime(defaultDateFrom), ptrTime(defaultDateTo))
-			if err := DecodeURLParams(simulatedRequest, form); err != nil {
+
+			form := NewSearchForm(new(defaultDateFrom), new(defaultDateTo))
+			if err := DecodeURLParams(simulatedRequest.URL.Query(), form); err != nil {
 				if tt.err != err {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -175,6 +208,18 @@ func TestSearchForm(t *testing.T) {
 
 			if diff := cmp.Diff(validator, tt.validationErrs); diff != "" {
 				t.Errorf("unexpected validation diff %s", diff)
+			}
+
+			if tt.fieldNameForError != "" {
+				if got, want := validator.FieldError(tt.fieldNameForError), tt.fieldNameIsError; got != want {
+					t.Errorf("got %t want %t in FieldError check", got, want)
+				}
+			}
+
+			if tt.offSetPageLen > 0 {
+				if got, want := form.Offset(tt.offSetPageLen), tt.offSetResult; got != want {
+					t.Errorf("offset got %d want %d", got, want)
+				}
 			}
 		})
 	}
@@ -434,4 +479,108 @@ func TestAsSalesforceIDRefs(t *testing.T) {
 		}
 	}
 
+}
+
+// TestSearchDonationsForm tests the SearchDonationsForm behaviour.
+// Tests: NewSearchDonationsForm
+//
+//	Validate
+//	Offset (database offset)
+//	decode/encode (via DecodeURLParams)
+func TestSearchDonationsForm(t *testing.T) {
+
+	var pageLen = 5
+
+	tests := []struct {
+		name             string
+		dateFrom, dateTo *time.Time
+		url              string
+		defaultURL       string // should always be the same
+		afterEncodingURL string // the form after url has been encoded with DecodeURLParams
+		isValid          bool
+		offset           int // page offset
+	}{
+
+		{
+			name:             "ok case",
+			dateFrom:         new(time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)),
+			dateTo:           new(time.Date(2026, 1, 3, 12, 0, 0, 0, time.UTC)),
+			url:              "status=Linked&date-from=2026-01-01&date-to=2026-01-04&payout-reference=pr1&search=hi&page=2",
+			defaultURL:       "date-from=2026-01-02&date-to=2026-01-03&page=1&payout-reference=&search=&status=NotLinked",
+			afterEncodingURL: "date-from=2026-01-01&date-to=2026-01-04&page=2&payout-reference=pr1&search=hi&status=Linked",
+			isValid:          true,
+			offset:           5,
+		},
+		{
+			name:       "invalid status",
+			dateFrom:   new(time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)),
+			dateTo:     new(time.Date(2026, 1, 3, 12, 0, 0, 0, time.UTC)),
+			url:        "status=Nonsense&date-from=2026-01-01&date-to=2026-01-04&payout-reference=pr1&search=hi&page=2",
+			defaultURL: "date-from=2026-01-02&date-to=2026-01-03&page=1&payout-reference=&search=&status=NotLinked",
+			isValid:    false,
+		},
+		{
+			name:       "invalid from date",
+			dateFrom:   new(time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)),
+			dateTo:     new(time.Date(2026, 1, 3, 12, 0, 0, 0, time.UTC)),
+			url:        "status=Linked&date-from=&date-to=2026-01-04&payout-reference=pr1&search=hi&page=2",
+			defaultURL: "date-from=2026-01-02&date-to=2026-01-03&page=1&payout-reference=&search=&status=NotLinked",
+			isValid:    false,
+		},
+		{
+			name:       "to date before from",
+			dateFrom:   new(time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)),
+			dateTo:     new(time.Date(2026, 1, 3, 12, 0, 0, 0, time.UTC)),
+			url:        "status=Linked&date-from=2026-01-02&date-to=2026-01-01&payout-reference=pr1&search=hi&page=2",
+			defaultURL: "date-from=2026-01-02&date-to=2026-01-03&page=1&payout-reference=&search=&status=NotLinked",
+			isValid:    false,
+		},
+	}
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
+
+			form := NewSearchDonationsForm(tt.dateFrom, tt.dateTo)
+			defaultURL, err := form.AsURLParams()
+			if err != nil {
+				t.Fatal(err) // should never happen on default
+			}
+			if got, want := defaultURL, tt.defaultURL; got != want {
+				t.Errorf("default url mismatch:\n%s\n%s", got, want)
+			}
+
+			urlParams, err := url.ParseQuery(tt.url)
+			if err != nil {
+				t.Fatalf("unexpected url parsequery error: %v", err)
+			}
+
+			err = DecodeURLParams(urlParams, form)
+			if err != nil {
+				t.Fatalf("unexpected decoding params error: %v", err)
+			}
+
+			validator := NewValidator()
+			form.Validate(validator)
+			if got, want := validator.Valid(), tt.isValid; got != want {
+				// fmt.Println(validator.Errors)
+				t.Errorf("validator got %t want %t", got, want)
+			}
+			if !validator.Valid() {
+				return
+			}
+
+			afterEncodingURL, err := form.AsURLParams()
+			if err != nil {
+				t.Fatalf("unexpected after encoding error: %v", err) // still hopefully unlikely
+			}
+			if got, want := afterEncodingURL, tt.afterEncodingURL; got != want {
+				t.Errorf("after encoding url mismatch:\n%s\n%s", got, want)
+			}
+
+			if got, want := form.Offset(pageLen), tt.offset; got != want {
+				t.Errorf("offset got %d want %d", got, want)
+			}
+
+		})
+	}
 }

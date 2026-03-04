@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"net/url"
 	"reconciler/apiclients/salesforce"
 	"reflect"
@@ -212,8 +211,8 @@ func (f *SearchDonationsForm) Validate(v *Validator) {
 	allowedStatus := map[string]bool{"All": true, "Linked": true, "NotLinked": true}
 	v.Check(allowedStatus[f.LinkageStatus], "status", "Invalid status value provided.")
 
-	v.Check(!f.DateTo.Before(f.DateFrom), "date-to", "End date cannot be before the start date.")
 	v.Check(!f.DateFrom.IsZero(), "date-from", "From date must be provided.")
+	v.Check(!f.DateTo.Before(f.DateFrom), "date-to", "End date cannot be before the start date.")
 
 	if f.Page < 1 {
 		f.Page = 1
@@ -310,9 +309,9 @@ func newSchemaDecoder() *schema.Decoder {
 
 // DecodeURLParams is helper that decodes URL query parameters from a request
 // into a destination struct (dst).
-func DecodeURLParams(r *http.Request, dst any) error {
+func DecodeURLParams(rURLQuery map[string][]string, dst any) error {
 	decoder := newSchemaDecoder()
-	if err := decoder.Decode(dst, r.URL.Query()); err != nil {
+	if err := decoder.Decode(dst, rURLQuery); err != nil {
 		return fmt.Errorf("url parameter decoding error: %v", err)
 	}
 	return nil
