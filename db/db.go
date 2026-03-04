@@ -104,10 +104,15 @@ func NewConnection(
 	// DataSource is the default setting for file-based databases.
 	dataSource := fmt.Sprintf("%s?_dataSource=foreign_keys(1)&_dataSource=journal_mode(WAL)", dbPath)
 
-	// For in-memory databases, force the dataSource path.
+	// For in-memory databases, force the dataSource path if the mode is not explicitly
+	// set.
 	if strings.Contains(dbPath, ":memory:") {
 		dataSource = "file:memdb1?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
 	}
+	if !strings.Contains(dbPath, ":memory:") && strings.Contains(dbPath, "mode=memory") {
+		dataSource = dbPath
+	}
+
 	dbDB, err := sql.Open("sqlite", dataSource)
 	if err != nil {
 		return nil, err
@@ -188,19 +193,31 @@ func NewConnectionInTestMode(
 	logger *slog.Logger,
 ) (*DB, error) {
 
-	if !strings.Contains(dbPath, ":memory:") {
+	if !strings.Contains(dbPath, ":memory:") && !strings.Contains(dbPath, "mode=memory") {
 		return nil, fmt.Errorf("db path %q invalid for test mode", dbPath)
 	}
+
+	testingMode = true
 
 	testDB, err := NewConnection(dbPath, sqlFS, accountCodes, logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialise test database: %w", err)
 	}
 
-	// Load the schema definitions.
-	if err := testDB.InitSchema(testDB.sqlFS, "schema.sql"); err != nil {
-		_ = testDB.Close()
-		return nil, fmt.Errorf("failed to initialize schema for test database: %w", err)
+	testingMode = false
+
+	// Initialize the data schema. This is idempotent.
+	err = testDB.InitSchema(sqlFS, "schema.sql")
+	if err != nil {
+		testDB.log.Error(fmt.Sprintf("schema setup error: %v", err))
+		return nil, fmt.Errorf("schema setup error: %w", err)
+	}
+
+	// Initialize the databse named statements.
+	err = testDB.prepareNamedStatements()
+	if err != nil {
+		testDB.log.Error(fmt.Sprintf("could not prepare named statements: %v", err))
+		return nil, fmt.Errorf("could not prepare named statements: %w", err)
 	}
 
 	// Load the test data.
@@ -213,13 +230,6 @@ func NewConnectionInTestMode(
 		_ = testDB.Close()
 		testDB.log.Error(fmt.Sprintf("Failed to load data for test database: %v", err))
 		return nil, fmt.Errorf("failed to load data for test database: %w", err)
-	}
-
-	// Prepare the functions and named statements.
-	err = testDB.prepareNamedStatements()
-	if err != nil {
-		testDB.log.Error(fmt.Sprintf("could not prepare named statements: %v", err))
-		return nil, fmt.Errorf("could not prepare named statements: %v", err)
 	}
 
 	return testDB, nil
