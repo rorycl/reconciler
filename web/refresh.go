@@ -3,8 +3,6 @@ package web
 import (
 	"context"
 	"fmt"
-	"reconciler/apiclients/salesforce"
-	"reconciler/apiclients/xero"
 	"reconciler/internal/token"
 	"time"
 )
@@ -39,7 +37,7 @@ func (web *WebApp) refreshXeroRecords(ctx context.Context) (map[string]string, e
 	}
 
 	// Connect the Xero client.
-	xeroClient, err := xero.NewClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
+	xeroClient, err := web.newXeroClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
 	if err != nil {
 		// Todo: report errors to client.
 		return nil, fmt.Errorf("failed to create xero client: %v", err)
@@ -125,7 +123,7 @@ func (web *WebApp) refreshSalesforceRecords(ctx context.Context) error {
 	}
 
 	// Connect the Salesforce client.
-	sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
+	sfClient, err := web.newSFClient(ctx, web.cfg, web.log, sfToken)
 	if err != nil {
 		// Todo: report errors to client.
 		return fmt.Errorf("failed to create salesforce client: %v", err)

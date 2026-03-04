@@ -77,11 +77,11 @@ var StaticEmbeddedFS embed.FS
 var TemplatesEmbeddedFS embed.FS
 
 // refreshDurationWindow is the duration window given for a remote platform to update
-// it's records.
-var refreshDurationWindow = time.Duration(1000000000 * 15) // 15s
+// its records.
+var refreshDurationWindow = 10 * time.Second
 
 // refreshTrucation is the user-oriented refresh rounding duration.
-var refreshTruncation = time.Duration(1000000000 * 10) // 10s
+var refreshTruncation = 10 * time.Second
 
 // WebApp is the configuration object for the web server.
 type WebApp struct {
@@ -93,6 +93,10 @@ type WebApp struct {
 	server         *http.Server
 	sessions       *scs.SessionManager
 	accountsRegexp *regexp.Regexp
+
+	// client factory funcs
+	newXeroClient xeroFactoryFunc
+	newSFClient   sfFactoryFunc
 
 	// web clients for oauth2
 	xeroWebClient *token.TokenWebClient
@@ -144,6 +148,10 @@ func New(
 		server:         server,
 		sessions:       scsSessionStore,
 		accountsRegexp: accountsRegexp,
+
+		// client factory funcs
+		newXeroClient: newXeroClienter,
+		newSFClient:   newSalesforceClienter,
 	}
 
 	// Attach the salesforce and xero OAuth2 web client handler constructors.
