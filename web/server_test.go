@@ -15,54 +15,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// TestWebAppToRun is for running the web server in development.
-func TestWebAppToRun(t *testing.T) {
-
-	t.Skip()
-
-	cfg := &config.Config{
-		Web: config.WebConfig{
-			ListenAddress: "127.0.0.1:8080",
-		},
-		Xero:          config.XeroConfig{},
-		Salesforce:    config.SalesforceConfig{},
-		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
-	}
-
-	logger := slog.New(slog.NewTextHandler(
-		t.Output(),
-		&slog.HandlerOptions{Level: slog.LevelDebug},
-	))
-
-	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	templatesFS, err := mounts.NewFileMount("templates", TemplatesEmbeddedFS, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sqlFS, err := mounts.NewFileMount("sql", db.SQLEmbeddedFS, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	accountCodes := "^(53|55|57)"
-	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", sqlFS, accountCodes, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = webApp.StartServer()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // TestWebAppAndShutdown tests bringing up the web server and then stopping it.
 func TestWebAppAndShutdown(t *testing.T) {
 
@@ -99,6 +51,7 @@ func TestWebAppAndShutdown(t *testing.T) {
 		t.Output(),
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	))
+	t.Log("logger initialised")
 
 	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
 	if err != nil {
@@ -112,20 +65,25 @@ func TestWebAppAndShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Log("mounts initialised")
 
 	accountCodes := "^(53|55|57)"
-	db, err := db.NewConnectionInTestMode("file::memory:?cache=shared", sqlFS, accountCodes, logger)
+	dbPath := "file:memdb_srv?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	db, err := db.NewConnectionInTestMode(dbPath, sqlFS, accountCodes, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Log("db initalised")
 
 	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Log("web app initialised")
 
 	go func() {
 		<-time.After(50 * time.Millisecond)
+		t.Log("shutdown called")
 		_ = webApp.server.Shutdown(context.Background())
 	}()
 

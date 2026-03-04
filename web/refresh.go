@@ -32,14 +32,12 @@ func (web *WebApp) refreshXeroRecords(ctx context.Context) (map[string]string, e
 	// Retrieve the oauth2 tokens from the session
 	xeroToken, err := web.getValidTokenFromSession(ctx, token.XeroToken)
 	if err != nil {
-		// Todo: report errors to client.
 		return nil, fmt.Errorf("failed to refresh xero token: %v", err)
 	}
 
 	// Connect the Xero client.
 	xeroClient, err := web.newXeroClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
 	if err != nil {
-		// Todo: report errors to client.
 		return nil, fmt.Errorf("failed to create xero client: %v", err)
 	}
 	web.log.Info("Xero client authenticated successfully.")
