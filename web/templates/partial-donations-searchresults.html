@@ -5,13 +5,13 @@
 {{ $sfInstanceURL := .SFInstanceURL }}
 <!-- start of partial -->
 
-<div id="donations-link-error" class="text-red-500"></div>
+<div id="donations-link-error" class="text-sm font-bold text-red px-4 pb-2"></div>
 
 {{- /* the link form targets: Typer: donations, invoice or bank-transaction .ID: the salesforce id */ -}}
 <div id="donations-link-search">
 {{ if ne .Typer "direct" }}
 <form hx-post="/donations/{{ .Typer }}/{{ .ID }}/link"
-      hx-target="#donations-link-search"
+      hx-target="#donations-link-error"
       hx-swap="innerHTML">
 {{ end }}
 <div class="border-2 border-slate-300 mx-4 mb-3"> 
