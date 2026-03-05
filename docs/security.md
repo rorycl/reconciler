@@ -1,6 +1,6 @@
 ## Reconciler Security
 
-**Revision D: 28 February 2026**
+**Revision E: 5 March 2026**
 
 ### Introduction
 
@@ -11,14 +11,15 @@ financial and CRMS systems, currently focusing on Salesforce and Xero.
 Reconciler acts as an Application-Programming Interface (API) client to
 donation-based data in the remote platforms to read Xero and Salesforce
 data, and to update one field in Salesforce Opportunity records to
-reconcile records. 
+reconcile records.
 
-Reconciler requires a senior administrator or manager to configure
-OAuth2 PKCE access on their platform instances. These credentials are
-used in the App to guide users through OAuth2 logins with their own
-credentials to link Reconciler to the platforms. Users without access to
-both the organisation's Salesforce and Xero instances will not be able
-to use Reconciler.
+Reconciler requires a Salesforce Admisterator and Xero user with
+'Standard' or 'Adviser' rights to generate API keys to configure OAuth2
+PKCE access on their platform instances. These credentials are used in
+the App to guide users through OAuth2 logins with their own credentials
+to link Reconciler to the platforms. Users without access to both the
+organisation's Salesforce and Xero instances will not be able to use
+Reconciler.
 
 The App database and session tokens run entirely in memory for a maximum
 period of 8 hours. OAuth2 token lifetime is shorter and will require the
@@ -43,8 +44,11 @@ repository](https://github.com/rorycl/reconciler).
 
 * The App should be used on a machine protected by a firewall.
 
-* The App will only operate on the `127.0.0.1` or `localhost` address
-  for security reasons and must not be shared over the network. 
+* The App operates only on the `127.0.0.1` or `localhost` address for
+  security reasons and cannot be shared over the network.
+
+* Reconciler communicates with only the Xero and Salesforce platforms
+  and no other platforms or services.
 
 * Closing the App will require restarting and reconnecting to the
   platforms.
@@ -56,6 +60,7 @@ repository. The App is a cross-platform local webapp, to be run
 on a local desktop, and configured with a local configuration
 `yaml` file. An example configuration file is provided
 [here](https://github.com/rorycl/reconciler/blob/main/config/config.example.yaml).
+SHA 256 checksums are provided for binary releases.
 
 The App requires OAuth2 connection permissions to be created on the
 remote platforms. (Separate guidance for administrators to configure
@@ -76,13 +81,11 @@ the user to log in again.
 For Xero, only read-only API connections are made. The chart of account
 and some organisation details are retrieved. All donation-related
 invoices and bank transactions (those line items with account codes
-matching the configured `donation_account_prefixes`) are also retrieved
-and stored in the in-memory database.
+matching the configured `donation_account_prefixes`) are also retrieved.
 
 For Salesforce, sparse information is retrieved from the Opportunities
 (also known as "Donations") object as set out in the configured
-`salesforce.query` SOQL query and stored in the local in-memory
-database.
+`salesforce.query` SOQL query.
 
 The App works to add Xero codes to a target field in Salesforce donation
 records. This is the only data changing operation made by the App.
@@ -115,12 +118,13 @@ built into the App.
 
 #### Filesystem security
 
-Reconciler is configured with a local yaml-format file on disk.
+Reconciler is configured with a local yaml-format file on disk. The
+configuration file with its OAuth2 application credentials should be in
+a suitably protected filesystem location.
 
 Access to the configuration file is unlikely to allow an attacker to
 cause damage, as each user is required to provide additional login
-credentials to access the platforms. Nevertheless, the configuration
-file with its credentials should be protected. Any suspected leak of
+credentials to access the platforms. Nevertheless, any suspected leak of
 credentials should be met with the immediate suspension of the platform
 connection setups.
 
