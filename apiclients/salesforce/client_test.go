@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rorycl/reconciler/config"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"github.com/rorycl/reconciler/config"
 	"strings"
 	"testing"
 	"time"
@@ -134,7 +134,7 @@ func testPatch(
 				// Simulate error.
 				cur[i].Success = false
 				cur[i].Errors = []ErrorDetail{
-					ErrorDetail{
+					{
 						StatusCode: "404",
 						Message:    "simulated error",
 						Fields:     []string{"simulated"},
@@ -216,9 +216,9 @@ func TestBatchUpdateOpportunityRefs_Succeed(t *testing.T) {
 	)
 
 	idRefs := []IDRef{
-		IDRef{"a", "ref-abc"},
-		IDRef{"b", "ref-abc"},
-		IDRef{"c", "ref-abc"},
+		{"a", "ref-abc"},
+		{"b", "ref-abc"},
+		{"c", "ref-abc"},
 	}
 
 	getBatchUpdate := func(client *Client) error {
@@ -249,9 +249,9 @@ func TestBatchUpdateOpportunityRefs_Fail(t *testing.T) {
 	)
 
 	idRefs := []IDRef{
-		IDRef{"a", "ref-abc"},
-		IDRef{"b", "ref-abc"},
-		IDRef{"c", "ref-abc"},
+		{"a", "ref-abc"},
+		{"b", "ref-abc"},
+		{"c", "ref-abc"},
 	}
 
 	var capturedResponse CollectionsUpdateResponse

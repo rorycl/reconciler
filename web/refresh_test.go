@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"log/slog"
 	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"github.com/rorycl/reconciler/apiclients/xero"
 	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
 	"github.com/rorycl/reconciler/internal/token"
+	"log/slog"
 	"regexp"
 	"testing"
 	"time"
@@ -32,17 +32,17 @@ func (mxc *mockXeroClient) GetOrganisation(ctx context.Context) (xero.Organisati
 func (mxc *mockXeroClient) GetAccounts(ctx context.Context, ifModifiedSince time.Time) ([]xero.Account, error) {
 	mxc.getCount++
 	mxc.log.Info(fmt.Sprintf("GetAccounts %d", mxc.getCount))
-	return []xero.Account{xero.Account{AccountID: fmt.Sprintf("accountId-%d", mxc.getCount)}}, nil
+	return []xero.Account{{AccountID: fmt.Sprintf("accountId-%d", mxc.getCount)}}, nil
 }
 func (mxc *mockXeroClient) GetBankTransactions(ctx context.Context, fromDate time.Time, ifModifiedSince time.Time, accountsRegexp *regexp.Regexp) ([]xero.BankTransaction, error) {
 	mxc.getCount++
 	mxc.log.Info(fmt.Sprintf("GetBankTransactions %d", mxc.getCount))
-	return []xero.BankTransaction{xero.BankTransaction{BankTransactionID: fmt.Sprintf("btId-%d", mxc.getCount)}}, nil
+	return []xero.BankTransaction{{BankTransactionID: fmt.Sprintf("btId-%d", mxc.getCount)}}, nil
 }
 func (mxc *mockXeroClient) GetInvoices(ctx context.Context, fromDate time.Time, ifModifiedSince time.Time, accountsRegexp *regexp.Regexp) ([]xero.Invoice, error) {
 	mxc.getCount++
 	mxc.log.Info(fmt.Sprintf("Invoices %d", mxc.getCount))
-	return []xero.Invoice{xero.Invoice{InvoiceID: fmt.Sprintf("iId-%d", mxc.getCount)}}, nil
+	return []xero.Invoice{{InvoiceID: fmt.Sprintf("iId-%d", mxc.getCount)}}, nil
 }
 
 // not good for parallel tests.
@@ -188,7 +188,7 @@ type mockSalesforceClient struct {
 func (msc *mockSalesforceClient) GetOpportunities(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]salesforce.Donation, error) {
 	msc.getCount++
 	msc.log.Info(fmt.Sprintf("GetOpportunities %d", msc.getCount))
-	return []salesforce.Donation{salesforce.Donation{CoreFields: salesforce.CoreFields{ID: fmt.Sprintf("ID-%d", msc.getCount)}}}, nil
+	return []salesforce.Donation{{CoreFields: salesforce.CoreFields{ID: fmt.Sprintf("ID-%d", msc.getCount)}}}, nil
 }
 
 func (msc *mockSalesforceClient) BatchUpdateOpportunityRefs(ctx context.Context, idRefs []salesforce.IDRef, allOrNone bool) (salesforce.CollectionsUpdateResponse, error) {

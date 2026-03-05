@@ -1,8 +1,8 @@
 package web
 
 import (
-	"html/template"
 	"github.com/rorycl/reconciler/db"
+	"html/template"
 	"testing"
 	"time"
 
@@ -23,7 +23,7 @@ func litterOutput(data any) string {
 func TestViewDonation(t *testing.T) {
 
 	donations := []db.Donation{
-		db.Donation{
+		{
 			ID:              "id123",
 			Name:            "name1",
 			Amount:          123.4,
@@ -38,7 +38,7 @@ func TestViewDonation(t *testing.T) {
 			LinkTyper:       "link type",
 			RowCount:        1,
 		},
-		db.Donation{
+		{
 			ID:              "id_with_missing_fields",
 			Name:            "name1",
 			Amount:          123.4,
@@ -56,7 +56,7 @@ func TestViewDonation(t *testing.T) {
 	}
 
 	expectedDonations := []viewDonation{
-		viewDonation{
+		{
 			ID:              "id123",
 			Name:            "name1",
 			Amount:          123.4,
@@ -71,7 +71,7 @@ func TestViewDonation(t *testing.T) {
 			LinkTyper:       "link type",
 			RowCount:        1,
 		},
-		viewDonation{
+		{
 			ID:              "id_with_missing_fields",
 			Name:            "name1",
 			Amount:          123.4,
@@ -97,7 +97,7 @@ func TestViewDonation(t *testing.T) {
 func TestViewLineItem(t *testing.T) {
 
 	lineItems := []db.WRLineItem{
-		db.WRLineItem{
+		{
 			AccountCode:    new("accode"),
 			AccountName:    new("acname"),
 			Description:    new("desc"),
@@ -105,7 +105,7 @@ func TestViewLineItem(t *testing.T) {
 			LineAmount:     new(0.25),
 			DonationAmount: new(0.20),
 		},
-		db.WRLineItem{
+		{
 			AccountCode:    nil,
 			AccountName:    nil,
 			Description:    nil,
@@ -116,7 +116,7 @@ func TestViewLineItem(t *testing.T) {
 	}
 
 	expectedLineItems := []viewLineItem{
-		viewLineItem{
+		{
 			AccountCode:    "accode",
 			AccountName:    "acname",
 			Description:    "desc",
@@ -124,7 +124,7 @@ func TestViewLineItem(t *testing.T) {
 			LineAmount:     0.25,
 			DonationAmount: 0.2,
 		},
-		viewLineItem{
+		{
 			AccountCode:    "",
 			AccountName:    "",
 			Description:    "",

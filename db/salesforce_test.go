@@ -239,7 +239,7 @@ func Test09_UpsertDonations(t *testing.T) {
 	ctx := context.Background()
 
 	donations := []salesforce.Donation{
-		salesforce.Donation{
+		{
 			CoreFields: salesforce.CoreFields{
 				ID:               "fb8b156f",
 				Name:             "A test donation",
@@ -256,7 +256,7 @@ func Test09_UpsertDonations(t *testing.T) {
 				"another label": 2,
 			},
 		},
-		salesforce.Donation{
+		{
 			CoreFields: salesforce.CoreFields{
 				ID:               "57144a9d",
 				Name:             "Another test donation",

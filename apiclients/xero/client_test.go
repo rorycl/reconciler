@@ -302,8 +302,8 @@ func TestGetOrganisation(t *testing.T) {
 func TestLineItemHasWantedAccount(t *testing.T) {
 
 	lis := []LineItem{
-		LineItem{AccountCode: "a"},
-		LineItem{AccountCode: "b"},
+		{AccountCode: "a"},
+		{AccountCode: "b"},
 	}
 	if !lineItemHasWantedAccount(lis, regexp.MustCompile("b")) {
 		t.Error("unexpected false return from lineItemHasWantedAccount")

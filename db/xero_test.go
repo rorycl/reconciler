@@ -324,7 +324,7 @@ func Test_InvoicesUpsert(t *testing.T) {
 	ctx := context.Background()
 
 	invoices := []xero.Invoice{
-		xero.Invoice{
+		{
 			Type:          "ACCREC",
 			InvoiceID:     "9fe6d963-fa41",
 			InvoiceNumber: "INV-TEST-01",
@@ -336,7 +336,7 @@ func Test_InvoicesUpsert(t *testing.T) {
 			Total:         212.20,
 			AmountPaid:    212.20,
 			LineItems: []xero.LineItem{
-				xero.LineItem{
+				{
 					Description: "A line item",
 					UnitAmount:  210.20,
 					AccountCode: "5501", // general giving
@@ -345,7 +345,7 @@ func Test_InvoicesUpsert(t *testing.T) {
 					TaxAmount:   0,
 					LineAmount:  210.20,
 				},
-				xero.LineItem{
+				{
 					Description: "Second line item",
 					UnitAmount:  2.0,
 					AccountCode: "429", // fees
@@ -563,7 +563,7 @@ func Test_BankTransactionsUpsert(t *testing.T) {
 	ctx := context.Background()
 
 	transactions := []xero.BankTransaction{
-		xero.BankTransaction{
+		{
 			BankTransactionID: "27104cb7-fac4",
 			Type:              "RECEIVE",
 			Contact:           "Contact Name2",
@@ -575,7 +575,7 @@ func Test_BankTransactionsUpsert(t *testing.T) {
 			Total:             20.00,
 			BankAccount:       "current",
 			LineItems: []xero.LineItem{
-				xero.LineItem{
+				{
 					Description: "bank transaction line item",
 					AccountCode: "9999",
 					LineItemID:  "5f117b7b",
@@ -648,14 +648,14 @@ func Test_InvoiceWithLineItemsQuery(t *testing.T) {
 				IsReconciled:     true,
 			},
 			lineItems: []WRLineItem{
-				WRLineItem{
+				{
 					AccountCode:    ptrStr("5301"),
 					AccountName:    ptrStr("Fundraising Dinners"),
 					Description:    ptrStr("Pledged donation via Stripe"),
 					LineAmount:     ptrFloat64(200),
 					DonationAmount: ptrFloat64(200),
 				},
-				WRLineItem{
+				{
 					AccountCode:    ptrStr("429"),
 					AccountName:    ptrStr("Platform Fees"),
 					Description:    ptrStr("Stripe processing fee"),

@@ -3,8 +3,8 @@ package web
 /* view types for the web server */
 
 import (
-	"html/template"
 	"github.com/rorycl/reconciler/db"
+	"html/template"
 )
 
 // viewDonation  is a view version of the db.Donations type,

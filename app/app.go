@@ -5,13 +5,13 @@ package app
 import (
 	"errors"
 	"fmt"
-	"io/fs"
-	"log/slog"
-	"os"
 	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
 	"github.com/rorycl/reconciler/web"
+	"io/fs"
+	"log/slog"
+	"os"
 )
 
 // App encapsulates the functions of reconciler for use by command programs.

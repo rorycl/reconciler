@@ -10,7 +10,6 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/schema v1.4.1
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/sanity-io/litter v1.5.8
 	github.com/urfave/cli/v3 v3.7.0
 	golang.org/x/oauth2 v0.35.0
 	gopkg.in/yaml.v2 v2.4.0
