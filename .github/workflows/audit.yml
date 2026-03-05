@@ -23,7 +23,8 @@ jobs:
 
     # build
     - name: Verify Build
-      run: go build -v ./cmd/reconciler
+      # run: go build -v ./cmd/reconciler
+      run: go build -v -buildvcs=false ./cmd/reconciler
 
     # vet
     - name: Run Vet
