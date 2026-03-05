@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"reconciler/config"
-	"reconciler/db"
-	mounts "reconciler/internal/mounts"
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/db"
+	mounts "github.com/rorycl/reconciler/internal/mounts"
 	"testing"
 	"time"
 

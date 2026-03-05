@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"reconciler/apiclients/xero"
+	"github.com/rorycl/reconciler/apiclients/xero"
 	"testing"
 	"time"
 

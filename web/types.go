@@ -6,10 +6,10 @@ package web
 import (
 	"context"
 	"log/slog"
-	"reconciler/apiclients/salesforce"
-	"reconciler/apiclients/xero"
-	"reconciler/config"
-	"reconciler/internal/token"
+	"github.com/rorycl/reconciler/apiclients/salesforce"
+	"github.com/rorycl/reconciler/apiclients/xero"
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/internal/token"
 	"regexp"
 	"time"
 )

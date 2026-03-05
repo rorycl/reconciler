@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"reconciler/apiclients/salesforce"
+	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"reflect"
 	"time"
 

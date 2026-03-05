@@ -3,7 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
-	"reconciler/internal/token"
+	"github.com/rorycl/reconciler/internal/token"
 	"time"
 )
 

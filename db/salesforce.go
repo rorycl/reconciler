@@ -10,7 +10,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"reconciler/apiclients/salesforce"
+	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"time"
 )
 

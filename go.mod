@@ -1,4 +1,4 @@
-module reconciler
+module github.com/rorycl/reconciler
 
 go 1.26
 

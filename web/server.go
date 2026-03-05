@@ -52,10 +52,10 @@ import (
 	"strings"
 	"time"
 
-	"reconciler/apiclients/salesforce"
-	"reconciler/config"
-	"reconciler/db"
-	"reconciler/internal/token"
+	"github.com/rorycl/reconciler/apiclients/salesforce"
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/db"
+	"github.com/rorycl/reconciler/internal/token"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/gorilla/handlers"

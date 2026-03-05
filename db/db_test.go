@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	mounts "reconciler/internal/mounts"
+	mounts "github.com/rorycl/reconciler/internal/mounts"
 )
 
 func ptrTime(ti time.Time) *time.Time { return &ti }

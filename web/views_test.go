@@ -2,7 +2,7 @@ package web
 
 import (
 	"html/template"
-	"reconciler/db"
+	"github.com/rorycl/reconciler/db"
 	"testing"
 	"time"
 

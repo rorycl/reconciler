@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"reconciler/config"
+	"github.com/rorycl/reconciler/config"
 
 	"github.com/alexedwards/scs/v2"
 	"golang.org/x/oauth2"

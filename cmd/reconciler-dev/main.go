@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
-	"reconciler/app"
+	"github.com/rorycl/reconciler/app"
 	"strconv"
 	"strings"
 	"time"

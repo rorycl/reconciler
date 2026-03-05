@@ -8,10 +8,10 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"reconciler/config"
-	"reconciler/db"
-	mounts "reconciler/internal/mounts"
-	"reconciler/web"
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/db"
+	mounts "github.com/rorycl/reconciler/internal/mounts"
+	"github.com/rorycl/reconciler/web"
 )
 
 // App encapsulates the functions of reconciler for use by command programs.

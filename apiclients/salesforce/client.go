@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"reconciler/config"
-	"reconciler/internal/token"
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/internal/token"
 
 	"golang.org/x/oauth2"
 )

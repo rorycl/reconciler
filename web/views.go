@@ -4,7 +4,7 @@ package web
 
 import (
 	"html/template"
-	"reconciler/db"
+	"github.com/rorycl/reconciler/db"
 )
 
 // viewDonation  is a view version of the db.Donations type,

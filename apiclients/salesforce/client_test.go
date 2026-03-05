@@ -10,7 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reconciler/config"
+	"github.com/rorycl/reconciler/config"
 	"strings"
 	"testing"
 	"time"

@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"reconciler/internal/token"
+	"github.com/rorycl/reconciler/internal/token"
 	"regexp"
 	"strings"
 	"time"

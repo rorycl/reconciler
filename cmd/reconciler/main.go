@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"reconciler/app"
+	"github.com/rorycl/reconciler/app"
 )
 
 // appInitialiser converts an app.NewApp to a cli WebRunner interface.

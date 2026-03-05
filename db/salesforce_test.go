@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"reconciler/apiclients/salesforce"
+	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"testing"
 	"time"
 

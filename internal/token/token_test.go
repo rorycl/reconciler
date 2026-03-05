@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"reconciler/config"
+	"github.com/rorycl/reconciler/config"
 
 	"golang.org/x/oauth2"
 )
