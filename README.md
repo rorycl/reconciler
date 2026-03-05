@@ -1,3 +1,6 @@
+[![Security Audit](https://github.com/rorycl/reconciler/actions/workflows/audit.yml/badge.svg)](https://github.com/rorycl/reconciler/actions/workflows/audit.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## reconciler
 
 The `reconciler` app is a cross-platform desktop webapp for charities to
