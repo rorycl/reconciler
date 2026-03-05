@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/sanity-io/litter"
 )
 
+/*
 // litterOutput provides a way of dumping a struct.
 func litterOutput(data any) string {
 	// https://github.com/sanity-io/litter/issues/12#issuecomment-1144643251
@@ -18,6 +18,7 @@ func litterOutput(data any) string {
 	litter.Config.DisablePointerReplacement = true
 	return litter.Sdump(data)
 }
+*/
 
 func TestViewDonation(t *testing.T) {
 
