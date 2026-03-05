@@ -1,5 +1,6 @@
 [![Security Audit](https://github.com/rorycl/reconciler/actions/workflows/audit.yml/badge.svg)](https://github.com/rorycl/reconciler/actions/workflows/audit.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rorycl/reconciler)](https://goreportcard.com/report/github.com/rorycl/reconciler)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## reconciler
 
