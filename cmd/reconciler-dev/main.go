@@ -1,3 +1,4 @@
+// reconciler-dev is a version of the reconciler app for local development.
 package main
 
 import (
@@ -8,10 +9,11 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
-	"github.com/rorycl/reconciler/app"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rorycl/reconciler/app"
 )
 
 // appInitialiser converts an app.NewApp to a cli WebRunner interface.

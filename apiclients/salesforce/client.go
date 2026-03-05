@@ -1,3 +1,4 @@
+// package salesforce provides salesforce api client capabilities.
 package salesforce
 
 import (

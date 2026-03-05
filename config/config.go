@@ -1,3 +1,5 @@
+// package config provides app configuration capabilities, partly configured through a
+// yaml configuration file.
 package config
 
 import (

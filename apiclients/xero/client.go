@@ -1,3 +1,4 @@
+// package xero provides xero api client capabilities.
 package xero
 
 import (
@@ -10,10 +11,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"github.com/rorycl/reconciler/internal/token"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/rorycl/reconciler/internal/token"
 
 	"golang.org/x/oauth2"
 )
@@ -284,7 +286,7 @@ func (c *Client) UpdateBankTransactionReference(ctx context.Context, tx BankTran
 		c.log.Error("UpdateBankTransactionReference: update response did not contain a bank transaction")
 		return BankTransaction{}, fmt.Errorf("update response did not contain a bank transaction")
 	}
-	c.log.Info("UpdateBankTransactionReference: succesful")
+	c.log.Info("UpdateBankTransactionReference: successful")
 	return response.BankTransactions[0], nil
 }
 

@@ -1,3 +1,5 @@
+// package token provides an extended oauth2 token type usable by both Xero and
+// Salesforce api clients, together with web handlers for running an oauth2 login flow.
 package token
 
 import (

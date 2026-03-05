@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"testing"
+	"time"
+
 	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
-	"testing"
-	"time"
 
 	"golang.org/x/oauth2"
 )
@@ -73,7 +74,7 @@ func TestWebAppAndShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("db initalised")
+	t.Log("db initialised")
 
 	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
 	if err != nil {

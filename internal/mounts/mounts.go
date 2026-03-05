@@ -144,7 +144,7 @@ func (fm *FileMount) Materialize(root string) error {
 	// Recurse, writing files and making directories from the fs.FS.
 	err := fs.WalkDir(fm.FS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err // error propogation
+			return err // error propagation
 		}
 		fullPath := filepath.Join(mountRoot, path)
 
@@ -181,7 +181,7 @@ func PrintFS(thisFS fs.FS) (string, error) {
 
 	err := fs.WalkDir(thisFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err // propogate
+			return err // propagate
 		}
 		if !topSeen { // verbatim root as "[d] ./ (./)"
 			_, err := fmt.Fprintf(&printOutput, tpl, "\n", "d", ".", "/", ".")

@@ -1,3 +1,5 @@
+// reconciler is the main command line program for running the web app to reconcile
+// salesforce and xero donation records.
 package main
 
 import (
@@ -5,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+
 	"github.com/rorycl/reconciler/app"
 )
 

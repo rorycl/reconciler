@@ -1,13 +1,13 @@
 // Package db provides the database component of the reconciler project.
 //
-// Althought the current database backend is sqlite to allow for cross-platform desktop
+// Although the current database backend is sqlite to allow for cross-platform desktop
 // use, the database is not considered a simple storage layer. Each query below is held
 // in an sql file held in the `sql` directory, which can be run on the sqlite command
 // line. (For some queries it is advisable to run the sql in a transaction, so that the
 // results can be rolled back.)
 //
 // The use of external, runnable sql files also as Go prepared statements is made
-// possible through a novel parameterization scheme, as set out in parameterize.go.
+// possible through a novel parameterization scheme, set out in parameterize.go.
 package db
 
 import (
