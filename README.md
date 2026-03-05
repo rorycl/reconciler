@@ -5,7 +5,8 @@ reconcile their accounts and CRMS systems to search, align and audit
 donation income and records, presently focusing on Xero and Salesforce.
 
 > [!CAUTION]
-> Reconciler is in early Beta and not recommended for production use.
+> Reconciler is in Beta testing. Backups of Salesforce data are
+> recommended before use.
 
 Reconciler draws records over OAuth2 secured API connections into a
 local in-memory database to assist users to update a field in Salesforce
@@ -18,11 +19,9 @@ donations.
 
 ### Reconciliation Mechanism
 
-The reconciliation concept centres on the use of a unique key to link an
-accounting income record to one or many donations in the CRMS system. In
-Reconciler this linkage is known as the `DFK` or `distributed foreign
-key`, in reference to how databases typically relate tables of data
-using a [foreign key](https://en.wikipedia.org/wiki/Foreign_key).
+The reconciliation concept centres on the use of a unique linking key to
+link an accounting income record to one or many donations in the CRMS
+system.
 
 For example, a bank transaction in Xero recording an income payment from
 the JustGiving platform might be given a reference `JUST-GIVE-01122025`.
@@ -31,7 +30,7 @@ The Reconciler app can be used to find the related donation (or
 donation records' target field. Reconciler shows if the total donation
 component of the Xero income (disregarding platform fees, etc.) for this
 bank transaction equals the total related Salesforce donations, using
-`JUST-GIVE-01122025` as the `DFK`. When the donation-related income
+`JUST-GIVE-01122025` as the linking key. When the donation-related income
 total equals the sum of related donations, the income and related
 donations for this income are considered reconciled.
 
@@ -65,12 +64,12 @@ Reconciler runs locally, accessing the remote systems with OAuth2
 authorized connections. A [yaml configuration
 file](config/config.example.yaml) is used to configure settings such as
 the OAuth2 client identifiers, the accounting account codes representing
-donation income, the CRMS target linkage/DFK object and field, the
+donation income, the CRMS target linkage object and field, the
 reconciliation start date, and other details.
 
 A local in-memory sqlite database is used to provide search
 capabilities. Connections to Xero are read-only, whereas only the target
-DFK field on the configured Salesforce object may be altered through
+linking field on the configured Salesforce object may be altered through
 Reconciler operations.
 
 ### Licence
