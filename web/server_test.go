@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"html/template"
@@ -14,11 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexedwards/scs/v2"
 	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
-	"github.com/rorycl/reconciler/internal/token"
 
 	"golang.org/x/oauth2"
 )
@@ -117,19 +114,6 @@ func TestServerHandlers(t *testing.T) {
 
 	serverURL := "localhost:8000"
 
-	// Register types for scs.
-	gob.Register(time.Time{})
-	gob.Register(token.ExtendedToken{})
-	sessionStore := scs.New()
-	sessionStore.Lifetime = 1 * time.Hour
-
-	/*
-		ctx, err := sessionStore.Load(context.Background(), "")
-		if err != nil {
-			t.Fatalf("could not load session store: %v", err)
-		}
-	*/
-
 	cfg := &config.Config{
 		Web: config.WebConfig{ListenAddress: serverURL},
 		Xero: config.XeroConfig{
@@ -182,7 +166,6 @@ func TestServerHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	webApp.sessions = sessionStore
 	webApp.SetInDevelopment()
 
 	router := webApp.routes()
@@ -208,7 +191,9 @@ func TestServerHandlers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to make request to %s: %v", path, err)
 		}
-		defer resp.Body.Close()
+		t.Cleanup(func() {
+			_ = resp.Body.Close()
+		})
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
