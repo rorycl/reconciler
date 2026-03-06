@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"html/template"
@@ -13,9 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexedwards/scs/v2"
 	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
+	"github.com/rorycl/reconciler/internal/token"
 
 	"golang.org/x/oauth2"
 )
@@ -23,7 +26,7 @@ import (
 // TestWebAppAndShutdown tests bringing up the web server and then stopping it.
 func TestWebAppAndShutdown(t *testing.T) {
 
-	serverURL := "127.0.0.1:8000"
+	serverURL := "localhost:8000"
 
 	cfg := &config.Config{
 		Web: config.WebConfig{
@@ -91,6 +94,11 @@ func TestWebAppAndShutdown(t *testing.T) {
 	webApp.RestartRoutes()
 	t.Log("routes restarted")
 
+	webApp.SetInDevelopment()
+	if !webApp.inDevelopment {
+		t.Error("inDevelopment false after SetInDevelopment")
+	}
+
 	go func() {
 		<-time.After(50 * time.Millisecond)
 		t.Log("shutdown called")
@@ -101,6 +109,118 @@ func TestWebAppAndShutdown(t *testing.T) {
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		t.Fatalf("server error: %T %v", err, err)
 	}
+
+}
+
+// TestServerHandlers tests the main server handlers.
+func TestServerHandlers(t *testing.T) {
+
+	serverURL := "localhost:8000"
+
+	// Register types for scs.
+	gob.Register(time.Time{})
+	gob.Register(token.ExtendedToken{})
+	sessionStore := scs.New()
+	sessionStore.Lifetime = 1 * time.Hour
+
+	/*
+		ctx, err := sessionStore.Load(context.Background(), "")
+		if err != nil {
+			t.Fatalf("could not load session store: %v", err)
+		}
+	*/
+
+	cfg := &config.Config{
+		Web: config.WebConfig{ListenAddress: serverURL},
+		Xero: config.XeroConfig{
+			OAuth2Config: &oauth2.Config{
+				RedirectURL: "/xero/callback",
+				Endpoint: oauth2.Endpoint{
+					AuthURL:  fmt.Sprintf("%s/oauth2/authorize", serverURL),
+					TokenURL: fmt.Sprintf("%s/oauth2/token", serverURL),
+				},
+				Scopes: []string{"accounting.transactions", "accounting.settings.read", "offline_access"},
+			},
+		},
+		Salesforce: config.SalesforceConfig{
+			OAuth2Config: &oauth2.Config{
+				RedirectURL: "/sf/callback",
+				Endpoint: oauth2.Endpoint{
+					AuthURL:  fmt.Sprintf("%s/oauth2/authorize", serverURL),
+					TokenURL: fmt.Sprintf("%s/oauth2/token", serverURL),
+				},
+				Scopes: []string{"api", "refresh_token"},
+			},
+		},
+		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	staticFS, err := mounts.NewFileMount("static", StaticEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templatesFS, err := mounts.NewFileMount("templates", TemplatesEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlFS, err := mounts.NewFileMount("sql", db.SQLEmbeddedFS, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accountCodes := "^(53|55|57)"
+	dbPath := "file:memdb_srv2?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	db, err := db.NewConnectionInTestMode(dbPath, sqlFS, accountCodes, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	webApp.sessions = sessionStore
+	webApp.SetInDevelopment()
+
+	router := webApp.routes()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+
+	client := ts.Client()
+
+	paths := []string{
+		"/connect",
+		"/refresh",
+		"/invoices",
+		"/bank-transactions",
+		"/donations",
+		"/invoice/inv-001/link",
+		"/bank-transaction/bt-001/unlink",
+		"/logout",
+	}
+
+	for _, path := range paths {
+
+		resp, err := client.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("Failed to make request to %s: %v", path, err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.StatusCode != 200 {
+			t.Errorf("%s got unexpected status code %d", path, resp.StatusCode)
+			fmt.Println(string(body))
+		}
+	}
+
 }
 
 // TestDonationSearchTimeSpan tests the dates around which a donation should be searched
@@ -138,139 +258,104 @@ func TestDonationSearchTimeSpan(t *testing.T) {
 	}
 }
 
-/*
-github.com/rorycl/reconciler/web/server.go:1494:	getInvoiceOrBankTransactionDetails	0.0%
-github.com/rorycl/reconciler/web/types.go:27:		newXeroClienter				0.0%
-github.com/rorycl/reconciler/web/types.go:42:		newSalesforceClienter			0.0%
-*/
-
+// TestServerComponents tests some of the support components such as error and render
+// methods.
 func TestServerComponents(t *testing.T) {
 
-	logger := slog.New(slog.NewTextHandler(
-		t.Output(),
-		&slog.HandlerOptions{Level: slog.LevelDebug},
-	))
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	webApp := &WebApp{
-		inDevelopment: false,
-		log:           logger,
-	}
-	webApp.SetInDevelopment()
-	if got, want := webApp.inDevelopment, true; got != want {
-		t.Errorf("inDevelopment got %t want %t", got, want)
-	}
-
-	// ServerError.
-	r := httptest.NewRequest("GET", "/error", nil)
-	w := httptest.NewRecorder()
-
-	webApp.ServerError(w, r, errors.New("error1"))
-
-	result := w.Result()
-	body, err := io.ReadAll(result.Body)
-	if err != nil {
-		t.Fatalf("result body reading error: %v", err)
-	}
-	if got, want := result.StatusCode, http.StatusInternalServerError; got != want {
-		t.Errorf("got status %d expected %d", got, want)
-	}
-	if got, want := string(body), "Internal Server Error"; !strings.Contains(got, want) {
-		t.Errorf("body: expected %s in %s", want, got)
-	}
-
-	// clientError with message.
-	w = httptest.NewRecorder()
-	webApp.clientError(w, "a bad request message", http.StatusBadRequest)
-
-	result = w.Result()
-	body, err = io.ReadAll(result.Body)
-	if err != nil {
-		t.Fatalf("result body reading error: %v", err)
-	}
-	if got, want := result.StatusCode, http.StatusBadRequest; got != want {
-		t.Errorf("got status %d expected %d", got, want)
-	}
-	if got, want := string(body), "a bad request message"; !strings.Contains(got, want) {
-		t.Errorf("body: expected %s in %s", want, got)
-	}
-
-	// clientError without message.
-	w = httptest.NewRecorder()
-	webApp.clientError(w, "", http.StatusBadRequest)
-
-	result = w.Result()
-	body, err = io.ReadAll(result.Body)
-	if err != nil {
-		t.Fatalf("result body reading error: %v", err)
-	}
-	if got, want := result.StatusCode, http.StatusBadRequest; got != want {
-		t.Errorf("got status %d expected %d", got, want)
-	}
-	if got, want := string(body), http.StatusText(result.StatusCode); !strings.Contains(got, want) {
-		t.Errorf("body: expected %s in %s", want, got)
-	}
-
-	// htmxClientError.
-	w = httptest.NewRecorder()
-	webApp.htmxClientError(w, "htmx client error")
-
-	result = w.Result()
-	body, err = io.ReadAll(result.Body)
-	if err != nil {
-		t.Fatalf("result body reading error: %v", err)
-	}
-	if got, want := result.StatusCode, http.StatusOK; got != want { // 200 status needed for htmx.
-		t.Errorf("got status %d expected %d", got, want)
-	}
-	if got, want := string(body), "htmx client error"; !strings.Contains(got, want) {
-		t.Errorf("body: expected %s in %s", want, got)
+	tests := []struct {
+		name       string
+		testFunc   func(a *WebApp, w http.ResponseWriter, r *http.Request)
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name: "ServerError",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				a.ServerError(w, r, errors.New("error1"))
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   "Internal Server Error",
+		},
+		{
+			name: "clientError",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				a.clientError(w, "a bad request message", http.StatusBadRequest)
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "a bad request message",
+		},
+		{
+			name: "clientError without message",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				a.clientError(w, "", http.StatusBadRequest)
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   http.StatusText(http.StatusBadRequest),
+		},
+		{
+			name: "htmx client error",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				a.htmxClientError(w, "htmx client error")
+			},
+			wantStatus: http.StatusOK,
+			wantBody:   "htmx client error",
+		},
+		{
+			name: "not found error",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				a.notFound(w, r, fmt.Sprintf("%q was not found", r.URL.Path))
+			},
+			wantStatus: http.StatusNotFound,
+			wantBody:   "was not found",
+		},
+		{
+			name: "render ok",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				tpl := template.Must(template.New("t").Parse("hi {{ .Name }}"))
+				a.render(w, r, tpl, "t", map[string]string{"Name": "emaN"})
+			},
+			wantStatus: http.StatusOK,
+			wantBody:   "hi emaN",
+		},
+		{
+			name: "render fail",
+			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+				tpl := template.Must(template.New("t").Parse("hi {{ .XXX }}"))
+				a.render(w, r, tpl, "t", struct{}{}) // trigger a template error
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   "",
+		},
 	}
 
-	// notFound.
-	r = httptest.NewRequest("GET", "/not/found", nil)
-	w = httptest.NewRecorder()
-	webApp.notFound(w, r, fmt.Sprintf("%q was not found", r.URL.Path))
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
-	result = w.Result()
-	body, err = io.ReadAll(result.Body)
-	if err != nil {
-		t.Fatalf("result body reading error: %v", err)
+			a := &WebApp{
+				inDevelopment: false,
+				log:           logger,
+			}
+
+			r := httptest.NewRequest("GET", "/", nil)
+			w := httptest.NewRecorder()
+
+			tt.testFunc(a, w, r)
+
+			result := w.Result()
+			body, err := io.ReadAll(result.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got, want := result.StatusCode, tt.wantStatus; got != want {
+				t.Errorf("got status %d expected %d", got, want)
+			}
+			if got, want := string(body), tt.wantBody; !strings.Contains(got, want) {
+				t.Errorf("body: expected %s in %s", want, got)
+			}
+
+		})
 	}
-	if got, want := result.StatusCode, http.StatusNotFound; got != want { // 404
-		t.Errorf("got status %d expected %d", got, want)
-	}
-	if got, want := string(body), `was not found`; !strings.Contains(got, want) {
-		t.Errorf("body: expected %q in %q", want, got)
-	}
-
-	// render ok.
-	r = httptest.NewRequest("GET", "/hi/name", nil)
-	w = httptest.NewRecorder()
-	tpl := template.Must(template.New("t").Parse("hi {{ .Name }}"))
-
-	webApp.render(w, r, tpl, "t", map[string]string{"Name": "emaN"})
-
-	result = w.Result()
-	body, err = io.ReadAll(result.Body)
-	if got, want := result.StatusCode, http.StatusOK; got != want {
-		t.Errorf("got status %d expected %d", got, want)
-	}
-	if got, want := string(body), "hi emaN"; !strings.Contains(got, want) {
-		t.Errorf("body: expected %s in %s", want, got)
-	}
-
-	// render error.
-	r = httptest.NewRequest("GET", "/hi/error", nil)
-	w = httptest.NewRecorder()
-	tpl = template.Must(template.New("t").Parse("hi {{ .XXX }}"))
-
-	webApp.render(w, r, tpl, "t", struct{}{}) // trigger a template error
-
-	result = w.Result()
-	// body, err = io.ReadAll(result.Body)
-	// fmt.Println(string(body))
-	if got, want := result.StatusCode, http.StatusInternalServerError; got != want {
-		t.Errorf("got status %d expected %d", got, want)
-	}
-
 }
