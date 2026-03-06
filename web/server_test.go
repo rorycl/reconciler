@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,6 +86,11 @@ func TestWebAppAndShutdown(t *testing.T) {
 	}
 	t.Log("web app initialised")
 
+	// Check route restarting works (this is useful for live reloading, for example for
+	// testing template and static file changes.
+	webApp.RestartRoutes()
+	t.Log("routes restarted")
+
 	go func() {
 		<-time.After(50 * time.Millisecond)
 		t.Log("shutdown called")
@@ -127,4 +136,141 @@ func TestDonationSearchTimeSpan(t *testing.T) {
 
 		})
 	}
+}
+
+/*
+github.com/rorycl/reconciler/web/server.go:1494:	getInvoiceOrBankTransactionDetails	0.0%
+github.com/rorycl/reconciler/web/types.go:27:		newXeroClienter				0.0%
+github.com/rorycl/reconciler/web/types.go:42:		newSalesforceClienter			0.0%
+*/
+
+func TestServerComponents(t *testing.T) {
+
+	logger := slog.New(slog.NewTextHandler(
+		t.Output(),
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	))
+
+	webApp := &WebApp{
+		inDevelopment: false,
+		log:           logger,
+	}
+	webApp.SetInDevelopment()
+	if got, want := webApp.inDevelopment, true; got != want {
+		t.Errorf("inDevelopment got %t want %t", got, want)
+	}
+
+	// ServerError.
+	r := httptest.NewRequest("GET", "/error", nil)
+	w := httptest.NewRecorder()
+
+	webApp.ServerError(w, r, errors.New("error1"))
+
+	result := w.Result()
+	body, err := io.ReadAll(result.Body)
+	if err != nil {
+		t.Fatalf("result body reading error: %v", err)
+	}
+	if got, want := result.StatusCode, http.StatusInternalServerError; got != want {
+		t.Errorf("got status %d expected %d", got, want)
+	}
+	if got, want := string(body), "Internal Server Error"; !strings.Contains(got, want) {
+		t.Errorf("body: expected %s in %s", want, got)
+	}
+
+	// clientError with message.
+	w = httptest.NewRecorder()
+	webApp.clientError(w, "a bad request message", http.StatusBadRequest)
+
+	result = w.Result()
+	body, err = io.ReadAll(result.Body)
+	if err != nil {
+		t.Fatalf("result body reading error: %v", err)
+	}
+	if got, want := result.StatusCode, http.StatusBadRequest; got != want {
+		t.Errorf("got status %d expected %d", got, want)
+	}
+	if got, want := string(body), "a bad request message"; !strings.Contains(got, want) {
+		t.Errorf("body: expected %s in %s", want, got)
+	}
+
+	// clientError without message.
+	w = httptest.NewRecorder()
+	webApp.clientError(w, "", http.StatusBadRequest)
+
+	result = w.Result()
+	body, err = io.ReadAll(result.Body)
+	if err != nil {
+		t.Fatalf("result body reading error: %v", err)
+	}
+	if got, want := result.StatusCode, http.StatusBadRequest; got != want {
+		t.Errorf("got status %d expected %d", got, want)
+	}
+	if got, want := string(body), http.StatusText(result.StatusCode); !strings.Contains(got, want) {
+		t.Errorf("body: expected %s in %s", want, got)
+	}
+
+	// htmxClientError.
+	w = httptest.NewRecorder()
+	webApp.htmxClientError(w, "htmx client error")
+
+	result = w.Result()
+	body, err = io.ReadAll(result.Body)
+	if err != nil {
+		t.Fatalf("result body reading error: %v", err)
+	}
+	if got, want := result.StatusCode, http.StatusOK; got != want { // 200 status needed for htmx.
+		t.Errorf("got status %d expected %d", got, want)
+	}
+	if got, want := string(body), "htmx client error"; !strings.Contains(got, want) {
+		t.Errorf("body: expected %s in %s", want, got)
+	}
+
+	// notFound.
+	r = httptest.NewRequest("GET", "/not/found", nil)
+	w = httptest.NewRecorder()
+	webApp.notFound(w, r, fmt.Sprintf("%q was not found", r.URL.Path))
+
+	result = w.Result()
+	body, err = io.ReadAll(result.Body)
+	if err != nil {
+		t.Fatalf("result body reading error: %v", err)
+	}
+	if got, want := result.StatusCode, http.StatusNotFound; got != want { // 404
+		t.Errorf("got status %d expected %d", got, want)
+	}
+	if got, want := string(body), `was not found`; !strings.Contains(got, want) {
+		t.Errorf("body: expected %q in %q", want, got)
+	}
+
+	// render ok.
+	r = httptest.NewRequest("GET", "/hi/name", nil)
+	w = httptest.NewRecorder()
+	tpl := template.Must(template.New("t").Parse("hi {{ .Name }}"))
+
+	webApp.render(w, r, tpl, "t", map[string]string{"Name": "emaN"})
+
+	result = w.Result()
+	body, err = io.ReadAll(result.Body)
+	if got, want := result.StatusCode, http.StatusOK; got != want {
+		t.Errorf("got status %d expected %d", got, want)
+	}
+	if got, want := string(body), "hi emaN"; !strings.Contains(got, want) {
+		t.Errorf("body: expected %s in %s", want, got)
+	}
+
+	// render error.
+	r = httptest.NewRequest("GET", "/hi/error", nil)
+	w = httptest.NewRecorder()
+	tpl = template.Must(template.New("t").Parse("hi {{ .XXX }}"))
+
+	webApp.render(w, r, tpl, "t", struct{}{}) // trigger a template error
+
+	result = w.Result()
+	// body, err = io.ReadAll(result.Body)
+	// fmt.Println(string(body))
+	if got, want := result.StatusCode, http.StatusInternalServerError; got != want {
+		t.Errorf("got status %d expected %d", got, want)
+	}
+
 }
