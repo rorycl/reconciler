@@ -24,7 +24,7 @@
         </thead>
         <tbody class="bg-white divide-y divide-slate-300">
             {{ range .ViewDonations }}
-            <tr>
+            <tr class="hover:bg-slate-100">
                 <td class="px-4 py-1 text-center"><input name="donation-ids" value="{{ .ID }}" type="checkbox"></td>
                 <td class="px-4 py-1 whitespace-nowrap">{{ .Name }}</td>
                 <td class="px-4 py-1 whitespace-nowrap">{{ .CloseDateStr }}</td>
