@@ -327,7 +327,10 @@ func (web *WebApp) handleRoot() http.Handler {
 func (web *WebApp) handleConnect() http.Handler {
 
 	name := "connect.html"
-	tpls := []string{"base.html", "connect.html"}
+	tpls := []string{
+		"base.html",
+		"connect.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -360,7 +363,10 @@ func (web *WebApp) handleConnect() http.Handler {
 func (web *WebApp) handleLogout() http.Handler {
 
 	name := "logout.html"
-	tpls := []string{"base.html", "logout.html"}
+	tpls := []string{
+		"base.html",
+		"logout.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	// Determine if an in-memory database is in use.
@@ -409,7 +415,10 @@ func (web *WebApp) handleLogoutConfirmed() http.Handler {
 func (web *WebApp) handleRefresh() http.Handler {
 
 	name := "refresh.html"
-	tpls := []string{"base.html", "refresh.html"}
+	tpls := []string{
+		"base.html",
+		"refresh.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
 	// Configuration start date.
@@ -502,7 +511,12 @@ func (web *WebApp) handleInvoices() http.Handler {
 
 	thisURL := "/invoices"
 	name := "invoices.html"
-	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "invoices.html"}
+	tpls := []string{
+		"base.html",
+		"nav.html",
+		"partial-listingTabs.html",
+		"invoices.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
@@ -636,7 +650,12 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 
 	thisURL := "/bank-transactions"
 	name := "bank-transactions.html"
-	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "bank-transactions.html"}
+	tpls := []string{
+		"base.html",
+		"nav.html",
+		"partial-listingTabs.html",
+		"bank-transactions.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
@@ -768,7 +787,14 @@ func (web *WebApp) handleDonations() http.Handler {
 
 	thisURL := "/donations"
 	name := "donations.html"
-	tpls := []string{"base.html", "nav.html", "partial-listingTabs.html", "partial-donations-searchform.html", "partial-donations-searchresults.html", "donations.html"}
+	tpls := []string{
+		"base.html",
+		"nav.html",
+		"partial-listingTabs.html",
+		"partial-donations-searchform.html",
+		"partial-donations-searchresults.html",
+		"donations.html",
+	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
