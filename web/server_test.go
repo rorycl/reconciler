@@ -166,7 +166,10 @@ func TestServerHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set development and testing flags.
 	webApp.SetInDevelopment()
+	webApp.logoutDuration = time.Duration(10 * time.Millisecond)
+	Exiter = func(int) {} // override default os.Exit
 
 	router := webApp.routes()
 	ts := httptest.NewServer(router)
@@ -183,6 +186,7 @@ func TestServerHandlers(t *testing.T) {
 		"/invoice/inv-001/link",
 		"/bank-transaction/bt-001/unlink",
 		"/logout",
+		"/logout/confirmed",
 	}
 
 	for _, path := range paths {

@@ -83,6 +83,9 @@ var refreshDurationWindow = 10 * time.Second
 // refreshTrucation is the user-oriented refresh rounding duration.
 var refreshTruncation = 10 * time.Second
 
+// Exiter is the local Exit func
+var Exiter func(code int) = os.Exit
+
 // WebApp is the configuration object for the web server.
 type WebApp struct {
 	log            *slog.Logger
@@ -93,6 +96,7 @@ type WebApp struct {
 	server         *http.Server
 	sessions       *scs.SessionManager
 	accountsRegexp *regexp.Regexp
+	logoutDuration time.Duration // time to pause when logging out.
 
 	// client factory funcs
 	newXeroClient xeroFactoryFunc
@@ -128,12 +132,15 @@ func New(
 	// Initialise in-memory session store and related custom gob types.
 	// Sessions have an absolute validity limit of 8 hours.
 	// Sessions time out after 2 hours of inactivity.
+	gob.Register(time.Time{})
+	gob.Register(token.ExtendedToken{})
+
 	scsSessionStore := scs.New()
 	scsSessionStore.Lifetime = 8 * time.Hour
 	scsSessionStore.IdleTimeout = 2 * time.Hour
 
-	gob.Register(time.Time{})
-	gob.Register(token.ExtendedToken{})
+	// Set the duration of the logout pause before closing the app.
+	logoutDuration := time.Duration(1 * time.Second)
 
 	// Compile the donation accounts filtering regexp
 	// (this is a safe assignment, checked at config ingestion).
@@ -148,6 +155,7 @@ func New(
 		server:         server,
 		sessions:       scsSessionStore,
 		accountsRegexp: accountsRegexp,
+		logoutDuration: logoutDuration,
 
 		// client factory funcs
 		newXeroClient: newXeroClienter,
@@ -385,15 +393,15 @@ func (web *WebApp) handleLogoutConfirmed() http.Handler {
 
 		// Close the database and kill the session.
 		_ = web.db.Close()
-		time.Sleep(1 * time.Second)
+		time.Sleep(web.logoutDuration)
 		web.log.Info("Logout completed")
 		if fl, ok := w.(http.Flusher); ok {
 			_, _ = fmt.Fprint(w, "Logout completed. Please restart the program.")
 			fl.Flush()
 		}
 
-		time.Sleep(1 * time.Second)
-		os.Exit(0)
+		time.Sleep(web.logoutDuration)
+		Exiter(0)
 	})
 }
 
