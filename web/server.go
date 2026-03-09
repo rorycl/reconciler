@@ -804,6 +804,20 @@ func (web *WebApp) handleDonations() http.Handler {
 
 		// Initialise url parameter form and derive url.
 		form := NewSearchDonationsForm(&web.cfg.DataStartDate, nil)
+		defaultURLParams, err := form.AsURLParams()
+		if err != nil {
+			web.ServerError(w, r, err)
+		}
+		defaultURL := thisURL + "?" + defaultURLParams
+
+		// If the url is 'reset', clear the last saved url and redirect to the base URL.
+		if r.URL.Query().Get("reset") == "true" {
+			_ = web.sessions.PopString(ctx, thisURL)
+			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
+			return
+		}
+
+		// Decode the form with the URL parameters
 		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
 			web.ServerError(w, r, err)
 			return
@@ -813,13 +827,6 @@ func (web *WebApp) handleDonations() http.Handler {
 			web.ServerError(w, r, err)
 		}
 		redirectURL := thisURL + "?" + urlParams
-
-		// If the url is 'reset', clear the last saved url and redirect to default.
-		if r.URL.Query().Get("reset") == "true" {
-			_ = web.sessions.PopString(ctx, thisURL)
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-			return
-		}
 
 		// If the url is 'naked', redirect to the default.
 		if r.URL.RawQuery == "" {
