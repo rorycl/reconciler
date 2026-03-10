@@ -47,6 +47,7 @@ type ExtendedToken struct {
 	Type        TokenType     `json:"type"`
 	Token       *oauth2.Token `json:"token"`
 	InstanceURL string        `json:"instance_url"` // only relevant to Salesforce Tokens
+	TenantID    string        `json:"-"`
 }
 
 // NewExtendedToken creates a new ExtendedToken, running any ancillary checks and/or

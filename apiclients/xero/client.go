@@ -49,18 +49,21 @@ func NewClient(
 	ts := oauth2.StaticTokenSource(et.Token)
 	oauthClient := oauth2.NewClient(ctx, ts)
 
-	// Retrieve the tenantID.
-	tenantID, err := getTenantID(ctx, oauthClient)
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine tenant ID: %w", err)
-	}
-	if tenantID == "" {
-		return nil, errors.New("tenant ID is empty")
+	// Retrieve the tenantID if empty.
+	if et.TenantID == "" {
+		tenantID, err := getTenantID(ctx, oauthClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine tenant ID: %w", err)
+		}
+		if tenantID == "" {
+			return nil, errors.New("tenant ID is empty")
+		}
+		et.TenantID = tenantID
 	}
 
 	return &Client{
 		httpClient:     oauthClient,
-		tenantID:       tenantID,
+		tenantID:       et.TenantID,
 		baseURL:        baseURL,
 		accountsRegexp: accountsRegexp,
 		log:            logger,
