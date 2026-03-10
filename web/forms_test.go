@@ -192,7 +192,7 @@ func TestSearchForm(t *testing.T) {
 			simulatedRequest := newRequest(t, tt.inputURL)
 
 			form := NewSearchForm(new(defaultDateFrom), new(defaultDateTo))
-			if err := DecodeURLParams(simulatedRequest.URL.Query(), form); err != nil {
+			if err := form.DecodeURLParams(simulatedRequest.URL.Query()); err != nil {
 				if tt.err != err {
 					t.Fatalf("unexpected error: %v", err)
 				}
@@ -554,7 +554,7 @@ func TestSearchDonationsForm(t *testing.T) {
 				t.Fatalf("unexpected url parsequery error: %v", err)
 			}
 
-			err = DecodeURLParams(urlParams, form)
+			err = form.DecodeURLParams(urlParams)
 			if err != nil {
 				t.Fatalf("unexpected decoding params error: %v", err)
 			}

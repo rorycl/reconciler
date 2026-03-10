@@ -2,11 +2,12 @@ package web
 
 import (
 	"fmt"
-	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"log"
 	"net/url"
 	"reflect"
 	"time"
+
+	"github.com/rorycl/reconciler/apiclients/salesforce"
 
 	"github.com/google/go-querystring/query"
 	"github.com/gorilla/schema"
@@ -168,6 +169,17 @@ func (f *SearchForm) Offset(pageLen int) int {
 	return (f.Page - 1) * pageLen
 }
 
+// DecodeURLParams decodes a url query into a form.
+func (f *SearchForm) DecodeURLParams(urlQuery map[string][]string) error {
+	fs := f
+	err := decodeURLParams(urlQuery, fs)
+	if err != nil {
+		return err
+	}
+	*f = *fs
+	return nil
+}
+
 // SearchDonationsForm represents the URL query parameter filters for
 // donations.
 type SearchDonationsForm struct {
@@ -222,6 +234,17 @@ func (f *SearchDonationsForm) Validate(v *Validator) {
 // Offset calculates the database offset for (1-based) pagination.
 func (f *SearchDonationsForm) Offset(pageLen int) int {
 	return (f.Page - 1) * pageLen
+}
+
+// DecodeURLParams decodes a url query into the form.
+func (f *SearchDonationsForm) DecodeURLParams(urlQuery map[string][]string) error {
+	fs := f
+	err := decodeURLParams(urlQuery, fs)
+	if err != nil {
+		return err
+	}
+	*f = *fs
+	return nil
 }
 
 // LinkOrUnlinkForm is a form for linking or unlinking donations in Salesforce to a Xero
@@ -307,9 +330,9 @@ func newSchemaDecoder() *schema.Decoder {
 	return decoder
 }
 
-// DecodeURLParams is helper that decodes URL query parameters from a request
+// decodeURLParams is helper that decodes URL query parameters from a request
 // into a destination struct (dst).
-func DecodeURLParams(rURLQuery map[string][]string, dst any) error {
+func decodeURLParams(rURLQuery map[string][]string, dst any) error {
 	decoder := newSchemaDecoder()
 	if err := decoder.Decode(dst, rURLQuery); err != nil {
 		return fmt.Errorf("url parameter decoding error: %v", err)
