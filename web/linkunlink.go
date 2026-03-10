@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"github.com/rorycl/reconciler/internal/token"
 )
 
@@ -104,8 +103,8 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			return
 		}
 
-		// Create the salesforce client and run a batch update.
-		sfClient, err := salesforce.NewClient(ctx, web.cfg, web.log, sfToken)
+		// Create the salesforce client.
+		sfClient, err := web.newSFClient(ctx, web.cfg, web.log, sfToken)
 		if err != nil {
 			web.ServerError(w, r, fmt.Errorf("failed to create salesforce client for linking/unlinking: %w", err))
 			return
