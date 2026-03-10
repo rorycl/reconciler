@@ -526,30 +526,15 @@ func (web *WebApp) handleInvoices() http.Handler {
 
 		// Initialise url parameter form and derive url.
 		form := NewSearchForm(&web.cfg.DataStartDate, nil)
-		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
-			web.ServerError(w, r, err)
-			return
-		}
-		urlParams, err := form.AsURLParams()
+
+		// Check if a redirection is needed.
+		derivedURL, redirect, err := redirectCheck(ctx, form, web.sessions, r, thisURL)
 		if err != nil {
 			web.ServerError(w, r, err)
 		}
-		redirectURL := thisURL + "?" + urlParams
-
-		// If the url is 'reset', clear the last saved url and redirect to default.
-		if r.URL.Query().Get("reset") == "true" {
-			_ = web.sessions.PopString(ctx, thisURL)
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-			return
-		}
-
-		// If the url is 'naked', redirect to the last saved url or default.
-		if r.URL.RawQuery == "" {
-			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
-				http.Redirect(w, r, savedURL, http.StatusSeeOther)
-				return
-			}
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		if redirect {
+			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
+			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
 			return
 		}
 
@@ -571,7 +556,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list invoices: refresh data error: %v", err))
 			}
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
 			return
 		}
 
@@ -639,7 +624,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 		}
 
 		// Save the url.
-		web.sessions.Put(ctx, thisURL, redirectURL)
+		web.sessions.Put(ctx, thisURL, derivedURL)
 
 		web.render(w, r, templates, name, data)
 	})
@@ -663,32 +648,17 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 
 		ctx := r.Context()
 
-		// Initialise url parameter form and derive url.
+		// Initialise url parameter form.
 		form := NewSearchForm(&web.cfg.DataStartDate, nil)
-		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
-			web.ServerError(w, r, err)
-			return
-		}
-		urlParams, err := form.AsURLParams()
+
+		// Check if a redirection is needed.
+		derivedURL, redirect, err := redirectCheck(ctx, form, web.sessions, r, thisURL)
 		if err != nil {
 			web.ServerError(w, r, err)
 		}
-		redirectURL := thisURL + "?" + urlParams
-
-		// If the url is 'reset', clear the last saved url and redirect to default.
-		if r.URL.Query().Get("reset") == "true" {
-			_ = web.sessions.PopString(ctx, thisURL)
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-			return
-		}
-
-		// If the url is 'naked', redirect to the default.
-		if r.URL.RawQuery == "" {
-			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
-				http.Redirect(w, r, savedURL, http.StatusSeeOther)
-				return
-			}
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		if redirect {
+			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
+			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
 			return
 		}
 
@@ -710,7 +680,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list bank-transactions: refresh data error: %v", err))
 			}
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
 			return
 		}
 
@@ -776,7 +746,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		}
 
 		// Save the url.
-		web.sessions.Put(ctx, thisURL, redirectURL)
+		web.sessions.Put(ctx, thisURL, derivedURL)
 
 		web.render(w, r, templates, name, data)
 	})
@@ -802,39 +772,17 @@ func (web *WebApp) handleDonations() http.Handler {
 
 		ctx := r.Context()
 
-		// Initialise url parameter form and derive url.
+		// Initialise url parameter form.
 		form := NewSearchDonationsForm(&web.cfg.DataStartDate, nil)
-		defaultURLParams, err := form.AsURLParams()
+
+		// Check if a redirection is needed.
+		derivedURL, redirect, err := redirectCheck(ctx, form, web.sessions, r, thisURL)
 		if err != nil {
 			web.ServerError(w, r, err)
 		}
-		defaultURL := thisURL + "?" + defaultURLParams
-
-		// If the url is 'reset', clear the last saved url and redirect to the base URL.
-		if r.URL.Query().Get("reset") == "true" {
-			_ = web.sessions.PopString(ctx, thisURL)
-			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
-			return
-		}
-
-		// Decode the form with the URL parameters
-		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
-			web.ServerError(w, r, err)
-			return
-		}
-		urlParams, err := form.AsURLParams()
-		if err != nil {
-			web.ServerError(w, r, err)
-		}
-		redirectURL := thisURL + "?" + urlParams
-
-		// If the url is 'naked', redirect to the default.
-		if r.URL.RawQuery == "" {
-			if savedURL := web.sessions.GetString(ctx, thisURL); savedURL != "" {
-				http.Redirect(w, r, savedURL, http.StatusSeeOther)
-				return
-			}
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		if redirect {
+			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
+			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
 			return
 		}
 
@@ -856,7 +804,7 @@ func (web *WebApp) handleDonations() http.Handler {
 			if err != nil {
 				web.log.Error(fmt.Sprintf("list donations: refresh data error: %v", err))
 			}
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
 			return
 		}
 
@@ -937,7 +885,7 @@ func (web *WebApp) handleDonations() http.Handler {
 		}
 
 		// Save the url.
-		web.sessions.Put(ctx, thisURL, redirectURL)
+		web.sessions.Put(ctx, thisURL, derivedURL)
 
 		web.render(w, r, templates, name, data)
 	})
@@ -1031,7 +979,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 
 		// Decode the url params and construct the current url, interjecting if the
 		// action is "unlink" to get the related information.
-		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
+		if err := form.DecodeURLParams(r.URL.Query()); err != nil {
 			web.ServerError(w, r, err)
 		}
 		if action == "unlink" {
@@ -1220,7 +1168,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 
 		// Decode the url params and construct the current url, interjecting if the
 		// action is "unlink" to get the related information.
-		if err := DecodeURLParams(r.URL.Query(), form); err != nil {
+		if err := form.DecodeURLParams(r.URL.Query()); err != nil {
 			web.ServerError(w, r, err)
 		}
 
