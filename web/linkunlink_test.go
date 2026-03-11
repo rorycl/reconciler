@@ -3,6 +3,8 @@ package web
 import (
 	"context"
 	"encoding/gob"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -62,28 +64,83 @@ func TestLinkUnlink(t *testing.T) {
 			Expiry:      time.Now().Add(1 * time.Hour), // not expired
 		},
 	}
-
-	key := validToken.Type.SessionName()
-	webApp.sessions.Put(ctx, key, validToken)
 	webApp.sessions.Put(ctx, token.SalesforceToken.SessionName(), validToken)
 
-	// Setup request.
-	request := httptest.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		"/donations/invoice/inv-002/link",
-		strings.NewReader("donation-ids=12&donation-ids=33&donation-ids=44"),
-	)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	// Setup writer.
-	writer := httptest.NewRecorder()
-
-	r := mux.NewRouter()
-	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", webApp.handleDonationsLinkUnlink())
-	r.ServeHTTP(writer, request)
-
-	if writer.Code != 200 {
-		t.Errorf("code %d received, not 200", writer.Code)
+	tests := []struct {
+		name         string
+		rq           *http.Request
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name: "3 donations ok",
+			rq: httptest.NewRequestWithContext(
+				ctx,
+				http.MethodPost,
+				"/donations/invoice/inv-002/link",
+				strings.NewReader("donation-ids=12&donation-ids=33&donation-ids=44"),
+			),
+			expectedCode: 200,
+			expectedBody: "",
+		},
+		{
+			name: "no donations",
+			rq: httptest.NewRequestWithContext(
+				ctx,
+				http.MethodPost,
+				"/donations/invoice/inv-002/link",
+				strings.NewReader("donation-ids="),
+			),
+			expectedCode: 200,
+			expectedBody: "invalid data was received",
+		},
+		{
+			name: "invalid method",
+			rq: httptest.NewRequestWithContext(
+				ctx,
+				http.MethodGet,
+				"/donations/invoice/inv-002/link",
+				strings.NewReader("donation-ids=12&donation-ids=33&donation-ids=44"),
+			),
+			expectedCode: 200,
+			expectedBody: "only POST requests allowed",
+		},
+		{
+			name: "no invoice or bank transaction",
+			rq: httptest.NewRequestWithContext(
+				ctx,
+				http.MethodPost,
+				"/donations/invoice/inv-99999/link",
+				strings.NewReader("donation-ids=12"),
+			),
+			expectedCode: 200,
+			expectedBody: "could not get invoice/transaction info",
+		},
 	}
+
+	for ii, tt := range tests {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
+
+			writer := httptest.NewRecorder()
+			tt.rq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			r := mux.NewRouter()
+			r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", webApp.handleDonationsLinkUnlink())
+
+			r.ServeHTTP(writer, tt.rq)
+
+			body, err := io.ReadAll(writer.Body)
+			if err != nil {
+				t.Fatalf("body read error: %v", err)
+			}
+			// htmx always expects a 200 response.
+			if got, want := writer.Code, tt.expectedCode; got != want {
+				t.Errorf("got code %d want %d", got, want)
+			}
+			if got, want := string(body), tt.expectedBody; !strings.Contains(got, want) {
+				t.Errorf("got body %q should contain %q", got, want)
+			}
+		})
+	}
+
 }

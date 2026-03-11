@@ -38,10 +38,10 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		// Extract the form data.
 		err = r.ParseForm()
 		if err != nil {
-			fmt.Printf("invalid POST request: %v", err)
+			web.log.Error(fmt.Sprintf("%s form error: invalid POST request: %v", vars["action"], err))
 			web.htmxClientError(
 				w,
-				fmt.Sprintf("%s form error: invalid POST request: %v", vars["action"], err),
+				fmt.Sprintf("%s form error: invalid POST request", vars["action"]),
 			)
 			return
 		}
@@ -49,10 +49,10 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		// Validate the form data
 		form, err := CheckLinkOrUnlinkForm(r.PostForm, vars)
 		if err != nil {
-			fmt.Printf("invalid form data: %v", err)
+			web.log.Error(fmt.Sprintf("%s form error: invalid form data: %v", vars["action"], err))
 			web.htmxClientError(
 				w,
-				fmt.Sprintf("%s form error: invalid form data: %v", vars["action"], err),
+				fmt.Sprintf("%s form error: invalid form data", vars["action"]),
 			)
 			return
 		}
@@ -62,7 +62,7 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 			web.log.Error(fmt.Sprintf("invalid data was received: %v", validator.Errors))
 			web.htmxClientError(
 				w,
-				fmt.Sprintf("%s form error: invalid data was received: %v", vars["action"], validator.Errors))
+				fmt.Sprintf("%s form error: invalid data was received", vars["action"]))
 			return
 		}
 
@@ -79,14 +79,14 @@ func (web *WebApp) handleDonationsLinkUnlink() http.Handler {
 		if form.Action == "link" {
 			dfk, _, err = web.getInvoiceOrBankTransactionDetails(ctx, form.Typer, form.ID)
 			if err != nil {
-				web.ServerError(w, r, fmt.Errorf("could not get invoice or bank transaction info: %w", err))
+				web.log.Error(fmt.Sprintf("could not get invoice or bank transaction info: %v", err))
 				web.htmxClientError(
 					w,
-					fmt.Sprintf("%s id: %s error: could get invoice/transaction info: %v", form.Typer, form.ID, err))
+					fmt.Sprintf("%s id: %s error: could not get invoice/transaction info", form.Typer, form.ID))
 				return
 			}
 			if dfk == "" || dfk == missingTransactionReference {
-				web.ServerError(w, r, fmt.Errorf("%s id %s had empty or invalid dfk and cannot be linked", form.Typer, form.ID))
+				web.log.Error(fmt.Sprintf("%s id %s had empty or invalid dfk and cannot be linked", form.Typer, form.ID))
 				web.htmxClientError(
 					w,
 					fmt.Sprintf("%s id %s has an empty dfk and cannot be linked", form.Typer, form.ID))
