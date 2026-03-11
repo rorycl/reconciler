@@ -29,7 +29,9 @@ func TestTypeInterfaceConverters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := sc.(sfClienter); !ok {
+	switch sc.(type) {
+	case sfClienter:
+	default:
 		t.Errorf("expected sfClienter type, got %T", sc)
 	}
 
@@ -47,8 +49,9 @@ func TestTypeInterfaceConverters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := xc.(xeroClienter); !ok {
-		t.Errorf("expected xeroClienter type, got %T", sc)
+	switch xc.(type) {
+	case xeroClienter:
+	default:
+		t.Errorf("expected xeroClienter type, got %T", xc)
 	}
-
 }
