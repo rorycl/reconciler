@@ -382,7 +382,7 @@ func TestFormLinkOrUnlink(t *testing.T) {
 		{
 			name: "form ok",
 			formData: map[string][]string{
-				"donation-ids": {"1", "3", "5"},
+				"donation-ids": {"0015A00002CrA9PQAV", "0055A000006vN9PQAU", "00Q5A000027fD8PQAU"},
 			},
 			routeParams: map[string]string{
 				"type":   "invoice",
@@ -406,7 +406,7 @@ func TestFormLinkOrUnlink(t *testing.T) {
 		{
 			name: "form error with incorrect action",
 			formData: map[string][]string{
-				"donation-ids": {"1", "3", "5"},
+				"donation-ids": {"0015A00002CrA9PQAV", "0055A000006vN9PQAU", "00Q5A000027fD8PQAU"},
 			},
 			routeParams: map[string]string{
 				"type":   "invoice",

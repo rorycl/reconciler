@@ -308,6 +308,13 @@ func (f *LinkOrUnlinkForm) Validate(v *Validator) {
 
 	v.Check(len(f.DonationIDs) > 0, "donation-ids", "No donation ids found.")
 
+	err := salesforce.IDsValid(f.DonationIDs...)
+	var errStr string
+	if err != nil {
+		errStr = err.Error()
+	}
+	v.Check(err == nil, "donation-ids", errStr)
+
 }
 
 // ------------------------------------------------------------------------------
