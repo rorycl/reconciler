@@ -4,6 +4,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/rorycl/reconciler/apiclients/salesforce"
-	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 )
 
@@ -39,17 +39,15 @@ func (e ErrSystem) Error() string {
 
 // Reconciler represents the main domain operations of the system.
 type Reconciler struct {
-	db     *db.DB
-	log    *slog.Logger
-	config *config.Config
+	db  *db.DB
+	log *slog.Logger
 }
 
 // NewReconciler creates a new Reconciler.
-func NewReconciler(db *db.DB, logger *slog.Logger, config *config.Config) *Reconciler {
+func NewReconciler(db *db.DB, logger *slog.Logger) *Reconciler {
 	return &Reconciler{
-		db:     db,
-		log:    logger,
-		config: config,
+		db:  db,
+		log: logger,
 	}
 }
 
@@ -116,13 +114,13 @@ func (r *Reconciler) DonationsGet(
 			msg:    "A problem was encountered retrieving donations",
 		}
 	}
-	return newViewDonations(donations), nil
+	return newViewDonations(donations), err // percolate sql.ErrNoRows if necessary.
 
 }
 
-// GetInvoiceDetail retrieves an invoice and its related line items which are returned
+// InvoiceDetailGet retrieves an invoice and its related line items which are returned
 // as de-pointered objects.
-func (r *Reconciler) GetInvoiceDetail(
+func (r *Reconciler) InvoiceDetailGet(
 	ctx context.Context,
 	invoiceID string,
 ) (db.WRInvoice, []ViewLineItem, error) {
@@ -138,13 +136,19 @@ func (r *Reconciler) GetInvoiceDetail(
 			msg:    "A problem was encountered retrieving the invoice details",
 		}
 	}
+	if err == sql.ErrNoRows {
+		return invoice, nil, ErrUsage{
+			detail: "db.InvoiceWRGet not found error",
+			msg:    "The requested invoice was not found",
+		}
+	}
 	viewLineItems := newViewLineItems(lineItems)
 	return invoice, viewLineItems, nil
 }
 
-// GetTransactionDetail retrieves a bank transaction and its related line items which
+// TransactionDetailGet retrieves a bank transaction and its related line items which
 // are returned as de-pointered objects.
-func (r *Reconciler) GetTransactionDetail(
+func (r *Reconciler) TransactionDetailGet(
 	ctx context.Context,
 	transactionID string,
 ) (db.WRTransaction, []ViewLineItem, error) {
@@ -160,15 +164,24 @@ func (r *Reconciler) GetTransactionDetail(
 			msg:    "A problem was encountered retrieving the transaction details",
 		}
 	}
+	if err == sql.ErrNoRows {
+		return transaction, nil, ErrUsage{
+			detail: "db.BankTransactionWRGet not found error",
+			msg:    "The requested transaction was not found",
+		}
+	}
 	viewLineItems := newViewLineItems(lineItems)
 	return transaction, viewLineItems, nil
+
 }
 
-// getInvoiceOrBankTransactionDetails returns the DFK (Invoice ID or Bank Transaction
+// InvoiceOrBankTransactionInfoGet returns the DFK (Invoice ID or Bank Transaction
 // Reference) and Date from an invoice or Bank Transaction identified by ID (a uuid).
-func (r *Reconciler) GetInvoiceOrBankTransactionDetails(ctx context.Context, typer string, id string) (string, time.Time, error) {
+func (r *Reconciler) InvoiceOrBankTransactionInfoGet(ctx context.Context, typer string, id string) (string, time.Time, error) {
 	var rt time.Time
-	if typer == "invoice" {
+
+	switch typer {
+	case "invoice":
 		invoice, _, err := r.db.InvoiceWRGet(ctx, id)
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -185,28 +198,35 @@ func (r *Reconciler) GetInvoiceOrBankTransactionDetails(ctx context.Context, typ
 
 		}
 		return invoice.InvoiceNumber, invoice.Date, nil
-	}
-	transaction, _, err := r.db.BankTransactionWRGet(ctx, id)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", rt, ErrUsage{
+	case "transaction":
+		transaction, _, err := r.db.BankTransactionWRGet(ctx, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return "", rt, ErrUsage{
+					detail: "BankTransactionWRGet error",
+					msg:    fmt.Sprintf("Transaction %q could not be found", id),
+				}
+			}
+			return "", rt, ErrSystem{
 				detail: "BankTransactionWRGet error",
-				msg:    fmt.Sprintf("Transaction %q could not be found", id),
+				err:    err,
+				msg:    fmt.Sprintf("An error was encountered retreiving transaction %q", id),
 			}
 		}
+		ref := *transaction.Reference
+		return ref, transaction.Date, nil
+	default:
 		return "", rt, ErrSystem{
-			detail: "BankTransactionWRGet error",
-			err:    err,
-			msg:    fmt.Sprintf("An error was encountered retreiving transaction %q", id),
+			detail: "InvoiceOrBankTransactionInfoGet error",
+			err:    errors.New("invalid typer provided"),
+			msg:    "An invalid record type was requested",
 		}
 	}
-	ref := *transaction.Reference
-	return ref, transaction.Date, nil
 }
 
-// LinkUnlinkDonations links or unlinks donations over the API and then updates the
+// DonationsLinkUnlink links or unlinks donations over the API and then updates the
 // local record store accordingly.
-func (r *Reconciler) LinkUnlinkDonations(
+func (r *Reconciler) DonationsLinkUnlink(
 	ctx context.Context,
 	sfClient SalesforceClient, // see types.go
 	idRefs []salesforce.IDRef,
@@ -265,9 +285,9 @@ type RefreshXeroResults struct {
 	TransactionsNo int // the filtered transactions
 }
 
-// RefreshXeroRecords retrieves remote records and updates the local store accordingly.
+// XeroRecordsRefresh retrieves remote records and updates the local store accordingly.
 // If a fullRefresh is not required, not all remote records are retrieved.
-func (r *Reconciler) RefreshXeroRecords(
+func (r *Reconciler) XeroRecordsRefresh(
 	ctx context.Context,
 	xeroClient XeroClient,
 	dataStartDate time.Time,
@@ -319,7 +339,7 @@ func (r *Reconciler) RefreshXeroRecords(
 			}
 		}
 		results.AccountsNo = len(accounts)
-		r.log.Info("retrieved and upserted %d accounts", "records", results.AccountsNo)
+		r.log.Info("retrieved and upserted accounts", "records", results.AccountsNo)
 	}
 
 	// Bank Transactions
@@ -332,7 +352,6 @@ func (r *Reconciler) RefreshXeroRecords(
 		}
 	}
 	if err = r.db.BankTransactionsUpsert(ctx, transactions); err != nil {
-		return results, fmt.Errorf("failed to upsert bank transactions: %w", err)
 		return results, ErrSystem{
 			detail: "xero BankTransactionsUpsert error",
 			err:    err,
@@ -365,13 +384,13 @@ func (r *Reconciler) RefreshXeroRecords(
 }
 
 // RefreshSalesforceResults reports the refresh status and number of records retrieved
-// and upserted as the result of a RefreshSalesforceRecords call.
+// and upserted as the result of a SalesforceRecordsRefresh call.
 type RefreshSalesforceResults struct {
 	FullRefresh bool
 	RecordsNo   int
 }
 
-// RefreshSalesforceRecords retrieves remote records and updates the local store accordingly.
+// SalesforceRecordsRefresh retrieves remote records and updates the local store accordingly.
 func (r *Reconciler) RefreshSalesforceRecords(
 	ctx context.Context,
 	sfClient SalesforceClient,
