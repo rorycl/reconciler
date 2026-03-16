@@ -1,15 +1,16 @@
-package web
+package domain
 
 /* view types for the web server */
 
 import (
-	"github.com/rorycl/reconciler/db"
 	"html/template"
+
+	"github.com/rorycl/reconciler/db"
 )
 
-// viewDonation  is a view version of the db.Donations type,
+// ViewDonation  is a view version of the db.Donations type,
 // with non-pointer fields.
-type viewDonation struct {
+type ViewDonation struct {
 	ID              string
 	Name            string
 	Amount          float64
@@ -25,9 +26,9 @@ type viewDonation struct {
 	RowCount        int
 }
 
-// newViewDonations maps db.Donation records to a slice of viewDonation.
-func newViewDonations(donations []db.Donation) []viewDonation {
-	dv := make([]viewDonation, len(donations))
+// newViewDonations maps db.Donation records to a slice of ViewDonation.
+func newViewDonations(donations []db.Donation) []ViewDonation {
+	dv := make([]ViewDonation, len(donations))
 	for i, d := range donations {
 		dv[i].ID = d.ID
 		dv[i].Name = d.Name
@@ -38,7 +39,7 @@ func newViewDonations(donations []db.Donation) []viewDonation {
 		dv[i].RowCount = d.RowCount
 		// de-pointer
 		if d.PayoutReference == nil {
-			dv[i].PayoutReference = template.HTML("&mdash;")
+			dv[i].PayoutReference = template.HTML("&mdash;") // fixme; should not be in domain logic
 		} else {
 			dv[i].PayoutReference = *d.PayoutReference
 		}
@@ -61,9 +62,9 @@ func newViewDonations(donations []db.Donation) []viewDonation {
 	return dv
 }
 
-// viewLineItems is a view version of the db.WRLineItem with
+// ViewLineItems is a view version of the db.WRLineItem with
 // non-pointer fields.
-type viewLineItem struct {
+type ViewLineItem struct {
 	AccountCode    string
 	AccountName    string
 	Description    string
@@ -74,8 +75,8 @@ type viewLineItem struct {
 
 // newViewLineItems converts a slice of WRLineItem to a slice of
 // viewLineItem.
-func newViewLineItems(lineItems []db.WRLineItem) []viewLineItem {
-	viewItems := make([]viewLineItem, len(lineItems))
+func newViewLineItems(lineItems []db.WRLineItem) []ViewLineItem {
+	viewItems := make([]ViewLineItem, len(lineItems))
 	for i, li := range lineItems {
 		if li.AccountCode != nil {
 			viewItems[i].AccountCode = *li.AccountCode

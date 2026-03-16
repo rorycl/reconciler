@@ -1,10 +1,11 @@
-package web
+package domain
 
 import (
-	"github.com/rorycl/reconciler/db"
 	"html/template"
 	"testing"
 	"time"
+
+	"github.com/rorycl/reconciler/db"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -55,7 +56,7 @@ func TestViewDonation(t *testing.T) {
 		},
 	}
 
-	expectedDonations := []viewDonation{
+	expectedDonations := []ViewDonation{
 		{
 			ID:              "id123",
 			Name:            "name1",
@@ -115,7 +116,7 @@ func TestViewLineItem(t *testing.T) {
 		},
 	}
 
-	expectedLineItems := []viewLineItem{
+	expectedLineItems := []ViewLineItem{
 		{
 			AccountCode:    "accode",
 			AccountName:    "acname",
