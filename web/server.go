@@ -49,11 +49,10 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
-	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
+	"github.com/rorycl/reconciler/domain"
 	"github.com/rorycl/reconciler/internal/token"
 
 	"github.com/alexedwards/scs/v2"
@@ -88,8 +87,7 @@ var Exiter func(code int) = os.Exit
 // WebApp is the configuration object for the web server.
 type WebApp struct {
 	log            *slog.Logger
-	cfg            *config.Config
-	db             *db.DB
+	reconciler     *domain.Reconciler
 	staticFS       fs.FS // the fs holding the static web resources.
 	templateFS     fs.FS // the fs holding the web templates.
 	server         *http.Server
@@ -97,9 +95,10 @@ type WebApp struct {
 	accountsRegexp *regexp.Regexp
 	logoutDuration time.Duration // time to pause when logging out.
 
-	// client factory funcs
-	newXeroClient xeroFactoryFunc
-	newSFClient   sfFactoryFunc
+	// Xero and Salesforce client factory funcs allow the passing in of funcs that make a client that meets
+	// the domain.XeroClient and domain.SalesforceClient interfaces.
+	newXeroClient xeroClientMaker
+	newSFClient   sfClientMaker
 
 	// web clients for oauth2
 	xeroWebClient *token.TokenWebClient
@@ -111,11 +110,12 @@ type WebApp struct {
 
 // New initialises a WebApp. An error type is returned for future use.
 func New(
+	reconciler *domain.Reconciler,
 	logger *slog.Logger,
-	cfg *config.Config,
-	db *db.DB,
 	staticFS fs.FS,
 	templateFS fs.FS,
+	xeroClientFunc *xeroClientMaker,
+	sfClientFunc *sfClientMaker,
 ) (*WebApp, error) {
 
 	// Add settings for the http server.
@@ -146,19 +146,26 @@ func New(
 	accountsRegexp := cfg.DonationAccountCodesAsRegex()
 
 	webApp := &WebApp{
+		reconciler:     reconciler,
 		log:            logger,
-		cfg:            cfg,
-		db:             db,
 		staticFS:       staticFS,
 		templateFS:     templateFS,
 		server:         server,
 		sessions:       scsSessionStore,
 		accountsRegexp: accountsRegexp,
 		logoutDuration: logoutDuration,
+	}
 
-		// client factory funcs
-		newXeroClient: newXeroClienter,
-		newSFClient:   newSalesforceClienter,
+	// Client factory funcs. The default is to attach the full API clients.
+	if xeroClientFunc == nil {
+		webApp.newXeroClient = newXeroClientMaker
+	} else {
+		webApp.newXeroClient = xeroClientFunc
+	}
+	if sfClientFunc == nil {
+		webApp.newSFClient = newSalesforceClientMaker
+	} else {
+		webApp.newSFClient = sfClientFunc
 	}
 
 	// Attach the salesforce and xero OAuth2 web client handler constructors.
@@ -276,7 +283,8 @@ func (web *WebApp) routes() http.Handler {
 	// Logout -- delete the api connection tokens and redirect to /connect
 
 	// Chain the desired middleware. Todo: add recover handler.
-	logging := handlers.LoggingHandler(os.Stdout, r)
+	errorChecking := ErrorChecker(r)
+	logging := handlers.LoggingHandler(os.Stdout, errorChecking)
 	sessionMiddleWare := web.sessions.LoadAndSave(logging)
 	csrfMiddlware := enforceCSRF(sessionMiddleWare)
 	return csrfMiddlware
@@ -312,18 +320,19 @@ func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 }
 
 // handleRoot deals with http calls to "/" by redirecting to "/connect".
-func (web *WebApp) handleRoot() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (web *WebApp) handleRoot() appHandler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
-			return
+			return nil
 		}
 		http.Redirect(w, r, "/connect", http.StatusFound)
+		return nil
 	})
 }
 
 // handleConnect serves the /connect endpoint.
-func (web *WebApp) handleConnect() http.Handler {
+func (web *WebApp) handleConnect() appHandler {
 
 	name := "connect.html"
 	tpls := []string{
@@ -332,7 +341,7 @@ func (web *WebApp) handleConnect() http.Handler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -355,11 +364,12 @@ func (web *WebApp) handleConnect() http.Handler {
 			"SFTokenIsValid":   sfTokenValid,
 		}
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleLogout serves the /logout endpoint.
-func (web *WebApp) handleLogout() http.Handler {
+func (web *WebApp) handleLogout() appHandler {
 
 	name := "logout.html"
 	tpls := []string{
@@ -368,23 +378,21 @@ func (web *WebApp) handleLogout() http.Handler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	// Determine if an in-memory database is in use.
-	hasMemoryDB := strings.Contains(web.db.Path, ":memory:")
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 		data := map[string]any{
-			"MemoryDatabase": hasMemoryDB,
-			"DBName":         web.db.Path,
+			"MemoryDatabase": web.reconciler.DBIsInMemory(),
+			"DBName":         web.reconciler.DBPath(),
 		}
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleLogoutConfirmed serves the /logout/confirmed endpoint, which clears the session
 // and redirects to /connect.
-func (web *WebApp) handleLogoutConfirmed() http.Handler {
+func (web *WebApp) handleLogoutConfirmed() appHandler {
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -397,7 +405,7 @@ func (web *WebApp) handleLogoutConfirmed() http.Handler {
 		}
 
 		// Close the database and kill the session.
-		_ = web.db.Close()
+		_ = web.reconciler.DBClose()
 		time.Sleep(web.logoutDuration)
 		web.log.Info("Logout completed")
 		if fl, ok := w.(http.Flusher); ok {
@@ -407,11 +415,12 @@ func (web *WebApp) handleLogoutConfirmed() http.Handler {
 
 		time.Sleep(web.logoutDuration)
 		Exiter(0)
+		return nil
 	})
 }
 
 // handleRefresh serves the /refresh page.
-func (web *WebApp) handleRefresh() http.Handler {
+func (web *WebApp) handleRefresh() appHandler {
 
 	name := "refresh.html"
 	tpls := []string{
@@ -424,7 +433,7 @@ func (web *WebApp) handleRefresh() http.Handler {
 	dataStartDate := web.cfg.DataStartDate
 	accountCodes := web.cfg.DonationAccountPrefixes
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 		ctx := r.Context()
 
 		// Todo: Refresh data is best determined by database data freshness.
@@ -449,64 +458,62 @@ func (web *WebApp) handleRefresh() http.Handler {
 			"Message":              web.sessions.PopString(ctx, "message"),
 		}
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleRefreshUpdates serves the htmx partial /refresh/update info for refreshing data
-// from the api platforms into the database. Note that Linking/Unlinking donations also
-// calls sfClient.GetOpportunities in a window of 2 minutes.
-//
-// Todo: consider splitting Xero and Salesforce update timestamps, and consider making
-// the time windows smaller.
-func (web *WebApp) handleRefreshUpdates() http.Handler {
+// from the api platforms into the database.
+func (web *WebApp) handleRefreshUpdates() appHandler {
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) err {
 
 		ctx := r.Context()
 
 		// Retrieve and upsert the Xero records.
-		infoMap, err := web.refreshXeroRecords(ctx)
+		results, err := web.refreshXeroRecords(ctx)
 		if err != nil {
 			// Todo: report errors to client.
 			msg := fmt.Sprintf("failed to refresh Xero records: %v", err)
 			web.log.Error(msg)
 			web.sessions.Put(ctx, "message", msg)
 			http.Redirect(w, r, "/refresh", http.StatusFound)
-			return
+			return nil
 		}
 
-		// Set the xero shortcode in the session if applicable.
-		if shortCode, ok := infoMap["xero-shortcode"]; ok {
-			web.sessions.Put(ctx, "xero-shortcode", shortCode)
+		// Set the xero shortcode in the session if a full refresh occurred.
+		if results.FullRefresh && results.ShortCode != "" {
+			web.sessions.Put(ctx, "xero-shortcode", results.ShortCode)
 		}
 
 		// Retrieve and upsert the Salesforce records.
-		err = web.refreshSalesforceRecords(ctx)
+		_, err = web.refreshSalesforceRecords(ctx)
 		if err != nil {
 			// Todo: report errors to client.
 			web.log.Error(fmt.Sprintf("failed to refresh Salesforce records: %v", err))
 			http.Redirect(w, r, "/refresh", http.StatusFound)
-			return
+			return nil
 		}
-
 		web.log.Info("Refresh successfully completed.")
 
 		// Redirect to invoices
 		w.Header().Set("HX-Redirect", "/invoices")
 		w.WriteHeader(http.StatusOK)
+		return nil
 
 	})
 }
 
 // handleHome redirects from /home.
-func (web *WebApp) handleHome() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (web *WebApp) handleHome() appHandler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 		http.Redirect(w, r, "/invoices", http.StatusFound)
+		return nil
 	})
 }
 
 // handleInvoices serves the /invoices list.
-func (web *WebApp) handleInvoices() http.Handler {
+func (web *WebApp) handleInvoices() appHandler {
 
 	thisURL := "/invoices"
 	name := "invoices.html"
@@ -519,7 +526,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -529,12 +536,12 @@ func (web *WebApp) handleInvoices() http.Handler {
 		// Check if a redirection is needed.
 		derivedURL, redirect, err := redirectCheck(ctx, form, web.sessions, r, thisURL)
 		if err != nil {
-			web.ServerError(w, r, err)
+			return errInternal{"redirectCheck", err}
 		}
 		if redirect {
 			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
 			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Create a validator and validate the form.
@@ -553,10 +560,10 @@ func (web *WebApp) handleInvoices() http.Handler {
 
 			_, err = web.refreshXeroRecords(ctx)
 			if err != nil {
-				web.log.Error(fmt.Sprintf("list invoices: refresh data error: %v", err))
+				return err
 			}
 			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Initialise pagination for default state.
@@ -588,10 +595,10 @@ func (web *WebApp) handleInvoices() http.Handler {
 		// Render template with errors and return if the form is invalid.
 		if !validator.Valid() {
 			web.render(w, r, templates, name, data)
-			return
+			return nil
 		}
 
-		invoices, err := web.db.InvoicesGet(
+		invoices, err := r.InvoicesGet(
 			ctx,
 			form.ReconciliationStatus,
 			form.DateFrom,
@@ -601,8 +608,7 @@ func (web *WebApp) handleInvoices() http.Handler {
 			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
+			return err
 		}
 
 		// Set valid data from successful database call.
@@ -626,11 +632,12 @@ func (web *WebApp) handleInvoices() http.Handler {
 		web.sessions.Put(ctx, thisURL, derivedURL)
 
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleBankTransactions serves the /bank-transactions bank transactions list.
-func (web *WebApp) handleBankTransactions() http.Handler {
+func (web *WebApp) handleBankTransactions() appHandler {
 
 	thisURL := "/bank-transactions"
 	name := "bank-transactions.html"
@@ -643,7 +650,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -666,7 +673,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		form.Validate(validator)
 
 		// Determine the last refresh time of Xero data. Note this can be
-		// time.Time.IsZero(), but it is unlikely since the user has already run a
+		// time.Time.IsZero(), but this is unlikely since the user has already run a
 		// refresh to get to this handler.
 		lastRefresh := web.sessions.GetTime(ctx, "xero-refreshed-datetime")
 		lastRefreshed := time.Since(lastRefresh).Truncate(refreshTruncation)
@@ -680,7 +687,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 				web.log.Error(fmt.Sprintf("list bank-transactions: refresh data error: %v", err))
 			}
 			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Initialise pagination for default state.
@@ -710,10 +717,10 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		// Render template with errors and return if the form is invalid.
 		if !validator.Valid() {
 			web.render(w, r, templates, name, data)
-			return
+			return nil
 		}
 
-		transactions, err := web.db.BankTransactionsGet(
+		transactions, err := web.reconciler.BankTransactionsGet(
 			ctx,
 			form.ReconciliationStatus,
 			form.DateFrom,
@@ -723,8 +730,7 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
+			return err
 		}
 
 		// Set valid data from successful database call.
@@ -748,11 +754,12 @@ func (web *WebApp) handleBankTransactions() http.Handler {
 		web.sessions.Put(ctx, thisURL, derivedURL)
 
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleDonations serves the /donations list of donations.
-func (web *WebApp) handleDonations() http.Handler {
+func (web *WebApp) handleDonations() appHandler {
 
 	thisURL := "/donations"
 	name := "donations.html"
@@ -767,7 +774,7 @@ func (web *WebApp) handleDonations() http.Handler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -777,12 +784,12 @@ func (web *WebApp) handleDonations() http.Handler {
 		// Check if a redirection is needed.
 		derivedURL, redirect, err := redirectCheck(ctx, form, web.sessions, r, thisURL)
 		if err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 		if redirect {
 			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
 			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Create a validator and validate the form.
@@ -801,10 +808,10 @@ func (web *WebApp) handleDonations() http.Handler {
 
 			err = web.refreshSalesforceRecords(ctx)
 			if err != nil {
-				web.log.Error(fmt.Sprintf("list donations: refresh data error: %v", err))
+				return err
 			}
 			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Initialise pagination for default state.
@@ -845,10 +852,10 @@ func (web *WebApp) handleDonations() http.Handler {
 		// Render template with errors and return if the form is invalid.
 		if !validator.Valid() {
 			web.render(w, r, templates, name, data)
-			return
+			return nil
 		}
 
-		donations, err := web.db.DonationsGet(
+		viewDonations, err := web.reconciler.DonationsGet(
 			ctx,
 			form.DateFrom,
 			form.DateTo,
@@ -859,12 +866,8 @@ func (web *WebApp) handleDonations() http.Handler {
 			form.Offset(pageLen),
 		)
 		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
+			return err
 		}
-
-		// Process donations into donationView type
-		viewDonations := newViewDonations(donations)
 
 		// Set valid data from successful database call.
 		data.ViewDonations = viewDonations
@@ -887,13 +890,14 @@ func (web *WebApp) handleDonations() http.Handler {
 		web.sessions.Put(ctx, thisURL, derivedURL)
 
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleInvoiceDetail serves the detail page at /invoice/<id> for a single invoice.
 // Note that the func can also be invoked at `/invoice/<id>/<action>(link|unlink)`. The
 // former redirect to the latter's 'link' form by default.
-func (web *WebApp) handleInvoiceDetail() http.Handler {
+func (web *WebApp) handleInvoiceDetail() appHandler {
 
 	name := "invoice.html"
 	tpls := []string{
@@ -908,15 +912,14 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
 		// Extract route parameters.
 		vars, err := validMuxVars(mux.Vars(r), "id")
 		if err != nil {
-			web.clientError(w, err.Error(), http.StatusBadRequest)
-			return
+			return errUsage{err.Error(), http.StatusBadRequest}
 		}
 		invoiceID := vars["id"]
 
@@ -929,20 +932,10 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		baseURL := fmt.Sprintf("/invoice/%s/%s", invoiceID, action)
 
 		// Get the invoice details.
-		var invoice db.WRInvoice
-		var lineItems []db.WRLineItem
-		invoice, lineItems, err = web.db.InvoiceWRGet(ctx, invoiceID)
-		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
+		invoice, viewLineItems, err = web.reconciler.GetInvoiceDetail(ctx, invoiceID)
+		if err != nil {
+			return err
 		}
-		if err == sql.ErrNoRows {
-			web.notFound(w, r, fmt.Sprintf("invoice %q not found", invoiceID))
-			return
-		}
-
-		// Process the line items.
-		viewLineItems := newViewLineItems(lineItems)
 
 		// Determine the dates for retrieving donations.
 		startDate, endDate := donationSearchTimeSpan(invoice.Date)
@@ -963,17 +956,17 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		if r.URL.Query().Get("reset") == "true" {
 			_ = web.sessions.PopString(ctx, baseURL)
 			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// If the url is 'naked', redirect to either the saved or default.
 		if r.URL.RawQuery == "" {
 			if savedURL := web.sessions.GetString(ctx, baseURL); savedURL != "" {
 				http.Redirect(w, r, savedURL, http.StatusSeeOther)
-				return
+				return nil
 			}
 			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Decode the url params and construct the current url, interjecting if the
@@ -1003,7 +996,7 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		// Get the donations if the form is valid
 		var donations []db.Donation
 		if validator.Valid() {
-			donations, err = web.db.DonationsGet(
+			viewDonations, err = web.reconciler.DonationsGet(
 				ctx,
 				form.DateFrom,
 				form.DateTo,
@@ -1014,13 +1007,9 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 				form.Offset(pageLen),
 			)
 			if err != nil && err != sql.ErrNoRows {
-				web.ServerError(w, r, err)
-				return
+				return err
 			}
 		}
-
-		// Process donations into donationView type
-		viewDonations := newViewDonations(donations)
 
 		// Set pagination for number of donations. In case of an error, log
 		// and continue. Each donation has the search query row count as a
@@ -1077,12 +1066,13 @@ func (web *WebApp) handleInvoiceDetail() http.Handler {
 		web.log.Debug(fmt.Sprintf("invoiceDetail: about to complete: %s", thisURL))
 
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
 // handleBankTransactionDetail serves the page at /bank-transaction/<id>, showing
 // details for a single bank transaction.
-func (web *WebApp) handleBankTransactionDetail() http.Handler {
+func (web *WebApp) handleBankTransactionDetail() appHandler {
 
 	name := "bank-transaction.html"
 	tpls := []string{
@@ -1097,15 +1087,14 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
 		// Extract route parameters.
 		vars, err := validMuxVars(mux.Vars(r), "id")
 		if err != nil {
-			web.clientError(w, err.Error(), http.StatusBadRequest)
-			return
+			return errUsage{err.Error(), http.StatusBadRequest}
 		}
 		transactionID := vars["id"]
 
@@ -1118,20 +1107,10 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		baseURL := fmt.Sprintf("/bank-transaction/%s/%s", transactionID, action)
 
 		// Get the transaction details.
-		var transaction db.WRTransaction
-		var lineItems []db.WRLineItem
-		transaction, lineItems, err = web.db.BankTransactionWRGet(ctx, transactionID)
-		if err != nil && err != sql.ErrNoRows {
-			web.ServerError(w, r, err)
-			return
+		transaction, viewLineItems, err = web.reconciler.BankTransactionWRGet(ctx, transactionID)
+		if err != nil {
+			return err
 		}
-		if err == sql.ErrNoRows {
-			web.notFound(w, r, fmt.Sprintf("transaction %q not found", transactionID))
-			return
-		}
-
-		// Process the line items.
-		viewLineItems := newViewLineItems(lineItems)
 
 		// Determine the dates for retrieving donations.
 		startDate, endDate := donationSearchTimeSpan(transaction.Date)
@@ -1142,8 +1121,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		// Derive the default url.
 		urlParams, err := form.AsURLParams()
 		if err != nil { // unlikely
-			web.log.Error(fmt.Sprintf("handleTransactionDetail: default url error: %v", err))
-			web.ServerError(w, r, err)
+			return errInternal{msg: "url paramater error", err: err}
 		}
 		defaultURL := baseURL + "?" + urlParams
 
@@ -1152,23 +1130,23 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		if r.URL.Query().Get("reset") == "true" {
 			_ = web.sessions.PopString(ctx, baseURL)
 			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// If the url is 'naked', redirect to either the saved or default.
 		if r.URL.RawQuery == "" {
 			if savedURL := web.sessions.GetString(ctx, baseURL); savedURL != "" {
 				http.Redirect(w, r, savedURL, http.StatusSeeOther)
-				return
+				return nil
 			}
 			http.Redirect(w, r, defaultURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Decode the url params and construct the current url, interjecting if the
 		// action is "unlink" to get the related information.
 		if err := form.DecodeURLParams(r.URL.Query()); err != nil {
-			web.ServerError(w, r, err)
+			return errInternal{msg: "url decoding error", err: err}
 		}
 
 		DFK := *transaction.Reference
@@ -1199,7 +1177,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		// Get the donations if the form is valid
 		var donations []db.Donation
 		if validator.Valid() {
-			donations, err = web.db.DonationsGet(
+			viewDonations, err = web.reconciler.DonationsGet(
 				ctx,
 				form.DateFrom,
 				form.DateTo,
@@ -1209,14 +1187,10 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 				pageLen,
 				form.Offset(pageLen),
 			)
-			if err != nil && err != sql.ErrNoRows {
-				web.ServerError(w, r, err)
-				return
+			if err != nil {
+				return err
 			}
 		}
-
-		// Process donations into donationView type
-		viewDonations := newViewDonations(donations)
 
 		// Set pagination for number of donations. In case of an error, log
 		// and continue. Each donation has the search query row count as a
@@ -1273,6 +1247,7 @@ func (web *WebApp) handleBankTransactionDetail() http.Handler {
 		web.log.Debug(fmt.Sprintf("transactionDetail: about to complete: %s", thisURL))
 
 		web.render(w, r, templates, name, data)
+		return nil
 	})
 }
 
@@ -1293,37 +1268,6 @@ func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *temp
 	_, _ = buf.WriteTo(w)
 }
 
-// ServerError logs and return an internal server 500 error. The error should contain
-// the information needed for logging.
-func (web *WebApp) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
-	err := errors.Join(errs...)
-	web.log.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
-	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-}
-
-// clientError returns a client error.
-func (web *WebApp) clientError(w http.ResponseWriter, message string, status int) {
-	if message == "" {
-		web.log.Warn(fmt.Sprintf("client error: status %d", status))
-		message = http.StatusText(status)
-	}
-	web.log.Warn(fmt.Sprintf("client error: %s (status %d)", message, status))
-	http.Error(w, message, status)
-}
-
-// htmxClientError returns an htmx client error.
-func (web *WebApp) htmxClientError(w http.ResponseWriter, message string) {
-	web.log.Warn(fmt.Sprintf("client htmx error: %s", message))
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// htmx won't normally process a non-200 response.
-	w.WriteHeader(http.StatusOK)
-	errorString := fmt.Sprintf(
-		`<div class="text-sm text-red px-4 pb-2">%s</div>`,
-		message,
-	)
-	_, _ = w.Write([]byte(errorString))
-}
-
 // donationSearchTimeSpan uses a simple heuristic for determining the dates for a
 // donation search, typically -6 weeks and +2 weeks around an invoice or bank
 // transaction date. Most donations are prior to the date recorded for an invoice or bank transaction.
@@ -1334,30 +1278,6 @@ func donationSearchTimeSpan(dt time.Time) (time.Time, time.Time) {
 	start := dt.Add(time.Duration(-6 * 7 * 24 * time.Hour))
 	end := dt.Add(time.Duration(+2 * 7 * 24 * time.Hour))
 	return start, end
-}
-
-// notfound raises a 404 clientError.
-func (web *WebApp) notFound(w http.ResponseWriter, r *http.Request, message string) {
-	web.clientError(w, message, http.StatusNotFound)
-}
-
-// getInvoiceOrBankTransactionDetails returns the DFK and Date from an invoice or Bank
-// Transaction identified by id (a uuid).
-func (web *WebApp) getInvoiceOrBankTransactionDetails(ctx context.Context, typer string, id string) (string, time.Time, error) {
-	var rt time.Time
-	if typer == "invoice" {
-		invoice, _, err := web.db.InvoiceWRGet(ctx, id)
-		if err != nil {
-			return "", rt, fmt.Errorf("could not get invoice details for %q: %w", id, err)
-		}
-		return invoice.InvoiceNumber, invoice.Date, nil
-	}
-	transaction, _, err := web.db.BankTransactionWRGet(ctx, id)
-	if err != nil {
-		return "", rt, fmt.Errorf("could not get transaction details for %q: %w", id, err)
-	}
-	ref := *transaction.Reference
-	return ref, transaction.Date, nil
 }
 
 var ErrTokenMissingOrInvalid = errors.New("token missing or invalid")
