@@ -6,6 +6,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -25,4 +26,26 @@ type XeroClient interface {
 type SalesforceClient interface {
 	BatchUpdateOpportunityRefs(ctx context.Context, idRefs []salesforce.IDRef, allOrNone bool) (salesforce.CollectionsUpdateResponse, error)
 	GetOpportunities(ctx context.Context, fromDate, ifModifiedSince time.Time) ([]salesforce.Donation, error)
+}
+
+// ErrUsage is an error in usage
+type ErrUsage struct {
+	Detail string
+	Msg    string // user facing message
+}
+
+func (e ErrUsage) Error() string {
+	return fmt.Sprintf("%s: %s", e.Detail, e.Msg)
+}
+
+// ErrSystem is a system error, potentially recording a domain logic issue or an
+// infrastructure problem such as an interrupted network or external API error.
+type ErrSystem struct {
+	Detail string
+	Err    error
+	Msg    string // user facing message
+}
+
+func (e ErrSystem) Error() string {
+	return fmt.Sprintf("%s: %s: %v", e.Detail, e.Msg, e.Err)
 }

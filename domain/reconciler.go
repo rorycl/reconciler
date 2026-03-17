@@ -15,28 +15,6 @@ import (
 	"github.com/rorycl/reconciler/db"
 )
 
-// ErrUsage is an error in usage
-type ErrUsage struct {
-	detail string
-	msg    string // user facing message
-}
-
-func (e ErrUsage) Error() string {
-	return fmt.Sprintf("%s: %s", e.detail, e.msg)
-}
-
-// ErrSystem is a system error, potentially recording a domain logic issue or an
-// infrastructure problem such as an interrupted network or external API error.
-type ErrSystem struct {
-	detail string
-	err    error
-	msg    string // user facing message
-}
-
-func (e ErrSystem) Error() string {
-	return fmt.Sprintf("%s: %s: %v", e.detail, e.msg, e.err)
-}
-
 // Reconciler represents the main domain operations of the system.
 type Reconciler struct {
 	db  *db.DB
@@ -109,9 +87,9 @@ func (r *Reconciler) DonationsGet(
 	donations, err := r.db.DonationsGet(ctx, from, to, linkage, payoutReference, search, pageLen, offset)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, ErrSystem{
-			detail: "db.DonationsGet error",
-			err:    err,
-			msg:    "A problem was encountered retrieving donations",
+			Detail: "db.DonationsGet error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving donations",
 		}
 	}
 	return newViewDonations(donations), err // percolate sql.ErrNoRows if necessary.
@@ -131,15 +109,15 @@ func (r *Reconciler) InvoiceDetailGet(
 	invoice, lineItems, err = r.db.InvoiceWRGet(ctx, invoiceID)
 	if err != nil && err != sql.ErrNoRows {
 		return invoice, nil, ErrSystem{
-			detail: "db.InvoiceWRGet error",
-			err:    err,
-			msg:    "A problem was encountered retrieving the invoice details",
+			Detail: "db.InvoiceWRGet error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving the invoice details",
 		}
 	}
 	if err == sql.ErrNoRows {
 		return invoice, nil, ErrUsage{
-			detail: "db.InvoiceWRGet not found error",
-			msg:    "The requested invoice was not found",
+			Detail: "db.InvoiceWRGet not found error",
+			Msg:    "The requested invoice was not found",
 		}
 	}
 	viewLineItems := newViewLineItems(lineItems)
@@ -159,15 +137,15 @@ func (r *Reconciler) TransactionDetailGet(
 	transaction, lineItems, err = r.db.BankTransactionWRGet(ctx, transactionID)
 	if err != nil && err != sql.ErrNoRows {
 		return transaction, nil, ErrSystem{
-			detail: "db.BankTransactionWRGet error",
-			err:    err,
-			msg:    "A problem was encountered retrieving the transaction details",
+			Detail: "db.BankTransactionWRGet error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving the transaction details",
 		}
 	}
 	if err == sql.ErrNoRows {
 		return transaction, nil, ErrUsage{
-			detail: "db.BankTransactionWRGet not found error",
-			msg:    "The requested transaction was not found",
+			Detail: "db.BankTransactionWRGet not found error",
+			Msg:    "The requested transaction was not found",
 		}
 	}
 	viewLineItems := newViewLineItems(lineItems)
@@ -186,14 +164,14 @@ func (r *Reconciler) InvoiceOrBankTransactionInfoGet(ctx context.Context, typer 
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return "", rt, ErrUsage{
-					detail: "InvoiceWRGet error",
-					msg:    fmt.Sprintf("Invoice %q could not be found", id),
+					Detail: "InvoiceWRGet error",
+					Msg:    fmt.Sprintf("Invoice %q could not be found", id),
 				}
 			}
 			return "", rt, ErrSystem{
-				detail: "InvoiceWRGet error",
-				err:    err,
-				msg:    fmt.Sprintf("An error was encountered retrieving invoice %q", id),
+				Detail: "InvoiceWRGet error",
+				Err:    err,
+				Msg:    fmt.Sprintf("An error was encountered retrieving invoice %q", id),
 			}
 
 		}
@@ -203,23 +181,23 @@ func (r *Reconciler) InvoiceOrBankTransactionInfoGet(ctx context.Context, typer 
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return "", rt, ErrUsage{
-					detail: "BankTransactionWRGet error",
-					msg:    fmt.Sprintf("Transaction %q could not be found", id),
+					Detail: "BankTransactionWRGet error",
+					Msg:    fmt.Sprintf("Transaction %q could not be found", id),
 				}
 			}
 			return "", rt, ErrSystem{
-				detail: "BankTransactionWRGet error",
-				err:    err,
-				msg:    fmt.Sprintf("An error was encountered retreiving transaction %q", id),
+				Detail: "BankTransactionWRGet error",
+				Err:    err,
+				Msg:    fmt.Sprintf("An error was encountered retreiving transaction %q", id),
 			}
 		}
 		ref := *transaction.Reference
 		return ref, transaction.Date, nil
 	default:
 		return "", rt, ErrSystem{
-			detail: "InvoiceOrBankTransactionInfoGet error",
-			err:    errors.New("invalid typer provided"),
-			msg:    "An invalid record type was requested",
+			Detail: "InvoiceOrBankTransactionInfoGet error",
+			Err:    errors.New("invalid typer provided"),
+			Msg:    "An invalid record type was requested",
 		}
 	}
 }
@@ -236,8 +214,8 @@ func (r *Reconciler) DonationsLinkUnlink(
 
 	if len(idRefs) == 0 {
 		return ErrUsage{
-			detail: "LinkUnlinkDonations error",
-			msg:    "no records were provided to link/unlink",
+			Detail: "LinkUnlinkDonations error",
+			Msg:    "no records were provided to link/unlink",
 		}
 	}
 
@@ -248,9 +226,9 @@ func (r *Reconciler) DonationsLinkUnlink(
 	_, err := sfClient.BatchUpdateOpportunityRefs(ctx, idRefs, false)
 	if err != nil {
 		return ErrSystem{
-			detail: "BatchUpdateOpportunityRefs error",
-			err:    err,
-			msg:    "A problem was encountered batch updating salesforce references",
+			Detail: "BatchUpdateOpportunityRefs error",
+			Err:    err,
+			Msg:    "A problem was encountered batch updating salesforce references",
 		}
 	}
 
@@ -259,16 +237,16 @@ func (r *Reconciler) DonationsLinkUnlink(
 	updatedDonations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefreshed)
 	if err != nil {
 		return ErrSystem{
-			detail: "GetOpportunities error",
-			err:    err,
-			msg:    "A problem was encountered retrieving updated salesforce records",
+			Detail: "GetOpportunities error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving updated salesforce records",
 		}
 	}
 	if err := r.db.UpsertDonations(ctx, updatedDonations); err != nil {
 		return ErrSystem{
-			detail: "UpsertDonations error",
-			err:    err,
-			msg:    "A problem was encountered upserting updated salesforce records",
+			Detail: "UpsertDonations error",
+			Err:    err,
+			Msg:    "A problem was encountered upserting updated salesforce records",
 		}
 	}
 	return nil
@@ -305,16 +283,16 @@ func (r *Reconciler) XeroRecordsRefresh(
 		organisation, err := xeroClient.GetOrganisation(ctx)
 		if err != nil {
 			return results, ErrSystem{
-				detail: "xero GetOrganisation error",
-				err:    err,
-				msg:    "A problem was encountered retrieving the Xero organisation record",
+				Detail: "xero GetOrganisation error",
+				Err:    err,
+				Msg:    "A problem was encountered retrieving the Xero organisation record",
 			}
 		}
 		if err := r.db.OrganisationUpsert(ctx, organisation); err != nil {
 			return results, ErrSystem{
-				detail: "xero OrganisationUpsert error",
-				err:    err,
-				msg:    "A problem was encountered upserting the Xero organisation record",
+				Detail: "xero OrganisationUpsert error",
+				Err:    err,
+				Msg:    "A problem was encountered upserting the Xero organisation record",
 			}
 		}
 		results.ShortCode = organisation.ShortCode
@@ -326,16 +304,16 @@ func (r *Reconciler) XeroRecordsRefresh(
 		accounts, err := xeroClient.GetAccounts(ctx, dataStartDate)
 		if err != nil {
 			return results, ErrSystem{
-				detail: "xero GetAccounts error",
-				err:    err,
-				msg:    "A problem was encountered retrieving the Xero accounts records",
+				Detail: "xero GetAccounts error",
+				Err:    err,
+				Msg:    "A problem was encountered retrieving the Xero accounts records",
 			}
 		}
 		if err := r.db.AccountsUpsert(ctx, accounts); err != nil {
 			return results, ErrSystem{
-				detail: "xero GetOrganisation error",
-				err:    err,
-				msg:    "A problem was encountered retrieving the Xero organisation record",
+				Detail: "xero GetOrganisation error",
+				Err:    err,
+				Msg:    "A problem was encountered retrieving the Xero organisation record",
 			}
 		}
 		results.AccountsNo = len(accounts)
@@ -346,16 +324,16 @@ func (r *Reconciler) XeroRecordsRefresh(
 	transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh, accountsRegexp)
 	if err != nil {
 		return results, ErrSystem{
-			detail: "xero GetBankTransactions error",
-			err:    err,
-			msg:    "A problem was encountered retrieving the Xero bank transactions",
+			Detail: "xero GetBankTransactions error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving the Xero bank transactions",
 		}
 	}
 	if err = r.db.BankTransactionsUpsert(ctx, transactions); err != nil {
 		return results, ErrSystem{
-			detail: "xero BankTransactionsUpsert error",
-			err:    err,
-			msg:    "A problem was encountered upserting the Xero bank transactions",
+			Detail: "xero BankTransactionsUpsert error",
+			Err:    err,
+			Msg:    "A problem was encountered upserting the Xero bank transactions",
 		}
 	}
 	results.TransactionsNo = len(transactions)
@@ -365,16 +343,16 @@ func (r *Reconciler) XeroRecordsRefresh(
 	invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh, accountsRegexp)
 	if err != nil {
 		return results, ErrSystem{
-			detail: "xero GetInvoices error",
-			err:    err,
-			msg:    "A problem was encountered retrieving the Xero invoices",
+			Detail: "xero GetInvoices error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving the Xero invoices",
 		}
 	}
 	if err := r.db.InvoicesUpsert(ctx, invoices); err != nil {
 		return results, ErrSystem{
-			detail: "xero InvoicesUpsert error",
-			err:    err,
-			msg:    "A problem was encountered upserting the Xero invoices",
+			Detail: "xero InvoicesUpsert error",
+			Err:    err,
+			Msg:    "A problem was encountered upserting the Xero invoices",
 		}
 	}
 	results.InvoicesNo = len(invoices)
@@ -406,17 +384,17 @@ func (r *Reconciler) RefreshSalesforceRecords(
 	donations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefresh)
 	if err != nil {
 		return results, ErrSystem{
-			detail: "salesforce GetOpportunities error",
-			err:    err,
-			msg:    "A problem was encountered retrieving the Salesforce records",
+			Detail: "salesforce GetOpportunities error",
+			Err:    err,
+			Msg:    "A problem was encountered retrieving the Salesforce records",
 		}
 	}
 
 	if err := r.db.UpsertDonations(ctx, donations); err != nil {
 		return results, ErrSystem{
-			detail: "salesforce UpsertDonations error",
-			err:    err,
-			msg:    "A problem was encountered upserting the Salesforce records",
+			Detail: "salesforce UpsertDonations error",
+			Err:    err,
+			Msg:    "A problem was encountered upserting the Salesforce records",
 		}
 	}
 	results.RecordsNo = len(donations)

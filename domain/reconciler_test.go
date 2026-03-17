@@ -174,10 +174,11 @@ func TestReconcilerRefreshXeroRecords(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected xero error")
 	}
-	if _, ok := errors.AsType[ErrSystem](err); !ok {
+	es, ok := errors.AsType[ErrSystem](err)
+	if !ok {
 		t.Errorf("expected ErrSystem error, got %T", err)
 	}
-	if got, want := err.Error(), "xero GetOrganisation error"; !strings.Contains(got, want) {
+	if got, want := es.Detail, "xero GetOrganisation error"; !strings.Contains(got, want) {
 		t.Errorf("expected error %q to contain %q", got, want)
 	}
 
@@ -473,7 +474,7 @@ func TestReconcilerDBDetail(t *testing.T) {
 				_, _, err := reconciler.InvoiceDetailGet(t.Context(), "inv-does-not-exist")
 				return "", err
 			},
-			expectedErr: ErrUsage{msg: "The requested invoice was not found"},
+			expectedErr: ErrUsage{Msg: "The requested invoice was not found"},
 		},
 		{
 			proc: func() (string, error) {
@@ -491,7 +492,7 @@ func TestReconcilerDBDetail(t *testing.T) {
 				_, _, err := reconciler.TransactionDetailGet(t.Context(), "bt-does-not-exist")
 				return "", err
 			},
-			expectedErr: ErrUsage{msg: "The requested transaction was not found"},
+			expectedErr: ErrUsage{Msg: "The requested transaction was not found"},
 		},
 		{
 			proc: func() (string, error) {
@@ -520,14 +521,14 @@ func TestReconcilerDBDetail(t *testing.T) {
 				_, _, err := reconciler.InvoiceOrBankTransactionInfoGet(t.Context(), "transaction", "invalid")
 				return "", err
 			},
-			expectedErr: ErrUsage{msg: "Transaction \"invalid\" could not be found"},
+			expectedErr: ErrUsage{Msg: "Transaction \"invalid\" could not be found"},
 		},
 		{
 			proc: func() (string, error) {
 				_, _, err := reconciler.InvoiceOrBankTransactionInfoGet(t.Context(), "nonsense", "invalid")
 				return "", err
 			},
-			expectedErr: ErrSystem{msg: "InvoiceOrBankTransactionInfoGet error"},
+			expectedErr: ErrSystem{Msg: "InvoiceOrBankTransactionInfoGet error"},
 		},
 	}
 
