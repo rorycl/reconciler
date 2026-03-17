@@ -58,8 +58,8 @@ func (r *Reconciler) InvoicesGet(
 	return r.db.InvoicesGet(ctx, status, from, to, search, pageLen, offset)
 }
 
-// BankTransactionsGet retrieves the bank transactions relating to the search terms.
-func (r *Reconciler) BankTransactionsGet(
+// TransactionsGet retrieves the bank transactions relating to the search terms.
+func (r *Reconciler) TransactionsGet(
 	ctx context.Context,
 	status string,
 	from time.Time,

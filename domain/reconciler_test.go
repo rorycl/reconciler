@@ -358,7 +358,7 @@ func TestReconcilerDBListings(t *testing.T) {
 		},
 		{
 			proc: func() (int, error) {
-				recs, err := reconciler.BankTransactionsGet(
+				recs, err := reconciler.TransactionsGet(
 					t.Context(),
 					"All",
 					time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -374,7 +374,7 @@ func TestReconcilerDBListings(t *testing.T) {
 		},
 		{
 			proc: func() (int, error) {
-				recs, err := reconciler.BankTransactionsGet(
+				recs, err := reconciler.TransactionsGet(
 					t.Context(),
 					"All",
 					time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
