@@ -369,7 +369,7 @@ type RefreshSalesforceResults struct {
 }
 
 // SalesforceRecordsRefresh retrieves remote records and updates the local store accordingly.
-func (r *Reconciler) RefreshSalesforceRecords(
+func (r *Reconciler) SalesforceRecordsRefresh(
 	ctx context.Context,
 	sfClient SalesforceClient,
 	dataStartDate time.Time,

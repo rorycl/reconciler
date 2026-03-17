@@ -225,7 +225,7 @@ func TestReconcilerRefreshSalesforceRecords(t *testing.T) {
 
 	reconciler := NewReconciler(testDB, logger)
 
-	results, err := reconciler.RefreshSalesforceRecords(
+	results, err := reconciler.SalesforceRecordsRefresh(
 		ctx,
 		&mockSalesforceClient{log: logger},
 		cfg.DataStartDate,
