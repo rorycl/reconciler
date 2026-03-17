@@ -3,8 +3,10 @@ package web
 import (
 	"context"
 	"fmt"
-	"github.com/rorycl/reconciler/internal/token"
 	"time"
+
+	"github.com/rorycl/reconciler/domain"
+	"github.com/rorycl/reconciler/internal/token"
 )
 
 // refreshXeroRecords retrieves the Xero organisation details, accounts, bank
@@ -14,7 +16,7 @@ import (
 //
 // Information requiring to be returned can be added to the returnMap, for example
 // needed to update session information.
-func (web *WebApp) refreshXeroRecords(ctx context.Context) (map[string]string, error) {
+func (web *WebApp) refreshXeroRecords(ctx context.Context) (*domain.RefreshXeroResults, error) {
 
 	dataStartDate := web.cfg.DataStartDate
 	accountsRegexp := web.cfg.DonationAccountCodesAsRegex()
@@ -27,80 +29,45 @@ func (web *WebApp) refreshXeroRecords(ctx context.Context) (map[string]string, e
 	if !lastRefresh.IsZero() {
 		lastRefresh = lastRefresh.Add(refreshDurationWindow) // window for platform updates
 	}
-	web.log.Info(fmt.Sprintf("Xero last refresh: %s", lastRefresh.Format(time.DateTime)))
+	web.log.Debug("Xero refresh", "time", lastRefresh.Format(time.DateTime))
 
 	// Retrieve the oauth2 tokens from the session
 	xeroToken, err := web.getValidTokenFromSession(ctx, token.XeroToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to refresh xero token: %v", err)
+		return nil, fmt.Errorf("failed to refresh xero token: %w", err)
 	}
 
 	// Connect the Xero client.
 	xeroClient, err := web.newXeroClient(ctx, web.log, web.cfg.DonationAccountCodesAsRegex(), xeroToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create xero client: %v", err)
+		return nil, fmt.Errorf("failed to create xero client: %w", err)
 	}
-	web.log.Info("Xero client authenticated successfully.")
+	web.log.Debug("Xero client authenticated successfully.")
 
 	fullUpdate := lastRefresh.IsZero()
-	returnMap := map[string]string{}
 
-	// Organisation
-	// Note that the shortcode is needed in the session.
-	if fullUpdate {
-		organisation, err := xeroClient.GetOrganisation(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("organisation retrieval error: %v", err)
-		}
-		if err := web.db.OrganisationUpsert(ctx, organisation); err != nil {
-			return nil, fmt.Errorf("failed to upsert organisation record: %v", err)
-		}
-		web.log.Info("retrieved and upserted organisation record successfully")
-		returnMap["xero-shortcode"] = organisation.ShortCode
-	}
-
-	// Accounts
-	if fullUpdate {
-		accounts, err := xeroClient.GetAccounts(ctx, dataStartDate)
-		if err != nil {
-			return nil, fmt.Errorf("accounts retrieval error: %v", err)
-		}
-		if err := web.db.AccountsUpsert(ctx, accounts); err != nil {
-			return nil, fmt.Errorf("failed to upsert account records: %v", err)
-		}
-		web.log.Info(fmt.Sprintf("retrieved and upserted %d accounts records successfully", len(accounts)))
-	}
-
-	// Bank Transactions
-	transactions, err := xeroClient.GetBankTransactions(ctx, dataStartDate, lastRefresh, accountsRegexp)
+	// Run the Xero refresher.
+	results, err := web.reconciler.RefreshXeroRecords(
+		ctx,
+		xeroClient,
+		dataStartDate,
+		lastRefresh,
+		accountsRegexp,
+		fullUpdate,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("bank transaction retrieval error: %v", err)
+		return nil, err
 	}
-	if err = web.db.BankTransactionsUpsert(ctx, transactions); err != nil {
-		return nil, fmt.Errorf("failed to upsert bank transactions: %v", err)
-	}
-	web.log.Info(fmt.Sprintf("retrieved and upserted %d bank transaction records successfully", len(transactions)))
-
-	// Invoices
-	invoices, err := xeroClient.GetInvoices(ctx, dataStartDate, lastRefresh, accountsRegexp)
-	if err != nil {
-		return nil, fmt.Errorf("invoices retrieval error: %v", err)
-	}
-	if err := web.db.InvoicesUpsert(ctx, invoices); err != nil {
-		return nil, fmt.Errorf("failed to upsert invoices: %v", err)
-	}
-	web.log.Info(fmt.Sprintf("retrieved and upserted %d invoice records successfully", len(invoices)))
-
 	// Update the session key
 	web.sessions.Put(ctx, sessionRefreshKey, updateStart)
 
-	return returnMap, nil
+	return results, nil
 }
 
 // refreshSalesforceRecords retrieves the Salesforce donation (opportunity) records. If
 // lastRefresh is time.IsZero() sfUpdate will simply get all records, otherwise only get
 // those modified since lastRefresh.
-func (web *WebApp) refreshSalesforceRecords(ctx context.Context) error {
+func (web *WebApp) refreshSalesforceRecords(ctx context.Context) (*domain.RefreshSalesforceResults, error) {
 
 	dataStartDate := web.cfg.DataStartDate
 
@@ -112,34 +79,27 @@ func (web *WebApp) refreshSalesforceRecords(ctx context.Context) error {
 	if !lastRefresh.IsZero() {
 		lastRefresh = lastRefresh.Add(refreshDurationWindow) // window for platform updates
 	}
-	web.log.Info(fmt.Sprintf("Salesforce last refresh: %s", lastRefresh.Format(time.DateTime)))
+	web.log.Debug("Salesforce refresh note", "time", lastRefresh.Format(time.DateTime))
 
 	sfToken, err := web.getValidTokenFromSession(ctx, token.SalesforceToken)
 	if err != nil {
-		// Todo: report errors to client.
-		return fmt.Errorf("failed to refresh saleforce token: %v", err)
+		return nil, fmt.Errorf("failed to refresh saleforce token: %w", err)
 	}
 
 	// Connect the Salesforce client.
 	sfClient, err := web.newSFClient(ctx, web.cfg, web.log, sfToken)
 	if err != nil {
-		// Todo: report errors to client.
-		return fmt.Errorf("failed to create salesforce client: %v", err)
+		return nil, fmt.Errorf("failed to create salesforce client: %w", err)
 	}
 
-	// Donations.
-	donations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefresh)
+	// Run the Salesforce refresher.
+	results, err := web.reconciler.RefreshSalesforceRecords(ctx, sfClient, dataStartDate, lastRefresh)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve donations: %v", err)
+		return nil, err
 	}
-
-	if err := web.db.UpsertDonations(ctx, donations); err != nil {
-		return fmt.Errorf("failed to upsert donations: %v", err)
-	}
-	web.log.Info(fmt.Sprintf("retrieved and upserted %d donations records successfully", len(donations)))
 
 	// Update the session key
 	web.sessions.Put(ctx, sessionRefreshKey, updateStart)
 
-	return nil
+	return results, nil
 }
