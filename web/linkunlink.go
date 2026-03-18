@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rorycl/reconciler/domain"
 	"github.com/rorycl/reconciler/internal/token"
 )
 
@@ -18,9 +19,7 @@ import (
 // date) is therefore retrieved using the `getInvoiceOrBankTransactionDetails` method.
 func (web *WebApp) handleDonationsLinkUnlink() appHandler {
 
-	dataStartDate := web.cfg.DataStartDate
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return (func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 		if r.Method != "POST" {
@@ -61,9 +60,18 @@ func (web *WebApp) handleDonationsLinkUnlink() appHandler {
 		// retrieve the related invoice or bank transaction dfk and date
 		var dfk string
 		if form.Action == "link" {
-			dfk, _, err = web.reconciler.GetInvoiceOrBankTransactionDetails(ctx, form.Typer, form.ID)
+			dfk, _, err = web.reconciler.InvoiceOrBankTransactionInfoGet(ctx, form.Typer, form.ID)
 			if err != nil {
-				return err
+				if e, ok := errors.AsType[domain.ErrUsage](err); ok {
+					return errHTMX{
+						msg: e.Msg,
+						err: e,
+					}
+				}
+				return errInternal{
+					msg: fmt.Sprintf("%T error: unexpected InvoiceOrBankTransactionInfoGet error", err),
+					err: fmt.Errorf("link/unlink InvoiceOrBankTransactionInfoGet error: %w", err),
+				}
 			}
 			if dfk == "" || dfk == missingTransactionReference {
 				return errHTMX{
@@ -85,15 +93,15 @@ func (web *WebApp) handleDonationsLinkUnlink() appHandler {
 		// Create the salesforce client.
 		sfClient, err := web.newSFClient(ctx, web.cfg, web.log, sfToken)
 		if err != nil {
-			errInternal{"failed to create salesforce client for linking/unlinking", err}
-			return
+			return errInternal{"failed to create salesforce client for linking/unlinking", err}
 		}
 
 		sfLastRefresh := web.sessions.GetTime(ctx, "sf-refreshed-datetime")
 
 		// Run the Link/Unlink batch opportunity update and then upsert the results.
-		err := web.reconciler.LinkUnlink(
+		err = web.reconciler.DonationsLinkUnlink(
 			ctx,
+			sfClient,
 			form.AsSalesforceIDRefs(dfk),
 			sfLastRefresh,
 			sfLastRefresh.Add(refreshDurationWindow),

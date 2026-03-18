@@ -16,6 +16,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/gorilla/mux"
 	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/domain"
 	"github.com/rorycl/reconciler/internal/token"
 	"golang.org/x/oauth2"
 )
@@ -41,9 +42,12 @@ func TestLinkUnlink(t *testing.T) {
 		t.Fatalf("could not load session store: %v", err)
 	}
 
+	// replace with interface
+	reconciler := domain.NewReconciler(testDB, logger)
+
 	webApp := &WebApp{
+		reconciler:     reconciler,
 		log:            logger,
-		db:             testDB,
 		sessions:       sessionStore,
 		accountsRegexp: regexp.MustCompile(".*"),
 		cfg: &config.Config{
@@ -114,7 +118,7 @@ func TestLinkUnlink(t *testing.T) {
 				strings.NewReader("donation-ids=0015A00002CrA9PQAV"),
 			),
 			expectedCode: 200,
-			expectedBody: "could not get invoice/transaction info",
+			expectedBody: "Invoice \"inv-99999\" could not be found",
 		},
 	}
 
@@ -125,7 +129,11 @@ func TestLinkUnlink(t *testing.T) {
 			tt.rq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			r := mux.NewRouter()
-			r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", webApp.handleDonationsLinkUnlink())
+			r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}",
+				webApp.ErrorChecker(
+					webApp.handleDonationsLinkUnlink(),
+				),
+			)
 
 			r.ServeHTTP(writer, tt.rq)
 
