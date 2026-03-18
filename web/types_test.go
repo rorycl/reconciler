@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/domain"
 	"github.com/rorycl/reconciler/internal/token"
 	"golang.org/x/oauth2"
 )
 
-// TestTypeInterfaces tests the newXeroClienter
-// and newSalesforceClienter interface converters.
+// TestTypeInterfaces tests newDefaultXeroClient and NewDefaultSalesforceClient
+// interface converters.
 func TestTypeInterfaceConverters(t *testing.T) {
 
 	validToken := &token.ExtendedToken{
@@ -25,12 +26,12 @@ func TestTypeInterfaceConverters(t *testing.T) {
 		},
 	}
 
-	sc, err := newSalesforceClienter(context.Background(), &config.Config{}, slog.Default(), validToken)
+	sc, err := newDefaultSalesforceClient(context.Background(), &config.Config{}, slog.Default(), validToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	switch sc.(type) {
-	case sfClienter:
+	case domain.SalesforceClient:
 	default:
 		t.Errorf("expected sfClienter type, got %T", sc)
 	}
@@ -45,12 +46,12 @@ func TestTypeInterfaceConverters(t *testing.T) {
 		TenantID: "tenant-1",
 	}
 
-	xc, err := newXeroClienter(context.Background(), slog.Default(), regexp.MustCompile("."), validToken)
+	xc, err := newDefaultXeroClient(context.Background(), slog.Default(), regexp.MustCompile("."), validToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	switch xc.(type) {
-	case xeroClienter:
+	case domain.XeroClient:
 	default:
 		t.Errorf("expected xeroClienter type, got %T", xc)
 	}

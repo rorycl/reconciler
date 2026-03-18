@@ -9,30 +9,30 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"github.com/rorycl/reconciler/apiclients/xero"
 	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/db"
 	"github.com/rorycl/reconciler/domain"
 	"github.com/rorycl/reconciler/internal/token"
 )
 
-// NewXeroClienter is a factory function for returning the default xeroClient as an
-// xeroClienter
-func newXeroClientMaker(ctx context.Context, logger *slog.Logger, accountsRegexp *regexp.Regexp, et *token.ExtendedToken) (domain.XeroClient, error) {
+// newDefaultXeroClient returns the default xeroClient as an domain.XeroClient.
+func newDefaultXeroClient(ctx context.Context, logger *slog.Logger, accountsRegexp *regexp.Regexp, et *token.ExtendedToken) (domain.XeroClient, error) {
 	return xero.NewClient(ctx, logger, accountsRegexp, et)
 }
 
-// xeroFactoryFunc is the signature of newXeroClienter.
+// xeroClientMaker is the signature of a newXeroClient factory function.
 type xeroClientMaker func(ctx context.Context, logger *slog.Logger, accountsRegexp *regexp.Regexp, et *token.ExtendedToken) (domain.XeroClient, error)
 
-// NewSalesforceClienter is a factory function for returning the default sfClient as an
-// sfClientMaker.
-func newSalesforceClientMaker(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (domain.SalesforceClient, error) {
+// NewDefaultSalesforceClient returns the default sfClient as a domain.SalesforceClient.
+func newDefaultSalesforceClient(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (domain.SalesforceClient, error) {
 	return salesforce.NewClient(ctx, cfg, logger, et)
 }
 
-// sfFactoryFunc is the signature of newXeroClienter.
+// sfClientMaker is the signature of newSalesforceClient.
 type sfClientMaker func(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (domain.SalesforceClient, error)
 
 // appHandler is a type of handler that returns an error. All normal web handlers are
@@ -70,4 +70,27 @@ type errHTMX struct {
 
 func (eh errHTMX) Error() string {
 	return fmt.Sprintf("%s: %v", eh.msg, eh.err)
+}
+
+// reconcilerer is the snappy name of an interface matching the main methods of
+// domain.Reconciler.
+type reconcilerer interface {
+	// Donations.
+	DonationsGet(context.Context, time.Time, time.Time, string, string, string, int, int) ([]domain.ViewDonation, error)
+	DonationsLinkUnlink(context.Context, domain.SalesforceClient, []salesforce.IDRef, time.Time, time.Time) error
+	// Invoices.
+	InvoiceDetailGet(context.Context, string) (db.WRInvoice, []domain.ViewLineItem, error)
+	InvoicesGet(context.Context, string, time.Time, time.Time, string, int, int) ([]db.Invoice, error)
+	// Transactions (bank transactions).
+	TransactionDetailGet(context.Context, string) (db.WRTransaction, []domain.ViewLineItem, error)
+	TransactionsGet(context.Context, string, time.Time, time.Time, string, int, int) ([]db.BankTransaction, error)
+	// Detail summary for an Invoice or Bank Transaction.
+	InvoiceOrBankTransactionInfoGet(context.Context, string, string) (string, time.Time, error)
+	// Data refresh.
+	SalesforceRecordsRefresh(context.Context, domain.SalesforceClient, time.Time, time.Time) (*domain.RefreshSalesforceResults, error)
+	XeroRecordsRefresh(context.Context, domain.XeroClient, time.Time, time.Time, *regexp.Regexp, bool) (*domain.RefreshXeroResults, error)
+	// Database.
+	DBIsInMemory() bool
+	DBPath() string
+	Close() error
 }
