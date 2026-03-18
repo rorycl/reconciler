@@ -51,6 +51,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
 	"github.com/rorycl/reconciler/domain"
 	"github.com/rorycl/reconciler/internal/token"
@@ -86,10 +87,11 @@ var Exiter func(code int) = os.Exit
 
 // WebApp is the configuration object for the web server.
 type WebApp struct {
+	cfg            *config.Config
 	log            *slog.Logger
-	reconciler     *domain.Reconciler
-	staticFS       fs.FS // the fs holding the static web resources.
-	templateFS     fs.FS // the fs holding the web templates.
+	reconciler     reconcilerer // interface to domain.Reconciler
+	staticFS       fs.FS        // the fs holding the static web resources.
+	templateFS     fs.FS        // the fs holding the web templates.
 	server         *http.Server
 	sessions       *scs.SessionManager
 	accountsRegexp *regexp.Regexp
@@ -110,6 +112,7 @@ type WebApp struct {
 
 // New initialises a WebApp. An error type is returned for future use.
 func New(
+	config *config.Config,
 	reconciler *domain.Reconciler,
 	logger *slog.Logger,
 	staticFS fs.FS,
@@ -122,7 +125,7 @@ func New(
 	// The timeout settings are intended to allow the API data refresh handler to run
 	// without interruption.
 	server := &http.Server{
-		Addr:              cfg.Web.ListenAddress,
+		Addr:              config.Web.ListenAddress,
 		ReadHeaderTimeout: time.Duration(300 * time.Second),
 		WriteTimeout:      time.Duration(300 * time.Second),
 		MaxHeaderBytes:    1 << 17, // 125k ish
@@ -143,9 +146,10 @@ func New(
 
 	// Compile the donation accounts filtering regexp
 	// (this is a safe assignment, checked at config ingestion).
-	accountsRegexp := cfg.DonationAccountCodesAsRegex()
+	accountsRegexp := config.DonationAccountCodesAsRegex()
 
 	webApp := &WebApp{
+		cfg:            config,
 		reconciler:     reconciler,
 		log:            logger,
 		staticFS:       staticFS,
@@ -158,20 +162,20 @@ func New(
 
 	// Client factory funcs. The default is to attach the full API clients.
 	if xeroClientFunc == nil {
-		webApp.newXeroClient = newXeroClientMaker
+		webApp.newXeroClient = newDefaultXeroClient
 	} else {
-		webApp.newXeroClient = xeroClientFunc
+		webApp.newXeroClient = *xeroClientFunc
 	}
 	if sfClientFunc == nil {
-		webApp.newSFClient = newSalesforceClientMaker
+		webApp.newSFClient = newDefaultSalesforceClient
 	} else {
-		webApp.newSFClient = sfClientFunc
+		webApp.newSFClient = *sfClientFunc
 	}
 
 	// Attach the salesforce and xero OAuth2 web client handler constructors.
 	sfWebClient, err := token.NewTokenWebClient(
 		token.SalesforceToken,
-		cfg.Salesforce.OAuth2Config,
+		config.Salesforce.OAuth2Config,
 		scsSessionStore,
 		webApp,     // implements ServerError
 		"/connect", // the redirect url
@@ -182,7 +186,7 @@ func New(
 	webApp.sfWebClient = sfWebClient
 	xeroWebClient, err := token.NewTokenWebClient(
 		token.XeroToken,
-		cfg.Xero.OAuth2Config,
+		config.Xero.OAuth2Config,
 		scsSessionStore,
 		webApp,     // implements ServerError
 		"/connect", // the redirect url
@@ -194,7 +198,7 @@ func New(
 
 	// In-Development mode triggers a warning as it bypasses the API connection check
 	// middleware.
-	if cfg.InDevelopmentMode {
+	if config.InDevelopmentMode {
 		webApp.inDevelopment = true
 		webApp.log.Warn("******************************************")
 		webApp.log.Warn("       Warning: IN DEVELOPMENT mode       ")
@@ -245,10 +249,10 @@ func (web *WebApp) routes() http.Handler {
 	apisOK := web.apisConnectedOK
 
 	// Note that the OAuth2 handlers are in the apiclient modules.
-	r.Handle("/", web.handleRoot()).Methods("GET") // synonym for /connect
-	r.Handle("/connect", web.handleConnect()).Methods("GET")
-	r.Handle("/logout", web.handleLogout()).Methods("GET")
-	r.Handle("/logout/confirmed", web.handleLogoutConfirmed()).Methods("GET")
+	r.Handle("/", web.ErrorChecker(web.handleRoot())).Methods("GET") // synonym for /connect
+	r.Handle("/connect", web.ErrorChecker(web.handleConnect())).Methods("GET")
+	r.Handle("/logout", web.ErrorChecker(web.handleLogout())).Methods("GET")
+	r.Handle("/logout/confirmed", web.ErrorChecker(web.handleLogoutConfirmed())).Methods("GET")
 
 	// Xero OAuth2 init and callback.
 	r.Handle("/xero/init", web.xeroWebClient.InitiateWebLogin()).Methods("GET")
@@ -259,32 +263,31 @@ func (web *WebApp) routes() http.Handler {
 	r.Handle(web.cfg.Web.SalesforceCallBack, web.sfWebClient.WebLoginCallBack()).Methods("GET")
 
 	// Refresh is the data refresh page.
-	r.Handle("/refresh", apisOK(web.handleRefresh())).Methods("GET")
-	r.Handle("/refresh/update", apisOK(web.handleRefreshUpdates())).Methods("GET")
+	r.Handle("/refresh", apisOK(web.ErrorChecker(web.handleRefresh()))).Methods("GET")
+	r.Handle("/refresh/update", apisOK(web.ErrorChecker(web.handleRefreshUpdates()))).Methods("GET")
 
 	// Main listing pages.
-	r.Handle("/home", apisOK(web.handleHome())).Methods("GET") // redirect to handleInvoices.
-	r.Handle("/invoices", apisOK(web.handleInvoices())).Methods("GET")
-	r.Handle("/bank-transactions", apisOK(web.handleBankTransactions())).Methods("GET")
-	r.Handle("/donations", apisOK(web.handleDonations())).Methods("GET")
+	r.Handle("/home", apisOK(web.ErrorChecker(web.handleHome()))).Methods("GET") // redirect to handleInvoices.
+	r.Handle("/invoices", apisOK(web.ErrorChecker(web.handleInvoices()))).Methods("GET")
+	r.Handle("/bank-transactions", apisOK(web.ErrorChecker(web.handleBankTransactions()))).Methods("GET")
+	r.Handle("/donations", apisOK(web.ErrorChecker(web.handleDonations()))).Methods("GET")
 	// Todo: consider adding campaigns page
 
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.handleInvoiceDetail())).Methods("GET")
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.handleInvoiceDetail())).Methods("GET")
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.handleBankTransactionDetail())).Methods("GET")
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.handleBankTransactionDetail())).Methods("GET")
+	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.ErrorChecker(web.handleInvoiceDetail()))).Methods("GET")
+	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.ErrorChecker(web.handleInvoiceDetail()))).Methods("GET")
+	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.ErrorChecker(web.handleBankTransactionDetail()))).Methods("GET")
+	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.ErrorChecker(web.handleBankTransactionDetail()))).Methods("GET")
 
 	// Donation linking/unlinking.
-	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.handleDonationsLinkUnlink())).Methods("POST")
+	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.ErrorChecker(web.handleDonationsLinkUnlink()))).Methods("POST")
 
 	// Todo: logout
 	// Logout -- delete the api connection tokens and redirect to /connect
 
 	// Chain the desired middleware. Todo: add recover handler.
-	errorChecking := ErrorChecker(r)
-	logging := handlers.LoggingHandler(os.Stdout, errorChecking)
+	logging := handlers.LoggingHandler(os.Stdout, r)
 	sessionMiddleWare := web.sessions.LoadAndSave(logging)
 	csrfMiddlware := enforceCSRF(sessionMiddleWare)
 	return csrfMiddlware
@@ -321,14 +324,14 @@ func (web *WebApp) apisConnectedOK(next http.Handler) http.Handler {
 
 // handleRoot deals with http calls to "/" by redirecting to "/connect".
 func (web *WebApp) handleRoot() appHandler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return nil
 		}
 		http.Redirect(w, r, "/connect", http.StatusFound)
 		return nil
-	})
+	}
 }
 
 // handleConnect serves the /connect endpoint.
@@ -341,7 +344,7 @@ func (web *WebApp) handleConnect() appHandler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -365,7 +368,7 @@ func (web *WebApp) handleConnect() appHandler {
 		}
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleLogout serves the /logout endpoint.
@@ -378,21 +381,21 @@ func (web *WebApp) handleLogout() appHandler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		data := map[string]any{
 			"MemoryDatabase": web.reconciler.DBIsInMemory(),
 			"DBName":         web.reconciler.DBPath(),
 		}
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleLogoutConfirmed serves the /logout/confirmed endpoint, which clears the session
 // and redirects to /connect.
 func (web *WebApp) handleLogoutConfirmed() appHandler {
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -405,7 +408,7 @@ func (web *WebApp) handleLogoutConfirmed() appHandler {
 		}
 
 		// Close the database and kill the session.
-		_ = web.reconciler.DBClose()
+		_ = web.reconciler.Close()
 		time.Sleep(web.logoutDuration)
 		web.log.Info("Logout completed")
 		if fl, ok := w.(http.Flusher); ok {
@@ -416,7 +419,7 @@ func (web *WebApp) handleLogoutConfirmed() appHandler {
 		time.Sleep(web.logoutDuration)
 		Exiter(0)
 		return nil
-	})
+	}
 }
 
 // handleRefresh serves the /refresh page.
@@ -433,7 +436,7 @@ func (web *WebApp) handleRefresh() appHandler {
 	dataStartDate := web.cfg.DataStartDate
 	accountCodes := web.cfg.DonationAccountPrefixes
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		ctx := r.Context()
 
 		// Todo: Refresh data is best determined by database data freshness.
@@ -459,14 +462,14 @@ func (web *WebApp) handleRefresh() appHandler {
 		}
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleRefreshUpdates serves the htmx partial /refresh/update info for refreshing data
 // from the api platforms into the database.
 func (web *WebApp) handleRefreshUpdates() appHandler {
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) err {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -501,15 +504,15 @@ func (web *WebApp) handleRefreshUpdates() appHandler {
 		w.WriteHeader(http.StatusOK)
 		return nil
 
-	})
+	}
 }
 
 // handleHome redirects from /home.
 func (web *WebApp) handleHome() appHandler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		http.Redirect(w, r, "/invoices", http.StatusFound)
 		return nil
-	})
+	}
 }
 
 // handleInvoices serves the /invoices list.
@@ -526,7 +529,7 @@ func (web *WebApp) handleInvoices() appHandler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -598,7 +601,7 @@ func (web *WebApp) handleInvoices() appHandler {
 			return nil
 		}
 
-		invoices, err := r.InvoicesGet(
+		invoices, err := web.reconciler.InvoicesGet(
 			ctx,
 			form.ReconciliationStatus,
 			form.DateFrom,
@@ -633,7 +636,7 @@ func (web *WebApp) handleInvoices() appHandler {
 
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleBankTransactions serves the /bank-transactions bank transactions list.
@@ -650,7 +653,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -665,7 +668,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 		if redirect {
 			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
 			http.Redirect(w, r, derivedURL, http.StatusSeeOther)
-			return
+			return nil
 		}
 
 		// Create a validator and validate the form.
@@ -720,7 +723,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 			return nil
 		}
 
-		transactions, err := web.reconciler.BankTransactionsGet(
+		transactions, err := web.reconciler.TransactionsGet(
 			ctx,
 			form.ReconciliationStatus,
 			form.DateFrom,
@@ -755,7 +758,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleDonations serves the /donations list of donations.
@@ -774,7 +777,7 @@ func (web *WebApp) handleDonations() appHandler {
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 	dataStartDate := web.cfg.DataStartDate
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -806,7 +809,7 @@ func (web *WebApp) handleDonations() appHandler {
 		// redirect back to the current page.
 		if validator.Valid() && form.Refresh {
 
-			err = web.refreshSalesforceRecords(ctx)
+			_, err = web.refreshSalesforceRecords(ctx)
 			if err != nil {
 				return err
 			}
@@ -824,7 +827,7 @@ func (web *WebApp) handleDonations() appHandler {
 		// errors back to the template if necessary.
 		data := struct {
 			PageTitle     string
-			ViewDonations []viewDonation
+			ViewDonations []domain.ViewDonation
 			Form          *SearchDonationsForm
 			ID            string // needed to match the invoice/bank transaction struct
 			Typer         string
@@ -891,7 +894,7 @@ func (web *WebApp) handleDonations() appHandler {
 
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleInvoiceDetail serves the detail page at /invoice/<id> for a single invoice.
@@ -912,7 +915,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -932,7 +935,9 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 		baseURL := fmt.Sprintf("/invoice/%s/%s", invoiceID, action)
 
 		// Get the invoice details.
-		invoice, viewLineItems, err = web.reconciler.GetInvoiceDetail(ctx, invoiceID)
+		var invoice db.WRInvoice
+		var viewLineItems []domain.ViewLineItem
+		invoice, viewLineItems, err = web.reconciler.InvoiceDetailGet(ctx, invoiceID)
 		if err != nil {
 			return err
 		}
@@ -994,7 +999,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 		form.Validate(validator)
 
 		// Get the donations if the form is valid
-		var donations []db.Donation
+		var viewDonations []domain.ViewDonation
 		if validator.Valid() {
 			viewDonations, err = web.reconciler.DonationsGet(
 				ctx,
@@ -1031,7 +1036,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 		data := struct {
 			PageTitle     string
 			Invoice       db.WRInvoice
-			LineItems     []viewLineItem
+			LineItems     []domain.ViewLineItem
 			ID            string
 			DFK           string // for Invoices, this is the Invoice Number
 			Typer         string
@@ -1041,7 +1046,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 			SFInstanceURL string
 
 			// Donation data
-			ViewDonations []viewDonation
+			ViewDonations []domain.ViewDonation
 			Form          *SearchDonationsForm
 			Validator     *Validator
 			Pagination    *Pagination
@@ -1067,7 +1072,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 // handleBankTransactionDetail serves the page at /bank-transaction/<id>, showing
@@ -1087,7 +1092,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 	}
 	templates := template.Must(template.ParseFS(web.templateFS, tpls...))
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
 
 		ctx := r.Context()
 
@@ -1107,7 +1112,9 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 		baseURL := fmt.Sprintf("/bank-transaction/%s/%s", transactionID, action)
 
 		// Get the transaction details.
-		transaction, viewLineItems, err = web.reconciler.BankTransactionWRGet(ctx, transactionID)
+		var transaction db.WRTransaction
+		var viewLineItems []domain.ViewLineItem
+		transaction, viewLineItems, err = web.reconciler.TransactionDetailGet(ctx, transactionID)
 		if err != nil {
 			return err
 		}
@@ -1175,7 +1182,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 		form.Validate(validator)
 
 		// Get the donations if the form is valid
-		var donations []db.Donation
+		var viewDonations []domain.ViewDonation
 		if validator.Valid() {
 			viewDonations, err = web.reconciler.DonationsGet(
 				ctx,
@@ -1212,7 +1219,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 		data := struct {
 			PageTitle     string
 			Transaction   db.WRTransaction
-			LineItems     []viewLineItem
+			LineItems     []domain.ViewLineItem
 			ID            string
 			DFK           string // for transactions, this is the Reference
 			Typer         string
@@ -1222,7 +1229,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 			SFInstanceURL string
 
 			// Donation data
-			ViewDonations []viewDonation
+			ViewDonations []domain.ViewDonation
 			Form          *SearchDonationsForm
 			Validator     *Validator
 			Pagination    *Pagination
@@ -1248,7 +1255,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 
 		web.render(w, r, templates, name, data)
 		return nil
-	})
+	}
 }
 
 /* -------------------------------------------------------------------------- */
