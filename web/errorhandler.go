@@ -47,10 +47,19 @@ func (web *WebApp) ErrorChecker(h appHandler) http.Handler {
 				return
 			}
 			web.log.Error(err.Error(), "method", r.Method, "uri", r.URL.RequestURI())
-			http.Error(w, e.msg, http.StatusInternalServerError)
+			http.Error(w, "an unknown error occurred", http.StatusInternalServerError)
 			return
 
 		}
 		return
+	})
+}
+
+// ServerError is an adapter from a ServerError handler to an ErrorChecker wrapped
+// handler normally used for middleware.
+func (web *WebApp) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
+	web.ErrorChecker(func(w http.ResponseWriter, r *http.Request) error {
+		err := errors.Join(errs...)
+		return err
 	})
 }
