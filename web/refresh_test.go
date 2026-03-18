@@ -4,16 +4,18 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"github.com/rorycl/reconciler/apiclients/salesforce"
-	"github.com/rorycl/reconciler/apiclients/xero"
-	"github.com/rorycl/reconciler/config"
-	"github.com/rorycl/reconciler/db"
-	mounts "github.com/rorycl/reconciler/internal/mounts"
-	"github.com/rorycl/reconciler/internal/token"
 	"log/slog"
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/rorycl/reconciler/apiclients/salesforce"
+	"github.com/rorycl/reconciler/apiclients/xero"
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/db"
+	"github.com/rorycl/reconciler/domain"
+	mounts "github.com/rorycl/reconciler/internal/mounts"
+	"github.com/rorycl/reconciler/internal/token"
 
 	"github.com/alexedwards/scs/v2"
 	"golang.org/x/oauth2"
@@ -48,7 +50,7 @@ func (mxc *mockXeroClient) GetInvoices(ctx context.Context, fromDate time.Time, 
 // not good for parallel tests.
 var counter = 0
 
-func NewMockXeroClient(ctx context.Context, logger *slog.Logger, accountsRegexp *regexp.Regexp, et *token.ExtendedToken) (xeroClienter, error) {
+func NewMockXeroClient(ctx context.Context, logger *slog.Logger, accountsRegexp *regexp.Regexp, et *token.ExtendedToken) (domain.XeroClient, error) {
 	return &mockXeroClient{getCount: counter, log: logger}, nil
 }
 
@@ -103,7 +105,7 @@ func TestRefreshXeroRecords(t *testing.T) {
 
 	webApp := &WebApp{
 		log:            logger,
-		db:             testDB,
+		reconciler:     domain.NewReconciler(testDB, logger),
 		sessions:       sessionStore,
 		accountsRegexp: regexp.MustCompile(".*"),
 		cfg: &config.Config{
@@ -152,8 +154,8 @@ func TestRefreshXeroRecords(t *testing.T) {
 	if shortCode != "BCD-1" {
 		t.Errorf("shortcode got %s want %s", shortCode, "BCD-1")
 	}
-	if results["xero-shortcode"] != "BCD-1" {
-		t.Errorf("results xero-shortcode got %s want %s", results["xero-shortcode"], "BCD-1")
+	if results.ShortCode != "BCD-1" {
+		t.Errorf("results xero-shortcode got %s want %s", results.ShortCode, "BCD-1")
 	}
 
 	// Run a partial update, checking only bank transactions and invoices are updated.
@@ -203,7 +205,7 @@ func (msc *mockSalesforceClient) BatchUpdateOpportunityRefs(ctx context.Context,
 	}, nil
 }
 
-func NewMockSFClient(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (sfClienter, error) {
+func NewMockSFClient(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (domain.SalesforceClient, error) {
 	return &mockSalesforceClient{getCount: counter, log: logger}, nil
 }
 
@@ -226,7 +228,7 @@ func TestRefreshSalesforceRecords(t *testing.T) {
 
 	webApp := &WebApp{
 		log:            logger,
-		db:             testDB,
+		reconciler:     domain.NewReconciler(testDB, logger),
 		sessions:       sessionStore,
 		accountsRegexp: regexp.MustCompile(".*"),
 		cfg: &config.Config{
@@ -256,7 +258,7 @@ func TestRefreshSalesforceRecords(t *testing.T) {
 	webApp.sessions.Put(ctx, key, validToken)
 	webApp.sessions.Put(ctx, token.SalesforceToken.SessionName(), validToken)
 
-	err = webApp.refreshSalesforceRecords(ctx)
+	_, err = webApp.refreshSalesforceRecords(ctx)
 	if err != nil {
 		t.Fatalf("refreshSalesforceRecords failed: %v", err)
 	}

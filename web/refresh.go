@@ -47,7 +47,7 @@ func (web *WebApp) refreshXeroRecords(ctx context.Context) (*domain.RefreshXeroR
 	fullUpdate := lastRefresh.IsZero()
 
 	// Run the Xero refresher.
-	results, err := web.reconciler.RefreshXeroRecords(
+	results, err := web.reconciler.XeroRecordsRefresh(
 		ctx,
 		xeroClient,
 		dataStartDate,
@@ -93,7 +93,7 @@ func (web *WebApp) refreshSalesforceRecords(ctx context.Context) (*domain.Refres
 	}
 
 	// Run the Salesforce refresher.
-	results, err := web.reconciler.RefreshSalesforceRecords(ctx, sfClient, dataStartDate, lastRefresh)
+	results, err := web.reconciler.SalesforceRecordsRefresh(ctx, sfClient, dataStartDate, lastRefresh)
 	if err != nil {
 		return nil, err
 	}
