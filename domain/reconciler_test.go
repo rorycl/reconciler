@@ -507,7 +507,7 @@ func TestReconcilerDBDetail(t *testing.T) {
 		},
 		{
 			proc: func() (string, error) {
-				_, dt, err := reconciler.InvoiceOrBankTransactionInfoGet(t.Context(), "transaction", "bt-001")
+				_, dt, err := reconciler.InvoiceOrBankTransactionInfoGet(t.Context(), "bank-transaction", "bt-001")
 				if err != nil {
 					return "", err
 				}
@@ -518,7 +518,7 @@ func TestReconcilerDBDetail(t *testing.T) {
 		},
 		{
 			proc: func() (string, error) {
-				_, _, err := reconciler.InvoiceOrBankTransactionInfoGet(t.Context(), "transaction", "invalid")
+				_, _, err := reconciler.InvoiceOrBankTransactionInfoGet(t.Context(), "bank-transaction", "invalid")
 				return "", err
 			},
 			expectedErr: ErrUsage{Msg: "Transaction \"invalid\" could not be found"},

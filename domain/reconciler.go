@@ -4,7 +4,6 @@ package domain
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -176,7 +175,7 @@ func (r *Reconciler) InvoiceOrBankTransactionInfoGet(ctx context.Context, typer 
 
 		}
 		return invoice.InvoiceNumber, invoice.Date, nil
-	case "transaction":
+	case "bank-transaction":
 		transaction, _, err := r.db.BankTransactionWRGet(ctx, id)
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -196,7 +195,7 @@ func (r *Reconciler) InvoiceOrBankTransactionInfoGet(ctx context.Context, typer 
 	default:
 		return "", rt, ErrSystem{
 			Detail: "InvoiceOrBankTransactionInfoGet error",
-			Err:    errors.New("invalid typer provided"),
+			Err:    fmt.Errorf("invalid typer %q provided", typer),
 			Msg:    "An invalid record type was requested",
 		}
 	}
@@ -222,7 +221,7 @@ func (r *Reconciler) DonationsLinkUnlink(
 	// Update the donations. If it is an unlink action, update the dfk with "", else
 	// the actual dfk from the bank transaction or invoice. The form contents (many
 	// salesforce IDs given the same DFK reference) must be translated to
-	// a slice of salesforce.IDRef, hence the use of form.AsSalesforceIDRefs.
+	// a slice of salesforce.IDRef, hence the use of `salesforce.IDRef`s.
 	_, err := sfClient.BatchUpdateOpportunityRefs(ctx, idRefs, false)
 	if err != nil {
 		return ErrSystem{
@@ -234,6 +233,7 @@ func (r *Reconciler) DonationsLinkUnlink(
 
 	// Upsert the updated opportunities.
 	// The refresh window is rough; double upserts shouldn't be a major issue.
+	r.log.Info(fmt.Sprintf("GetOpportunities %s %s", dataStartDate.Format(time.DateTime), lastRefreshed.Format(time.DateTime)))
 	updatedDonations, err := sfClient.GetOpportunities(ctx, dataStartDate, lastRefreshed)
 	if err != nil {
 		return ErrSystem{
