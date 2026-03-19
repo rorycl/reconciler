@@ -79,7 +79,7 @@ func (web *WebApp) refreshSalesforceRecords(ctx context.Context) (*domain.Refres
 	if !lastRefresh.IsZero() {
 		lastRefresh = lastRefresh.Add(refreshDurationWindow) // window for platform updates
 	}
-	web.log.Debug("Salesforce refresh note", "time", lastRefresh.Format(time.DateTime))
+	web.log.Debug("Salesforce last refresh", "time", lastRefresh.Format(time.DateTime))
 
 	sfToken, err := web.getValidTokenFromSession(ctx, token.SalesforceToken)
 	if err != nil {

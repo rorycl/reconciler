@@ -103,13 +103,13 @@ func (web *WebApp) handleDonationsLinkUnlink() appHandler {
 			ctx,
 			sfClient,
 			form.AsSalesforceIDRefs(dfk),
-			sfLastRefresh,
+			web.cfg.DataStartDate,
 			sfLastRefresh.Add(refreshDurationWindow),
 		)
 		if err != nil {
 			return err
 		}
-		web.log.Info(fmt.Sprintf("Successfully linked %d donations.", len(form.DonationIDs)))
+		web.log.Info("Successful donation opertions", "action", form.Action, "records", len(form.DonationIDs))
 
 		// Redirect to the originator.
 		// Todo: set focus to either the "find" or "linked" donations tab.

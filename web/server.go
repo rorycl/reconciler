@@ -77,7 +77,7 @@ var TemplatesEmbeddedFS embed.FS
 
 // refreshDurationWindow is the duration window given for a remote platform to update
 // its records.
-var refreshDurationWindow = 10 * time.Second
+var refreshDurationWindow = -10 * time.Second
 
 // refreshTrucation is the user-oriented refresh rounding duration.
 var refreshTruncation = 10 * time.Second
@@ -1186,7 +1186,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 				pageLen,
 				form.Offset(pageLen),
 			)
-			if err != nil {
+			if err != nil && err != sql.ErrNoRows {
 				return err
 			}
 		}
