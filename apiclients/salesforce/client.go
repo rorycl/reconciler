@@ -189,14 +189,12 @@ func (c *Client) BatchUpdateOpportunityRefs(
 	}
 
 	if len(errorMessages) > 0 {
-
 		c.log.Error("BatchUpdateOpportunityRefs: one or more donations failed to update")
-		c.log.Error(fmt.Sprintf("errors: %v", errorMessages))
 		return response, fmt.Errorf("one or more donations failed to update:\n- %s",
 			strings.Join(errorMessages, "\n- "))
 	}
 
-	c.log.Info("BatchUpdateOpportunityRefs: one or more donations failed to update")
+	c.log.Info("BatchUpdateOpportunityRefs completed successfully", "records", len(idRefs))
 	return response, nil
 }
 
