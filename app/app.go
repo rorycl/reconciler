@@ -5,13 +5,15 @@ package app
 import (
 	"errors"
 	"fmt"
-	"github.com/rorycl/reconciler/config"
-	"github.com/rorycl/reconciler/db"
-	mounts "github.com/rorycl/reconciler/internal/mounts"
-	"github.com/rorycl/reconciler/web"
 	"io/fs"
 	"log/slog"
 	"os"
+
+	"github.com/rorycl/reconciler/config"
+	"github.com/rorycl/reconciler/db"
+	"github.com/rorycl/reconciler/domain"
+	mounts "github.com/rorycl/reconciler/internal/mounts"
+	"github.com/rorycl/reconciler/web"
 )
 
 // App encapsulates the functions of reconciler for use by command programs.
@@ -20,7 +22,7 @@ type App struct {
 	log           *slog.Logger
 	logLevel      slog.Level
 	inDevelopment bool
-	db            *db.DB
+	reconciler    *domain.Reconciler
 	staticFS      fs.FS
 	templateFS    fs.FS
 	sqlFS         fs.FS
@@ -88,12 +90,15 @@ func NewApp(
 		return nil, fmt.Errorf("could not initialise database: %w", err)
 	}
 
+	// Construct the reconciler
+	reconciler := domain.NewReconciler(dbCon, logger)
+
 	return &App{
 		cfg:           cfg,
 		log:           logger,
 		logLevel:      logLevel,
 		inDevelopment: inDevelopment,
-		db:            dbCon,
+		reconciler:    reconciler,
 		staticFS:      staticFS,
 		templateFS:    templateFS,
 		sqlFS:         sqlFS,
@@ -104,8 +109,9 @@ func NewApp(
 // RunWebServer configures and launches the web server.
 func (a *App) RunWebServer() error {
 
-	// Configure and launch the web server.
-	webApp, err := web.New(a.log, a.cfg, a.db, a.staticFS, a.templateFS)
+	// Configure and launch the web server. This uses the default xero and salesforce
+	// Clients.
+	webApp, err := web.New(a.cfg, a.reconciler, a.log, a.staticFS, a.templateFS, nil, nil)
 	if err != nil {
 		a.log.Error(fmt.Sprintf("app web server init error: %v", err))
 		return fmt.Errorf("could not initialise web server: %w", err)
