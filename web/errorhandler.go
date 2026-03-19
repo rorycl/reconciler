@@ -27,7 +27,7 @@ func (web *WebApp) ErrorChecker(h appHandler) http.Handler {
 			}
 			if e, isErr := errors.AsType[domain.ErrUsage](err); isErr {
 				web.log.Info(err.Error(), "detail", e.Detail, "method", r.Method, "uri", r.URL.RequestURI())
-				http.Error(w, e.Msg, 404)
+				http.Error(w, e.Msg, http.StatusBadRequest)
 				return
 			}
 			if e, isErr := errors.AsType[errUsage](err); isErr {

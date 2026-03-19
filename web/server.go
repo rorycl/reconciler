@@ -113,12 +113,12 @@ type WebApp struct {
 // New initialises a WebApp. An error type is returned for future use.
 func New(
 	config *config.Config,
-	reconciler *domain.Reconciler,
+	reconciler reconcilerer,
 	logger *slog.Logger,
 	staticFS fs.FS,
 	templateFS fs.FS,
-	xeroClientFunc *xeroClientMaker,
-	sfClientFunc *sfClientMaker,
+	xeroClientFunc xeroClientMaker,
+	sfClientFunc sfClientMaker,
 ) (*WebApp, error) {
 
 	// Add settings for the http server.
@@ -164,12 +164,12 @@ func New(
 	if xeroClientFunc == nil {
 		webApp.newXeroClient = newDefaultXeroClient
 	} else {
-		webApp.newXeroClient = *xeroClientFunc
+		webApp.newXeroClient = xeroClientFunc
 	}
 	if sfClientFunc == nil {
 		webApp.newSFClient = newDefaultSalesforceClient
 	} else {
-		webApp.newSFClient = *sfClientFunc
+		webApp.newSFClient = sfClientFunc
 	}
 
 	// Attach the salesforce and xero OAuth2 web client handler constructors.
@@ -366,8 +366,7 @@ func (web *WebApp) handleConnect() appHandler {
 			"XeroTokenIsValid": xeroTokenValid,
 			"SFTokenIsValid":   sfTokenValid,
 		}
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -386,8 +385,7 @@ func (web *WebApp) handleLogout() appHandler {
 			"MemoryDatabase": web.reconciler.DBIsInMemory(),
 			"DBName":         web.reconciler.DBPath(),
 		}
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -460,8 +458,7 @@ func (web *WebApp) handleRefresh() appHandler {
 			"DonationAccountCodes": accountCodes,
 			"Message":              web.sessions.PopString(ctx, "message"),
 		}
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -597,8 +594,7 @@ func (web *WebApp) handleInvoices() appHandler {
 
 		// Render template with errors and return if the form is invalid.
 		if !validator.Valid() {
-			web.render(w, r, templates, name, data)
-			return nil
+			return web.render(w, r, templates, name, data)
 		}
 
 		invoices, err := web.reconciler.InvoicesGet(
@@ -634,8 +630,7 @@ func (web *WebApp) handleInvoices() appHandler {
 		// Save the url.
 		web.sessions.Put(ctx, thisURL, derivedURL)
 
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -719,8 +714,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 
 		// Render template with errors and return if the form is invalid.
 		if !validator.Valid() {
-			web.render(w, r, templates, name, data)
-			return nil
+			return web.render(w, r, templates, name, data)
 		}
 
 		transactions, err := web.reconciler.TransactionsGet(
@@ -756,8 +750,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 		// Save the url.
 		web.sessions.Put(ctx, thisURL, derivedURL)
 
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -854,8 +847,7 @@ func (web *WebApp) handleDonations() appHandler {
 
 		// Render template with errors and return if the form is invalid.
 		if !validator.Valid() {
-			web.render(w, r, templates, name, data)
-			return nil
+			return web.render(w, r, templates, name, data)
 		}
 
 		viewDonations, err := web.reconciler.DonationsGet(
@@ -892,8 +884,7 @@ func (web *WebApp) handleDonations() appHandler {
 		// Save the url.
 		web.sessions.Put(ctx, thisURL, derivedURL)
 
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -1070,8 +1061,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 
 		web.log.Debug(fmt.Sprintf("invoiceDetail: about to complete: %s", thisURL))
 
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -1156,9 +1146,11 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 			return errInternal{msg: "url decoding error", err: err}
 		}
 
-		DFK := *transaction.Reference
-		if DFK == "" {
+		var DFK string
+		if transaction.Reference == nil {
 			DFK = missingTransactionReference
+		} else {
+			DFK = *transaction.Reference
 		}
 
 		if action == "unlink" {
@@ -1253,8 +1245,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 
 		web.log.Debug(fmt.Sprintf("transactionDetail: about to complete: %s", thisURL))
 
-		web.render(w, r, templates, name, data)
-		return nil
+		return web.render(w, r, templates, name, data)
 	}
 }
 
@@ -1263,16 +1254,15 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 /* -------------------------------------------------------------------------- */
 
 // render renders the specified template.
-func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *template.Template, filename string, data any) {
+func (web *WebApp) render(w http.ResponseWriter, r *http.Request, template *template.Template, filename string, data any) error {
 	buf := new(bytes.Buffer)
 	err := template.ExecuteTemplate(buf, filename, data)
 	if err != nil {
-		web.log.Error(fmt.Sprintf("template %q rendering error %v", filename, err))
-		web.ServerError(w, r, err)
-		return
+		return err
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = buf.WriteTo(w)
+	return nil
 }
 
 // donationSearchTimeSpan uses a simple heuristic for determining the dates for a

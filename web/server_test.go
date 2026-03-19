@@ -9,16 +9,83 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rorycl/reconciler/apiclients/salesforce"
 	"github.com/rorycl/reconciler/config"
 	"github.com/rorycl/reconciler/db"
+	"github.com/rorycl/reconciler/domain"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
 
 	"golang.org/x/oauth2"
 )
+
+type reconciliationMock struct {
+	donationsGet                    int
+	donationsLinkUnlink             int
+	invoiceDetailGet                int
+	invoicesGet                     int
+	transactionDetailGet            int
+	transactionsGet                 int
+	invoiceOrBankTransactionInfoGet int
+	xeroRecordsRefresh              int
+	salesforceRecordsRefresh        int
+	dbIsInMemory                    int
+	dbPath                          int
+	closeCalled                     int
+}
+
+func (r *reconciliationMock) DonationsGet(context.Context, time.Time, time.Time, string, string, string, int, int) ([]domain.ViewDonation, error) {
+	r.donationsGet++
+	return nil, nil
+}
+func (r *reconciliationMock) DonationsLinkUnlink(context.Context, domain.SalesforceClient, []salesforce.IDRef, time.Time, time.Time) error {
+	r.donationsLinkUnlink++
+	return nil
+}
+func (r *reconciliationMock) InvoiceDetailGet(context.Context, string) (db.WRInvoice, []domain.ViewLineItem, error) {
+	r.invoiceDetailGet++
+	return db.WRInvoice{}, nil, nil
+}
+func (r *reconciliationMock) InvoicesGet(context.Context, string, time.Time, time.Time, string, int, int) ([]db.Invoice, error) {
+	r.invoicesGet++
+	return nil, nil
+}
+func (r *reconciliationMock) TransactionDetailGet(context.Context, string) (db.WRTransaction, []domain.ViewLineItem, error) {
+	r.transactionDetailGet++
+	return db.WRTransaction{}, nil, nil
+}
+func (r *reconciliationMock) TransactionsGet(context.Context, string, time.Time, time.Time, string, int, int) ([]db.BankTransaction, error) {
+	r.transactionsGet++
+	return nil, nil
+}
+func (r *reconciliationMock) InvoiceOrBankTransactionInfoGet(context.Context, string, string) (string, time.Time, error) {
+	r.invoiceOrBankTransactionInfoGet++
+	return "", time.Time{}, nil
+}
+func (r *reconciliationMock) SalesforceRecordsRefresh(context.Context, domain.SalesforceClient, time.Time, time.Time) (*domain.RefreshSalesforceResults, error) {
+	r.salesforceRecordsRefresh++
+	return nil, nil
+}
+func (r *reconciliationMock) XeroRecordsRefresh(context.Context, domain.XeroClient, time.Time, time.Time, *regexp.Regexp, bool) (*domain.RefreshXeroResults, error) {
+	r.xeroRecordsRefresh++
+	return nil, nil
+}
+func (r *reconciliationMock) DBIsInMemory() bool {
+	r.dbIsInMemory++
+	return true
+}
+func (r *reconciliationMock) DBPath() string {
+	r.dbPath++
+	return ""
+}
+func (r *reconciliationMock) Close() error {
+	r.closeCalled++
+	return nil
+}
 
 // TestWebAppAndShutdown tests bringing up the web server and then stopping it.
 func TestWebAppAndShutdown(t *testing.T) {
@@ -49,7 +116,8 @@ func TestWebAppAndShutdown(t *testing.T) {
 				Scopes: []string{"api", "refresh_token"},
 			},
 		},
-		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
+		DataStartDate:           time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
+		DonationAccountPrefixes: []string{"51", "52", "53"},
 	}
 
 	logger := slog.New(slog.NewTextHandler(
@@ -66,21 +134,10 @@ func TestWebAppAndShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sqlFS, err := mounts.NewFileMount("sql", db.SQLEmbeddedFS, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("mounts initialised")
 
-	accountCodes := "^(53|55|57)"
-	dbPath := "file:memdb_srv?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
-	db, err := db.NewConnectionInTestMode(dbPath, sqlFS, accountCodes, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("db initialised")
+	reconcilerMock := &reconciliationMock{}
 
-	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
+	webApp, err := New(cfg, reconcilerMock, logger, staticFS, templatesFS, NewMockXeroClient, NewMockSFClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +193,8 @@ func TestServerHandlers(t *testing.T) {
 				Scopes: []string{"api", "refresh_token"},
 			},
 		},
-		DataStartDate: time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
+		DataStartDate:           time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC),
+		DonationAccountPrefixes: []string{"53", "55", "57"},
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -149,19 +207,10 @@ func TestServerHandlers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sqlFS, err := mounts.NewFileMount("sql", db.SQLEmbeddedFS, "")
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	accountCodes := "^(53|55|57)"
-	dbPath := "file:memdb_srv2?mode=memory&cache=shared&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
-	db, err := db.NewConnectionInTestMode(dbPath, sqlFS, accountCodes, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	reconcilerMock := &reconciliationMock{}
 
-	webApp, err := New(logger, cfg, db, staticFS, templatesFS)
+	webApp, err := New(cfg, reconcilerMock, logger, staticFS, templatesFS, NewMockXeroClient, NewMockSFClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,72 +296,90 @@ func TestDonationSearchTimeSpan(t *testing.T) {
 	}
 }
 
-// TestServerComponents tests some of the support components such as error and render
-// methods.
+// TestServerComponents tests some of the support components such as the error and
+// render methods.
 func TestServerComponents(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	tests := []struct {
 		name       string
-		testFunc   func(a *WebApp, w http.ResponseWriter, r *http.Request)
+		testFunc   appHandler
 		wantStatus int
 		wantBody   string
 	}{
 		{
-			name: "ServerError",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
-				a.ServerError(w, r, errors.New("error1"))
+			name: "Domain System Error",
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
+				return domain.ErrSystem{
+					Detail: "some detail",
+					Err:    errors.New("an error"),
+					Msg:    "an internal error occurred",
+				}
 			},
 			wantStatus: http.StatusInternalServerError,
-			wantBody:   "Internal Server Error",
+			wantBody:   "an internal error occurred",
 		},
 		{
-			name: "clientError",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
-				a.clientError(w, "a bad request message", http.StatusBadRequest)
+			name: "Domain Usage Error",
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
+				return domain.ErrUsage{
+					Detail: "domain usage",
+					Msg:    "domain usage error",
+				}
 			},
 			wantStatus: http.StatusBadRequest,
-			wantBody:   "a bad request message",
+			wantBody:   "domain usage error",
 		},
 		{
-			name: "clientError without message",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
-				a.clientError(w, "", http.StatusBadRequest)
+			name: "Internal error",
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
+				return errInternal{
+					msg: "an internal error",
+					err: fmt.Errorf("an internal error"),
+				}
 			},
-			wantStatus: http.StatusBadRequest,
-			wantBody:   http.StatusText(http.StatusBadRequest),
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   "an internal error",
 		},
 		{
-			name: "htmx client error",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
-				a.htmxClientError(w, "htmx client error")
-			},
-			wantStatus: http.StatusOK,
-			wantBody:   "htmx client error",
-		},
-		{
-			name: "not found error",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
-				a.notFound(w, r, fmt.Sprintf("%q was not found", r.URL.Path))
+			name: "Usage 404 error",
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
+				return errUsage{
+					msg:    "example 404 error",
+					status: http.StatusNotFound,
+				}
 			},
 			wantStatus: http.StatusNotFound,
-			wantBody:   "was not found",
+			wantBody:   "example 404 error",
+		},
+		{
+			name: "htmx error",
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
+				return errHTMX{
+					msg: "an htmx error",
+					err: errors.New("an htmx error"),
+				}
+			},
+			wantStatus: http.StatusOK,
+			wantBody:   "an htmx error",
 		},
 		{
 			name: "render ok",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
 				tpl := template.Must(template.New("t").Parse("hi {{ .Name }}"))
-				a.render(w, r, tpl, "t", map[string]string{"Name": "emaN"})
+				a := &WebApp{inDevelopment: false, log: logger}
+				return a.render(w, r, tpl, "t", map[string]string{"Name": "emaN"})
 			},
 			wantStatus: http.StatusOK,
 			wantBody:   "hi emaN",
 		},
 		{
 			name: "render fail",
-			testFunc: func(a *WebApp, w http.ResponseWriter, r *http.Request) {
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
 				tpl := template.Must(template.New("t").Parse("hi {{ .XXX }}"))
-				a.render(w, r, tpl, "t", struct{}{}) // trigger a template error
+				a := &WebApp{inDevelopment: false, log: logger}
+				return a.render(w, r, tpl, "t", struct{}{}) // trigger a template error
 			},
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   "",
@@ -330,7 +397,8 @@ func TestServerComponents(t *testing.T) {
 			r := httptest.NewRequest("GET", "/", nil)
 			w := httptest.NewRecorder()
 
-			tt.testFunc(a, w, r)
+			wrappedHandler := a.ErrorChecker(tt.testFunc)
+			wrappedHandler.ServeHTTP(w, r)
 
 			result := w.Result()
 			body, err := io.ReadAll(result.Body)
