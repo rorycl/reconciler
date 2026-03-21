@@ -4,6 +4,7 @@ go 1.26
 
 require (
 	github.com/alexedwards/scs/v2 v2.9.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-querystring v1.2.0
 	github.com/gorilla/handlers v1.5.2
@@ -12,6 +13,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/urfave/cli/v3 v3.7.0
 	golang.org/x/oauth2 v0.36.0
+	golang.org/x/sync v0.19.0
 	gopkg.in/yaml.v2 v2.4.0
 	modernc.org/sqlite v1.47.0
 )
