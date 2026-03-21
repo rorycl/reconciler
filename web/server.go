@@ -92,6 +92,7 @@ type WebApp struct {
 	sessions       *scs.SessionManager
 	accountsRegexp *regexp.Regexp
 	logoutDuration time.Duration // time to pause when logging out.
+	started        bool          // the server has been started.
 
 	// Xero and Salesforce client factory funcs allow the passing in of funcs that make a client that meets
 	// the domain.XeroClient and domain.SalesforceClient interfaces.
@@ -190,30 +191,39 @@ func New(
 	}
 	webApp.xeroWebClient = xeroWebClient
 
-	// In-Development mode triggers a warning as it bypasses the API connection check
-	// middleware.
-	if config.InDevelopmentMode {
-		webApp.inDevelopment = true
-		webApp.log.Warn("******************************************")
-		webApp.log.Warn("       Warning: IN DEVELOPMENT mode       ")
-		webApp.log.Warn("    ** API connection check disabled **   ")
-		webApp.log.Warn("       Warning: IN DEVELOPMENT mode       ")
-		webApp.log.Warn("******************************************")
-	}
-
 	return webApp, nil
 }
 
 // SetInDevelopment is a development-mode switch for setting the web app in development
 // mode. This has no effect if called after the server has started.
 func (web *WebApp) SetInDevelopment() {
+	if web.started {
+		web.log.Error("SetInDevelopment called after the server started")
+	}
 	web.inDevelopment = true
+	web.log.Warn("******************************************")
+	web.log.Warn("       Warning: IN DEVELOPMENT mode       ")
+	web.log.Warn("    ** API connection check disabled **   ")
+	web.log.Warn("       Warning: IN DEVELOPMENT mode       ")
+	web.log.Warn("******************************************")
 }
 
-// RestartRoutes reruns the route setup. This should only be used in development mode as
-// it may panic.
+// RestartRoutes reruns the route setup. This should only be used in development mode to
+// re-compile templates. Panics are caught through recover but the routes are not
+// restarted.
 func (web *WebApp) RestartRoutes() {
-	web.server.Handler = web.routes()
+	if !web.inDevelopment {
+		web.log.Error("restarting routes only operates in development mode")
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			web.log.Error("restarting routes panic", "error", r)
+		}
+	}()
+	restartHandler := web.routes()
+	// Continue if there is no panic.
+	web.server.Handler = restartHandler
 }
 
 // StartServer starts a WebApp.
@@ -221,6 +231,7 @@ func (web *WebApp) StartServer() error {
 	web.server.Handler = web.routes()
 	// Print to the console, regardless of the log level.
 	fmt.Printf("Starting server on %s\n", web.cfg.Web.ListenAddress)
+	web.started = true
 	return web.server.ListenAndServe()
 }
 
