@@ -2,11 +2,9 @@ package filewatcher
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 )
@@ -38,7 +36,13 @@ func writeFiles(t *testing.T, dir1, dir2 string, flushDuration time.Duration) {
 func TestFileChangeCanonical(t *testing.T) {
 	dir1, dir2 := t.TempDir(), t.TempDir()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+
 	fcn, err := NewFileChangeNotifier(
+		ctx,
 		map[string][]string{
 			dir1: []string{".html"},
 			dir2: []string{"txt"},
@@ -51,34 +55,18 @@ func TestFileChangeCanonical(t *testing.T) {
 	// override default flushDuration for testing
 	fcn.flushDuration = 2 * time.Millisecond
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	watchErr := make(chan error, 1)
-	go func() {
-		watchErr <- fcn.Watch(ctx)
-	}()
-
 	writeFiles(t, dir1, dir2, fcn.flushDuration)
 
 	timeOut := time.After(2 * fcn.flushDuration)
 
-	testOK := false
 	select {
 	case <-timeOut:
 		t.Fatal("test timed out")
-	case err := <-watchErr:
-		if err != nil && !errors.Is(err, context.Canceled) {
-			t.Fatal(err)
+	case err := <-fcn.Update():
+		if err != nil {
+			t.Errorf("unexpected error from update: %v", err)
 		}
-	case <-fcn.Update():
-		testOK = true
-		cancel()
 		break
-	}
-
-	if !testOK {
-		t.Fatal("test failed")
 	}
 
 }
@@ -87,7 +75,11 @@ func TestFileChangeNotifier(t *testing.T) {
 
 	dir1, dir2 := t.TempDir(), t.TempDir()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Register notifer.
 	fcn, err := NewFileChangeNotifier(
+		ctx,
 		map[string][]string{
 			dir1: []string{".html"},
 			dir2: []string{"txt"},
@@ -100,42 +92,24 @@ func TestFileChangeNotifier(t *testing.T) {
 	// override default flushDuration for testing
 	fcn.flushDuration = 2 * time.Millisecond
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var wg sync.WaitGroup
-
-	// 1. run Watch in it's own goroutine to check for watching errors.
-	watchErr := make(chan error, 1)
-	wg.Go(func() {
-		watchErr <- fcn.Watch(ctx)
-	})
-
 	// 2. wait for Update events
 	counter := 0
-	wg.Go(func() {
+	go func() {
 		for range fcn.Update() {
 			counter++
 		}
-	})
+	}()
 
-	// Write files then cancel the watcher.
+	// 3. cancel after a few moments.
+	go func() {
+		time.Sleep(5 * fcn.flushDuration)
+		cancel()
+	}()
+
+	// Write files.
 	writeFiles(t, dir1, dir2, fcn.flushDuration)
 
-	// Wait for last file to flush
-	time.Sleep(2 * fcn.flushDuration)
-
-	// Cancel Watch and Update (which share the context).
-	cancel()
-
-	// Wait for goroutines to finish
-	wg.Wait()
-
-	// check there are no watching errors
-	err = <-watchErr
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("unexpected watch error: %v", err)
-	}
-
+	// Expect 3 valid events.
 	if got, want := counter, 3; got != want {
 		t.Errorf("counter got %d want %d", got, want)
 	}

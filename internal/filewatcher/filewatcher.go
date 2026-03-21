@@ -23,11 +23,11 @@ import (
 const defaultFlushDuration time.Duration = 25 * time.Millisecond
 
 // FileChangeNotifier is a type holding one or more FileChangeDescriptor
-// watchers.
+// watchers. An update event is an error chan. An empty error is a normal update.
 type FileChangeNotifier struct {
 	dirDescriptorMap map[string][]string
 	watcher          *fsnotify.Watcher
-	update           chan bool
+	updateChan       chan error
 	flushDuration    time.Duration
 }
 
@@ -39,7 +39,7 @@ type FileChangeNotifier struct {
 //
 // Refer to
 // https://github.com/fsnotify/fsnotify/blob/v1.8.0/cmd/fsnotify/file.go
-func NewFileChangeNotifier(descriptors map[string][]string) (*FileChangeNotifier, error) {
+func NewFileChangeNotifier(ctx context.Context, descriptors map[string][]string) (*FileChangeNotifier, error) {
 
 	if len(descriptors) < 1 {
 		return nil, fmt.Errorf("at least one dir/filematch suffix descriptor needed")
@@ -50,9 +50,9 @@ func NewFileChangeNotifier(descriptors map[string][]string) (*FileChangeNotifier
 		}
 	}
 
-	fcn := FileChangeNotifier{
+	fcn := &FileChangeNotifier{
 		dirDescriptorMap: map[string][]string{},
-		update:           make(chan bool),
+		updateChan:       make(chan error),
 		flushDuration:    defaultFlushDuration,
 	}
 
@@ -89,17 +89,23 @@ func NewFileChangeNotifier(descriptors map[string][]string) (*FileChangeNotifier
 			fcn.dirDescriptorMap[dir] = append(fcn.dirDescriptorMap[dir], ix)
 		}
 	}
-	return &fcn, nil
+
+	// Launch the watcher.
+	go func() {
+		fcn.watch(ctx)
+	}()
+
+	return fcn, err
 }
 
-// Watch watches the filesystem for the registered events, returning any
+// watch watches the filesystem for the registered events, returning any
 // error found while doing so. Watch blocks, so needs to be run in a
 // goroutine.
 //
-// Watch watches the specified directories for write events for files
+// watch watches the specified directories for write events for files
 // with the specified suffixes. Consumers should iterate over [Update]
 // to receive notice of a file write event requiring a refresh.
-func (fcn *FileChangeNotifier) Watch(ctx context.Context) error {
+func (fcn *FileChangeNotifier) watch(ctx context.Context) {
 
 	// eventChan is an internal chan used for buffering editor writes.
 	eventChan := make(chan bool)
@@ -171,21 +177,20 @@ func (fcn *FileChangeNotifier) Watch(ctx context.Context) error {
 				timer.Reset(fcn.flushDuration)
 			case <-timer.C:
 				if flush {
-					fcn.update <- true
+					fcn.updateChan <- nil
 					flush = false
 				}
 			}
 		}
 	})
 
-	err := g.Wait()
+	fcn.updateChan <- g.Wait()
 	close(eventChan)
-	close(fcn.update)
+	close(fcn.updateChan)
 	_ = fcn.watcher.Close()
-	return err
 }
 
 // Update returns a channel signalling a file refresh event.
-func (fcn *FileChangeNotifier) Update() <-chan bool {
-	return fcn.update
+func (fcn *FileChangeNotifier) Update() <-chan error {
+	return fcn.updateChan
 }
