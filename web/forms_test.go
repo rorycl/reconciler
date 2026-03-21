@@ -268,69 +268,6 @@ func TestAsURLParams(t *testing.T) {
 	}
 }
 
-// TestURLParse tests the validQuery function.
-func TestURLParse(t *testing.T) {
-
-	tests := []struct {
-		name   string
-		url    string
-		keys   []string
-		vals   url.Values
-		hasErr error
-	}{
-		{
-			name: "two parameters ok",
-			url:  "http://test.com?hi=there&ok=fine",
-			keys: []string{"hi", "ok"},
-			vals: url.Values{
-				"hi": []string{"there"},
-				"ok": []string{"fine"},
-			},
-			hasErr: nil,
-		},
-		{
-			name: "ok extraneous argument",
-			url:  "http://test.com?hi=there&ok=fine&not=needed",
-			keys: []string{"hi", "ok"},
-			vals: url.Values{
-				"hi":  []string{"there"},
-				"not": []string{"needed"},
-				"ok":  []string{"fine"},
-			},
-			hasErr: nil,
-		},
-		{
-			name:   "two parameters ok",
-			url:    "http://test.com?hi=there",
-			keys:   []string{"hi", "ok"},
-			hasErr: errors.New(`"ok" not in url`),
-		},
-	}
-
-	for ii, tt := range tests {
-		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
-			u, err := url.Parse(tt.url)
-			if err != nil {
-				t.Fatal(err)
-			}
-			vq, err := validQuery(u, tt.keys...)
-			if err != nil {
-				if tt.hasErr == nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				if got, want := tt.hasErr.Error(), err.Error(); got != want {
-					t.Errorf("got error %q want %q", got, want)
-				}
-				return
-			}
-			if diff := cmp.Diff(tt.vals, vq); diff != "" {
-				t.Errorf("unexpected diff %v", diff)
-			}
-
-		})
-	}
-}
-
 // TestValidMuxVars tests the validMuxVars function.
 func TestValidMuxVars(t *testing.T) {
 

@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"reflect"
 	"time"
 
@@ -53,25 +52,6 @@ func (v *Validator) Check(ok bool, key, message string) {
 func (v *Validator) FieldError(field string) bool {
 	_, ok := v.Errors[field]
 	return ok
-}
-
-// ------------------------------------------------------------------------------
-// URL query parsing
-// ------------------------------------------------------------------------------
-
-// validQuery checks the url query parameters for the desired keys returning a
-// url.Values map and error.
-func validQuery(thisURL *url.URL, keys ...string) (url.Values, error) {
-	vq, err := url.ParseQuery(thisURL.RawQuery)
-	if err != nil {
-		return nil, fmt.Errorf("url parsequery error: %v", err)
-	}
-	for _, k := range keys {
-		if _, ok := vq[k]; !ok {
-			return nil, fmt.Errorf("%q not in url", k)
-		}
-	}
-	return vq, nil
 }
 
 // ------------------------------------------------------------------------------
