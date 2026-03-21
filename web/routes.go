@@ -13,58 +13,73 @@ import (
 // Notes:
 // The /connect endpoint is the entry point to the system, ensuring that the api
 // platform connections are made. All data-related endpoints below this section need
-// to be protected by the apisOK/web.apisConnectedOK middleware.
+// to be protected by the apisOK/web.apisConnectedOK middleware and are protected by the
+// `protected` subrouter.
 func (web *WebApp) routes() http.Handler {
 
 	r := mux.NewRouter()
 
+	// Mount and publish the static routes.
 	fs := http.FileServerFS(web.staticFS)
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	// apisConnectedOk is a middleware ensuring certain endpoints are protected by a
-	// func that checks that both Salesforce and Xero apis are connected ok. 'connOK' is
-	// a shortcut.
-	apisOK := web.apisConnectedOK
+	// handleApp converts an appHandler to a *mux.Route
+	handleApp := func(router *mux.Router, path string, h appHandler) *mux.Route {
+		return router.Handle(path, web.ErrorChecker(h))
+	}
 
-	// Note that the OAuth2 handlers are in the apiclient modules.
-	r.Handle("/", web.ErrorChecker(web.handleRoot())).Methods("GET") // synonym for /connect
-	r.Handle("/connect", web.ErrorChecker(web.handleConnect())).Methods("GET")
-	r.Handle("/logout", web.ErrorChecker(web.handleLogout())).Methods("GET")
-	r.Handle("/logout/confirmed", web.ErrorChecker(web.handleLogoutConfirmed())).Methods("GET")
+	/****************************************************************************************
+	// public routes
+	****************************************************************************************/
 
-	// Xero OAuth2 init and callback.
-	r.Handle("/xero/init", web.ErrorChecker(web.xeroWebClient.InitiateWebLogin())).Methods("GET")
-	r.Handle(web.cfg.Web.XeroCallBack, web.ErrorChecker(web.xeroWebClient.WebLoginCallBack())).Methods("GET")
+	handleApp(r, "/", web.handleRoot()).Methods("GET") // synonym for /connect
+	handleApp(r, "/connect", web.handleConnect()).Methods("GET")
+	handleApp(r, "/logout", web.handleLogout()).Methods("GET")
+	handleApp(r, "/logout/confirmed", web.handleLogoutConfirmed()).Methods("GET")
 
-	// Salesforce OAuth2 init and callback.
-	r.Handle("/salesforce/init", web.ErrorChecker(web.sfWebClient.InitiateWebLogin())).Methods("GET")
-	r.Handle(web.cfg.Web.SalesforceCallBack, web.ErrorChecker(web.sfWebClient.WebLoginCallBack())).Methods("GET")
+	// Xero OAuth2 init and callback (the callback route is configured in web.cfg).
+	handleApp(r, "/xero/init", web.xeroWebClient.InitiateWebLogin()).Methods("GET")
+	handleApp(r, web.cfg.Web.XeroCallBack, web.xeroWebClient.WebLoginCallBack()).Methods("GET")
+
+	// Salesforce OAuth2 init and callback (the callback route is configured in web.cfg).
+	handleApp(r, "/salesforce/init", web.sfWebClient.InitiateWebLogin()).Methods("GET")
+	handleApp(r, web.cfg.Web.SalesforceCallBack, web.sfWebClient.WebLoginCallBack()).Methods("GET")
+
+	/****************************************************************************************
+	// protected routes
+	****************************************************************************************/
+
+	// Protected routes require valid connections to have been made.
+	protected := r.PathPrefix("").Subrouter()
+	protected.Use(web.apisConnectedOK)
 
 	// Refresh is the data refresh page.
-	r.Handle("/refresh", apisOK(web.ErrorChecker(web.handleRefresh()))).Methods("GET")
-	r.Handle("/refresh/update", apisOK(web.ErrorChecker(web.handleRefreshUpdates()))).Methods("GET")
+	handleApp(protected, "/refresh", web.handleRefresh()).Methods("GET")
+	handleApp(protected, "/refresh/update", web.handleRefreshUpdates()).Methods("GET")
 
 	// Main listing pages.
-	r.Handle("/home", apisOK(web.ErrorChecker(web.handleHome()))).Methods("GET") // redirect to handleInvoices.
-	r.Handle("/invoices", apisOK(web.ErrorChecker(web.handleInvoices()))).Methods("GET")
-	r.Handle("/bank-transactions", apisOK(web.ErrorChecker(web.handleBankTransactions()))).Methods("GET")
-	r.Handle("/donations", apisOK(web.ErrorChecker(web.handleDonations()))).Methods("GET")
+	handleApp(protected, "/home", web.handleHome()).Methods("GET") // redirect to handleInvoices.
+	handleApp(protected, "/invoices", web.handleInvoices()).Methods("GET")
+	handleApp(protected, "/bank-transactions", web.handleBankTransactions()).Methods("GET")
+	handleApp(protected, "/donations", web.handleDonations()).Methods("GET")
 	// Todo: consider adding campaigns page
 
 	// Detail pages.
 	// Note that the regexp works for uuids and the system test data.
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.ErrorChecker(web.handleInvoiceDetail()))).Methods("GET")
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.ErrorChecker(web.handleInvoiceDetail()))).Methods("GET")
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.ErrorChecker(web.handleBankTransactionDetail()))).Methods("GET")
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.ErrorChecker(web.handleBankTransactionDetail()))).Methods("GET")
+	handleApp(protected, "/invoice/{id:[A-Za-z0-9_-]+}", web.handleInvoiceDetail()).Methods("GET")
+	handleApp(protected, "/invoice/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", web.handleInvoiceDetail()).Methods("GET")
+	handleApp(protected, "/bank-transaction/{id:[A-Za-z0-9_-]+}", web.handleBankTransactionDetail()).Methods("GET")
+	handleApp(protected, "/bank-transaction/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", web.handleBankTransactionDetail()).Methods("GET")
 
 	// Donation linking/unlinking.
-	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.ErrorChecker(web.handleDonationsLinkUnlink()))).Methods("POST")
+	handleApp(protected, "/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", web.handleDonationsLinkUnlink()).Methods("POST")
 
-	// Todo: logout
-	// Logout -- delete the api connection tokens and redirect to /connect
+	/****************************************************************************************
+	// global middleware
+	****************************************************************************************/
 
-	// Chain the desired middleware. Todo: add recover handler.
+	// Chain the desired middleware.
+	r.Use(handlers.RecoveryHandler(handlers.PrintRecoveryStack(true)))
 	logging := handlers.LoggingHandler(os.Stdout, r)
 	sessionMiddleWare := web.sessions.LoadAndSave(logging)
 	csrfMiddlware := enforceCSRF(sessionMiddleWare)
