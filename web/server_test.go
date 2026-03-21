@@ -19,6 +19,7 @@ import (
 	"github.com/rorycl/reconciler/db"
 	"github.com/rorycl/reconciler/domain"
 	mounts "github.com/rorycl/reconciler/internal/mounts"
+	"github.com/rorycl/reconciler/internal/token"
 
 	"golang.org/x/oauth2"
 )
@@ -363,6 +364,18 @@ func TestServerComponents(t *testing.T) {
 			},
 			wantStatus: http.StatusOK,
 			wantBody:   "an htmx error",
+		},
+		{
+			name: "token error",
+			testFunc: func(w http.ResponseWriter, r *http.Request) error {
+				return token.ErrTokenWebClient{
+					Context: "token",
+					Err:     errors.New("an internal/token error"),
+					Msg:     "a token error",
+				}
+			},
+			wantStatus: http.StatusBadRequest, // not sure if this is appropriate
+			wantBody:   "a token error",
 		},
 		{
 			name: "render ok",

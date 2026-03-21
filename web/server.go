@@ -3,20 +3,17 @@ package web
 // This file describes the web server for the Reconciler project.
 //
 // Note that modules called by this server should provide self-describing errors since
-// these are sent directly to an internal server error func:
+// these are caught by ErrorChecker.
 //
-//	web.ServerError(w, r, err)
-//
-// This web server also sets out each endpoint handler as a HandlerFunc. This allows for
-// the router to provide arguments to the handler, as discussed in Mat Ryer's post at
+// This web server also sets out each endpoint handler as a wrapped handler (returning
+// an error). This allows for the router to provide arguments to the handler, as
+// discussed in Mat Ryer's post at
 //
 //	https://grafana.com/blog/how-i-write-http-services-in-go-after-13-years/
 //
 // Another use of this pattern is to initialise only the templates needed for a specific
 // endpoint. This allows for endpoint-specific template error catching, and potential
 // use-case specific overriding of template `block` components, if required.
-//
-// Helper functions, such as `ServerError` and `clientError` are at the end of the file.
 //
 // HTMX partials are used in this project to avoid duplicating content and to allow for
 // in-place updates of page components rather than requiring full page refreshes. These
@@ -57,7 +54,6 @@ import (
 	"github.com/rorycl/reconciler/internal/token"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/oauth2"
 )
@@ -177,7 +173,6 @@ func New(
 		token.SalesforceToken,
 		config.Salesforce.OAuth2Config,
 		scsSessionStore,
-		webApp,     // implements ServerError
 		"/connect", // the redirect url
 	)
 	if err != nil {
@@ -188,7 +183,6 @@ func New(
 		token.XeroToken,
 		config.Xero.OAuth2Config,
 		scsSessionStore,
-		webApp,     // implements ServerError
 		"/connect", // the redirect url
 	)
 	if err != nil {
@@ -228,69 +222,6 @@ func (web *WebApp) StartServer() error {
 	// Print to the console, regardless of the log level.
 	fmt.Printf("Starting server on %s\n", web.cfg.Web.ListenAddress)
 	return web.server.ListenAndServe()
-}
-
-// routes connects all of the endpoints and provides middleware.
-//
-// Notes:
-// The /connect endpoint is the entry point to the system, ensuring that the api
-// platform connections are made. All data-related endpoints below this section need
-// to be protected by the apisOK/web.apisConnectedOK middleware.
-func (web *WebApp) routes() http.Handler {
-
-	r := mux.NewRouter()
-
-	fs := http.FileServerFS(web.staticFS)
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
-
-	// apisConnectedOk is a middleware ensuring certain endpoints are protected by a
-	// func that checks that both Salesforce and Xero apis are connected ok. 'connOK' is
-	// a shortcut.
-	apisOK := web.apisConnectedOK
-
-	// Note that the OAuth2 handlers are in the apiclient modules.
-	r.Handle("/", web.ErrorChecker(web.handleRoot())).Methods("GET") // synonym for /connect
-	r.Handle("/connect", web.ErrorChecker(web.handleConnect())).Methods("GET")
-	r.Handle("/logout", web.ErrorChecker(web.handleLogout())).Methods("GET")
-	r.Handle("/logout/confirmed", web.ErrorChecker(web.handleLogoutConfirmed())).Methods("GET")
-
-	// Xero OAuth2 init and callback.
-	r.Handle("/xero/init", web.xeroWebClient.InitiateWebLogin()).Methods("GET")
-	r.Handle(web.cfg.Web.XeroCallBack, web.xeroWebClient.WebLoginCallBack()).Methods("GET")
-
-	// Salesforce OAuth2 init and callback.
-	r.Handle("/salesforce/init", web.sfWebClient.InitiateWebLogin()).Methods("GET")
-	r.Handle(web.cfg.Web.SalesforceCallBack, web.sfWebClient.WebLoginCallBack()).Methods("GET")
-
-	// Refresh is the data refresh page.
-	r.Handle("/refresh", apisOK(web.ErrorChecker(web.handleRefresh()))).Methods("GET")
-	r.Handle("/refresh/update", apisOK(web.ErrorChecker(web.handleRefreshUpdates()))).Methods("GET")
-
-	// Main listing pages.
-	r.Handle("/home", apisOK(web.ErrorChecker(web.handleHome()))).Methods("GET") // redirect to handleInvoices.
-	r.Handle("/invoices", apisOK(web.ErrorChecker(web.handleInvoices()))).Methods("GET")
-	r.Handle("/bank-transactions", apisOK(web.ErrorChecker(web.handleBankTransactions()))).Methods("GET")
-	r.Handle("/donations", apisOK(web.ErrorChecker(web.handleDonations()))).Methods("GET")
-	// Todo: consider adding campaigns page
-
-	// Detail pages.
-	// Note that the regexp works for uuids and the system test data.
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}", apisOK(web.ErrorChecker(web.handleInvoiceDetail()))).Methods("GET")
-	r.Handle("/invoice/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.ErrorChecker(web.handleInvoiceDetail()))).Methods("GET")
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}", apisOK(web.ErrorChecker(web.handleBankTransactionDetail()))).Methods("GET")
-	r.Handle("/bank-transaction/{id:[A-Za-z0-9_-]+}/{action:link|unlink}", apisOK(web.ErrorChecker(web.handleBankTransactionDetail()))).Methods("GET")
-
-	// Donation linking/unlinking.
-	r.Handle("/donations/{type:(?:invoice|bank-transaction)}/{id}/{action}", apisOK(web.ErrorChecker(web.handleDonationsLinkUnlink()))).Methods("POST")
-
-	// Todo: logout
-	// Logout -- delete the api connection tokens and redirect to /connect
-
-	// Chain the desired middleware. Todo: add recover handler.
-	logging := handlers.LoggingHandler(os.Stdout, r)
-	sessionMiddleWare := web.sessions.LoadAndSave(logging)
-	csrfMiddlware := enforceCSRF(sessionMiddleWare)
-	return csrfMiddlware
 }
 
 // apisConnectedOK checks whether the user is connected to the API services as
@@ -624,7 +555,7 @@ func (web *WebApp) handleInvoices() appHandler {
 		}
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 
 		// Save the url.
@@ -658,7 +589,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 		// Check if a redirection is needed.
 		derivedURL, redirect, err := redirectCheck(ctx, form, web.sessions, r, thisURL)
 		if err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 		if redirect {
 			web.log.Info(fmt.Sprintf("redirecting to %s", derivedURL))
@@ -744,7 +675,7 @@ func (web *WebApp) handleBankTransactions() appHandler {
 		}
 		data.Pagination, err = NewPagination(pageLen, recordsNo, form.Page, r.URL.Query())
 		if err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 
 		// Save the url.
@@ -942,8 +873,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 		// Derive the default url.
 		urlParams, err := form.AsURLParams()
 		if err != nil { // unlikely
-			web.log.Error(fmt.Sprintf("handleInvoiceDetail: default url error: %v", err))
-			web.ServerError(w, r, err)
+			return err
 		}
 		defaultURL := baseURL + "?" + urlParams
 
@@ -968,7 +898,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 		// Decode the url params and construct the current url, interjecting if the
 		// action is "unlink" to get the related information.
 		if err := form.DecodeURLParams(r.URL.Query()); err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 		if action == "unlink" {
 			form.DateFrom = web.cfg.DataStartDate
@@ -978,7 +908,7 @@ func (web *WebApp) handleInvoiceDetail() appHandler {
 		}
 		urlParams, err = form.AsURLParams()
 		if err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 		thisURL := baseURL + "?" + urlParams
 
@@ -1162,7 +1092,7 @@ func (web *WebApp) handleBankTransactionDetail() appHandler {
 
 		urlParams, err = form.AsURLParams()
 		if err != nil {
-			web.ServerError(w, r, err)
+			return err
 		}
 		thisURL := baseURL + "?" + urlParams
 
