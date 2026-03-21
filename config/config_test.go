@@ -65,7 +65,6 @@ func TestConfigDumpFile(t *testing.T) {
 			"55",
 			"57",
 		},
-		InDevelopmentMode: false,
 		Web: WebConfig{
 			ListenAddress:          "localhost:8080",
 			XeroCallBack:           "/xero/callback",

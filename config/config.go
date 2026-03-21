@@ -29,7 +29,6 @@ type Config struct {
 	Organisation            string   `yaml:"organisation_name"`
 	DataStartDateStr        string   `yaml:"data_date_start"`
 	DonationAccountPrefixes []string `yaml:"donation_account_prefixes"`
-	InDevelopmentMode       bool     `yaml:"-"`
 
 	// subsections
 	Web           WebConfig        `yaml:"web"`
