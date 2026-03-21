@@ -11,11 +11,11 @@ import (
 
 const (
 	ShortUsage      = "A local webapp for reconciling financial and CRMS donations"
-	LongDescription = `
-The reconciler app is a local web server for creating OAuth2 API connections to an
-organisation's financial and CRMS systems for reconciling these with codes from the
-financial system. Please see the project README for more information at
-https://github.com/rorycl/reconciler.`
+	LongDescription = `The reconciler app is a local web server for creating OAuth2 API connections to an
+organisation's financial and CRMS systems. The app uses an in-memory database to help
+users reconcile records between systems by updating the CRMS system donation records
+over the API with the relevant financial system code. Please see the project README,
+licence and other documentation at https://github.com/rorycl/reconciler.`
 )
 
 // WebRunner is an interface to the central coordinator for the project (concretely
