@@ -131,12 +131,9 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call /init: %v", err)
 	}
-	defer resp.Body.Close()
-	/*
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-	*/
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("expected 303 redirect from /init; got %d", resp.StatusCode)

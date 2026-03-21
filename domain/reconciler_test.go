@@ -279,7 +279,7 @@ func TestReconcilerLinkUnlink(t *testing.T) {
 	err = reconciler.DonationsLinkUnlink(
 		ctx,
 		msc,
-		[]salesforce.IDRef{{"a", "b"}, {"c", "d"}},
+		[]salesforce.IDRef{{ID: "a", Ref: "b"}, {ID: "c", Ref: "d"}},
 		cfg.DataStartDate,
 		time.Time{},
 	)
@@ -430,7 +430,7 @@ func TestReconcilerDBListings(t *testing.T) {
 					t.Fatalf("unexpected error %v", err)
 				}
 				if got, want := fmt.Sprintf("%T", err), fmt.Sprintf("%T", tt.expectedError); got != want {
-					fmt.Sprintf("got error type %s want %s", got, want)
+					t.Errorf("got error type %s want %s", got, want)
 				}
 				return
 			}
