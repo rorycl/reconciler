@@ -37,7 +37,7 @@ func TestSalesforceID(t *testing.T) {
 			if *got != *want {
 				t.Errorf("got %s want %s", *got, *want)
 			}
-			if got, want := got.String(), tt.input; got != want {
+			if got, want := string(*got), tt.input; got != want {
 				t.Errorf("string mismatch %s want %s", got, want)
 			}
 		})

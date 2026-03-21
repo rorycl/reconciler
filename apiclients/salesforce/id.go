@@ -22,10 +22,6 @@ import (
 
 type salesforceID string
 
-func (s salesforceID) String() string {
-	return string(s)
-}
-
 var regexpValidsalesforceID = regexp.MustCompile(`^[A-Za-z0-9]+$`)
 
 // NewSalesforceID converts a string into a SaleforceID, returning nil if the conversion
