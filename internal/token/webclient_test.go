@@ -20,18 +20,19 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// mock the WebServerError interface.
-type mockErrorLogger struct {
-	t *testing.T
+type errChecker struct {
+	errs     []error
+	errCount int
 }
 
-// ServerError meets the WebServerError interface for raising web server errors.
-func (m mockErrorLogger) ServerError(w http.ResponseWriter, r *http.Request, errs ...error) {
-	m.t.Helper()
-	for _, err := range errs {
-		m.t.Logf("[WebServerError] %v", err)
-	}
-	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+func (e *errChecker) ErrorChecker(h func(w http.ResponseWriter, r *http.Request) error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := h(w, r)
+		if err != nil {
+			e.errs = append(e.errs, err)
+			e.errCount++
+		}
+	})
 }
 
 // TestAuthWebLoginAndCallback tests the local web OAuth2 login and callback handlers.
@@ -95,18 +96,19 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 		SalesforceToken,
 		cfg.Salesforce.OAuth2Config,
 		sessionManager,
-		mockErrorLogger{t},
 		"/connect",
 	)
 	if err != nil {
 		t.Fatalf("NewTokenWebHander error: %v", err)
 	}
 
+	// Initialise an error checker handler consumer.
+	ec := new(errChecker)
 	localMux.Handle("/salesforce/init", sessionManager.LoadAndSave(
-		twc.InitiateWebLogin(),
+		ec.ErrorChecker(twc.InitiateWebLogin()),
 	))
 	localMux.Handle("/salesforce/callback", sessionManager.LoadAndSave(
-		twc.WebLoginCallBack(),
+		ec.ErrorChecker(twc.WebLoginCallBack()),
 	))
 
 	localServer := httptest.NewServer(localMux)
@@ -129,9 +131,12 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to call /init: %v", err)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer resp.Body.Close()
+	/*
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+	*/
 
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("expected 303 redirect from /init; got %d", resp.StatusCode)
@@ -215,6 +220,11 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 	if got, want := sessionToken.Token.AccessToken, mockAccessToken; got != want {
 		t.Errorf("saved accessToken: got %q want %q", got, want)
 	}
+
+	if ec.errCount != 0 {
+		t.Errorf("expected 0 handler error count, got %d", ec.errCount)
+		t.Errorf("detail: %v", ec.errs)
+	}
 }
 
 func TestNewTokenWebClient(t *testing.T) {
@@ -228,24 +238,22 @@ func TestNewTokenWebClient(t *testing.T) {
 	}
 
 	tests := []struct {
-		typer     TokenType
-		oauthCfg  *oauth2.Config
-		vs        ValueStorer
-		errLogger WebServerError
-		redirURL  string
-		err       error
+		typer    TokenType
+		oauthCfg *oauth2.Config
+		vs       ValueStorer
+		redirURL string
+		err      error
 	}{
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), mockErrorLogger{t}, "/connect", nil},
-		{57, cfg.Salesforce.OAuth2Config, scs.New(), mockErrorLogger{t}, "/connect", errors.New("token type 57 invalid")},
-		{SalesforceToken, nil, scs.New(), mockErrorLogger{t}, "/connect", errors.New("nil oauthCfg provided")},
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, nil, mockErrorLogger{t}, "/connect", errors.New("nil ValueStorer")},
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), nil, "/connect", errors.New("nil WebServerError provided")},
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), mockErrorLogger{t}, "", errors.New("empty redirection URL")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), "/connect", nil},
+		{57, cfg.Salesforce.OAuth2Config, scs.New(), "/connect", errors.New("token type 57 invalid")},
+		{SalesforceToken, nil, scs.New(), "/connect", errors.New("nil oauthCfg provided")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, nil, "/connect", errors.New("nil ValueStorer")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), "", errors.New("empty redirection URL")},
 	}
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
-			_, err := NewTokenWebClient(tt.typer, tt.oauthCfg, tt.vs, tt.errLogger, tt.redirURL)
+			_, err := NewTokenWebClient(tt.typer, tt.oauthCfg, tt.vs, tt.redirURL)
 			if err != nil && tt.err == nil {
 				t.Fatalf("unexpected error %v", err)
 			}
