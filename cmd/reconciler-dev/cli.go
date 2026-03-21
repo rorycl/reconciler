@@ -13,15 +13,14 @@ import (
 const (
 	ShortUsage      = "dev mode reconciler app"
 	LongDescription = `
-This reconciler app is a *development mode only* local web server for web development.
+This reconciler app is a *development mode only* local web server for web development on
+the reconciler app.
 
 Please see the project README for more information at
 https://github.com/rorycl/reconciler.
 
 The development mode server may use a local database file on disk but it is the
 developer's responsibility to keep this safe and remove it.
-
-This server does not presently automatically restart to recompile templates.
 
 A pin is required to start the server to stop this being run in production.
 `
