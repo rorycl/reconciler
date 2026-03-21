@@ -12,12 +12,12 @@ import (
 func writeFiles(t *testing.T, dir1, dir2 string, flushDuration time.Duration) {
 	t.Helper()
 	for _, dirFile := range [][]string{
-		[]string{dir1, ".newfile.html"}, // not counted
-		[]string{dir1, "abc.html"},      // counted
-		[]string{dir1, "abc.HTML"},      // counted
-		[]string{dir1, ".hidden.HTML"},  // not counted
-		[]string{dir2, "abctxt"},        // not counted
-		[]string{dir2, "ABC.txt"},       // counted
+		{dir1, ".newfile.html"}, // not counted
+		{dir1, "abc.html"},      // counted
+		{dir1, "abc.HTML"},      // counted
+		{dir1, ".hidden.HTML"},  // not counted
+		{dir2, "abctxt"},        // not counted
+		{dir2, "ABC.txt"},       // counted
 	} {
 		dir, file := dirFile[0], dirFile[1]
 		fmt.Println(dir, file)
@@ -44,8 +44,8 @@ func TestFileChangeCanonical(t *testing.T) {
 	fcn, err := NewFileChangeNotifier(
 		ctx,
 		map[string][]string{
-			dir1: []string{".html"},
-			dir2: []string{"txt"},
+			dir1: {".html"},
+			dir2: {"txt"},
 		},
 	)
 	if err != nil {
@@ -81,8 +81,8 @@ func TestFileChangeNotifier(t *testing.T) {
 	fcn, err := NewFileChangeNotifier(
 		ctx,
 		map[string][]string{
-			dir1: []string{".html"},
-			dir2: []string{"txt"},
+			dir1: {".html"},
+			dir2: {"txt"},
 		},
 	)
 	if err != nil {
