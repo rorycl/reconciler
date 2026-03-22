@@ -4,11 +4,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestAppInit(t *testing.T) {
+
+	var programLevel = new(slog.LevelVar) // Info by default
+	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel})
+	slog.SetDefault(slog.New(h))
+
+	logger := slog.Default()
 
 	tests := []struct {
 		name          string
@@ -71,9 +78,10 @@ func TestAppInit(t *testing.T) {
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
+			programLevel.Set(tt.logLevel)
 			_, err := NewApp(
 				tt.configFile,
-				tt.logLevel,
+				logger,
 				tt.inDevelopment,
 				tt.staticPath,
 				tt.templatePath,

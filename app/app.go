@@ -1,5 +1,6 @@
 // package app is the main entry point to the program, providing different ways of
-// accessing the RunWebServer function in production and development mode.
+// utilising the domain (Reconciler) package and calling the web.RunWebServer function
+// in production and development mode.
 package app
 
 import (
@@ -8,7 +9,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/rorycl/reconciler/config"
@@ -24,7 +24,6 @@ import (
 type App struct {
 	cfg        *config.Config
 	log        *slog.Logger
-	logLevel   slog.Level
 	reconciler *domain.Reconciler
 	staticFS   fs.FS
 	templateFS fs.FS
@@ -38,7 +37,7 @@ type App struct {
 // NewApp initialises a new App.
 func NewApp(
 	configFile string,
-	logLevel slog.Level,
+	logger *slog.Logger,
 	inDevelopment bool,
 	staticPath string,
 	templatePath string,
@@ -71,12 +70,6 @@ func NewApp(
 	}
 	accountCodes := cfg.DonationAccountCodesRegex()
 
-	// Initialise the logger.
-	logger := slog.New(slog.NewTextHandler(
-		os.Stdout,
-		&slog.HandlerOptions{Level: logLevel},
-	))
-
 	// Mount the filesystems.
 	staticFS, err := mounts.NewFileMount("static", web.StaticEmbeddedFS, staticPath)
 	if err != nil {
@@ -103,7 +96,6 @@ func NewApp(
 	app := &App{
 		cfg:           cfg,
 		log:           logger,
-		logLevel:      logLevel,
 		inDevelopment: inDevelopment,
 		reconciler:    reconciler,
 		staticFS:      staticFS,
