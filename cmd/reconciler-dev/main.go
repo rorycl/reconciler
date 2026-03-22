@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
+	charmlog "github.com/charmbracelet/log"
 	"github.com/rorycl/reconciler/app"
 )
 
@@ -17,7 +19,15 @@ func appInitialiser(
 	inDevelopment bool,
 	staticPath, templatePath, sqlPath, databasePath string,
 ) (WebRunner, error) {
-	return app.NewApp(configFile, logLevel, inDevelopment, staticPath, templatePath, sqlPath, databasePath)
+
+	charmLogger := charmlog.NewWithOptions(os.Stdout, charmlog.Options{
+		ReportCaller:    true,
+		ReportTimestamp: true,
+		TimeFormat:      time.Kitchen,
+		Level:           charmlog.Level(logLevel),
+	})
+	logger := slog.New(charmLogger)
+	return app.NewApp(configFile, logger, inDevelopment, staticPath, templatePath, sqlPath, databasePath)
 }
 
 // run is the entry point.

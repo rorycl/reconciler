@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 var pinTimeout = 10 * time.Second
@@ -36,11 +38,17 @@ func (p *pin) verify(input string) bool {
 
 var stdin = os.Stdin
 
+var magenta = color.New(color.FgCyan).Add(color.Underline)
+
 func (p *pin) check() error {
 	aChan := make(chan struct{})
 
 	go func() {
-		fmt.Printf("To proceed please input the code at the prompt.\n%s\n", string(*p))
+
+		fmt.Print("To proceed please input the code at the prompt ")
+		_, _ = magenta.Print(string(*p))
+		fmt.Println()
+
 		reader := bufio.NewReader(stdin)
 		for {
 			fmt.Print("> ")

@@ -18,7 +18,10 @@ func appInitialiser(
 	inDevelopment bool,
 	staticPath, templatePath, sqlPath, databasePath string,
 ) (WebRunner, error) {
-	return app.NewApp(configFile, logLevel, inDevelopment, staticPath, templatePath, sqlPath, databasePath)
+
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	logger := slog.New(handler)
+	return app.NewApp(configFile, logger, inDevelopment, staticPath, templatePath, sqlPath, databasePath)
 }
 
 func run(args []string) {
