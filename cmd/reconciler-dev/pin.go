@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -13,32 +12,42 @@ import (
 
 var pinTimeout = 10 * time.Second
 
-// getPin is a security checker to help ensure that the development binary is not used
-// in production.
-func getPin() error {
+type pin string
 
+func newPin() *pin {
 	sequence := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-
 	code := ""
 	for range 6 {
 		r := rand.Intn(len(sequence))
 		code += strconv.Itoa(sequence[r])
 	}
+	p := pin(code)
+	return &p
+}
 
+func (p *pin) verify(input string) bool {
+	if strings.TrimSpace(input) == string(*p) {
+		fmt.Println("champ")
+		return true
+	}
+	fmt.Println("nil points\n>")
+	return false
+}
+
+var stdin = os.Stdin
+
+func (p *pin) check() error {
 	aChan := make(chan struct{})
 
 	go func() {
-		fmt.Printf("To proceed please input the code at the prompt.\n%s\n", code)
-		reader := bufio.NewReader(os.Stdin)
+		fmt.Printf("To proceed please input the code at the prompt.\n%s\n", string(*p))
+		reader := bufio.NewReader(stdin)
 		for {
 			fmt.Print("> ")
-			text, _ := reader.ReadString('\n')
-			if strings.Contains(text, code) {
-				fmt.Printf("%s\n\n", "champ")
+			input, _ := reader.ReadString('\n')
+			if p.verify(input) {
 				close(aChan)
 				return
-			} else {
-				fmt.Println("nil points\n>")
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -46,7 +55,7 @@ func getPin() error {
 
 	select {
 	case <-time.After(pinTimeout):
-		return errors.New("no code was input in 10 seconds. aborting")
+		return fmt.Errorf("no code was input in %s. aborting", pinTimeout)
 	case <-aChan:
 		break
 	}

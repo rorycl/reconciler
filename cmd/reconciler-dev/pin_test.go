@@ -1,35 +1,39 @@
 package main
 
 import (
-	"io"
 	"os"
-	"regexp"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
 func TestPin(t *testing.T) {
 
-	orig := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	testPin := newPin()
 
+	if !testPin.verify(string(*testPin)) {
+		t.Errorf("unexpected error %s", string(*testPin))
+	}
+
+	// error test.
 	pinTimeout = 1 * time.Millisecond
-	err := getPin()
+	err := testPin.check()
 	if err == nil {
 		t.Error("unexpected nil error")
 	}
 
-	os.Stdout = orig
-	_ = w.Close()
-
-	contents, err := io.ReadAll(r)
+	// success test.
+	fileName := filepath.Join(t.TempDir(), "t1")
+	_ = os.WriteFile(fileName, []byte(*testPin), 0600)
+	f, err := os.Open(fileName)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
+	}
+	stdin = f
+
+	err = testPin.check()
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
 	}
 
-	regexpPin := regexp.MustCompile("\n[0-9]{6}\n")
-	if !regexpPin.Match(contents) {
-		t.Errorf("expected pin in %s", string(contents))
-	}
 }

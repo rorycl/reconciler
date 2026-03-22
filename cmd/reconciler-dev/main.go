@@ -20,11 +20,13 @@ func appInitialiser(
 	return app.NewApp(configFile, logLevel, inDevelopment, staticPath, templatePath, sqlPath, databasePath)
 }
 
+// run is the entry point.
 func run(args []string) error {
 
 	// BuildCLI builds the command line application, injecting the app constructor for
 	// filling with cli arguments.
-	cmd := BuildCLI(AppMaker(appInitialiser), getPin)
+	pin := newPin()
+	cmd := BuildCLI(AppMaker(appInitialiser), pin.check)
 
 	ctx := context.Background()
 
