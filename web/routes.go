@@ -2,7 +2,6 @@ package web
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -80,8 +79,7 @@ func (web *WebApp) routes() http.Handler {
 
 	// Chain the desired middleware.
 	r.Use(handlers.RecoveryHandler(handlers.PrintRecoveryStack(true)))
-	logging := handlers.LoggingHandler(os.Stdout, r)
-	sessionMiddleWare := web.sessions.LoadAndSave(logging)
+	sessionMiddleWare := web.sessions.LoadAndSave(r)
 	csrfMiddlware := enforceCSRF(sessionMiddleWare)
-	return csrfMiddlware
+	return web.slogMiddleware(csrfMiddlware)
 }
