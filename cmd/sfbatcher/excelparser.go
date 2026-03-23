@@ -8,22 +8,22 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// Parser opens an excel file and reads the contents of the first sheet.
-type Parser struct {
+// ExcelParser opens an excel file and reads the contents of the first sheet.
+type ExcelParser struct {
 	fileName   string
 	sheetNames []string
 	contents   [][]string
 	row        int
 }
 
-// NewParser initialises a Parser by reading an excel file, its sheet names and the
-// contents of the first sheet.
-func NewParser(fileName string) (*Parser, error) {
+// NewExcelParser initialises an ExcelParser by reading an excel file, its sheet names
+// and the contents of the first sheet.
+func NewExcelParser(fileName string) (*ExcelParser, error) {
 	if fileName == "" {
 		return nil, errors.New("newparser received an empty file name argument")
 	}
 
-	p := &Parser{fileName: fileName}
+	p := &ExcelParser{fileName: fileName}
 
 	f, err := excelize.OpenFile(fileName)
 	if err != nil {
@@ -52,14 +52,14 @@ func NewParser(fileName string) (*Parser, error) {
 	return p, nil
 }
 
-// Headers return the first row of the Parser contents.
-func (p *Parser) Headers() []string {
+// Headers return the first row of the parser contents.
+func (p *ExcelParser) Headers() []string {
 	p.row++
 	return p.contents[0]
 }
 
-// Rows returns an iterator over the Parser contents.
-func (p *Parser) Rows() iter.Seq[[]string] {
+// Rows returns an iterator over the parser contents.
+func (p *ExcelParser) Rows() iter.Seq[[]string] {
 	return func(yield func([]string) bool) {
 		for _, r := range p.contents[p.row:] {
 			p.row++

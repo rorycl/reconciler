@@ -13,7 +13,7 @@ func TestExcelParser(t *testing.T) {
 
 	testFile := "testdata/simple.xlsx"
 
-	parser, err := NewParser(testFile)
+	parser, err := NewExcelParser(testFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestExcelParserFail(t *testing.T) {
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
-			_, err := NewParser(tt.filename)
+			_, err := NewExcelParser(tt.filename)
 			if err == nil {
 				t.Fatal("expected error")
 			}
