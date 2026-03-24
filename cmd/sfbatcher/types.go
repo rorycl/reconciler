@@ -42,14 +42,15 @@ func (vs *valueStorer) GetString(ctx context.Context, key string) string {
 
 // getExtendedToken retrieves a token from the valueStorer map.
 func (vs *valueStorer) getExtendedToken(key string) *token.ExtendedToken {
-	if _, ok := vs.data[key]; !ok {
-		return nil
-	}
-	et, ok := vs.data[key].(token.ExtendedToken)
+	et, ok := vs.data[key]
 	if !ok {
 		return nil
 	}
-	return &et
+	etT := et.(*token.ExtendedToken)
+	if !ok {
+		return nil
+	}
+	return etT
 }
 
 // sfClienter is an interface to the BatchUpdateOpportunityRefs component of the
@@ -66,7 +67,7 @@ func sfClientMaker(ctx context.Context, cfg *config.Config, logger *slog.Logger,
 // sfClientMakerFunc is the type of the sfClienter initialiser func.
 type sfClientMakerFunc func(ctx context.Context, cfg *config.Config, logger *slog.Logger, et *token.ExtendedToken) (sfClienter, error)
 
-// oauth2Agent is an interface to the internal/token OAuth2 methods
+// oauth2Agent is an interface to the internal/token OAuth2 methods.
 type oauth2Agent interface {
 	InitiateLogin(ctx context.Context) (string, error)
 	WebLoginCallBack() func(w http.ResponseWriter, r *http.Request) error
