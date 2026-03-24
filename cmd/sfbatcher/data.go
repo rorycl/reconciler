@@ -35,14 +35,14 @@ func NewData(parser Parser) (*Data, error) {
 	if err := data.validHeaders(header); err != nil {
 		return data, err
 	}
-	data.Records = 1
+	data.Records = 0
 	for row := range parser.Rows() {
+		data.Records++
 		idRef, err := data.validateRow(row)
 		if err != nil {
 			return data, fmt.Errorf("row %d (1 indexed) error: %w", data.Records, err)
 		}
 		data.idRefs = append(data.idRefs, idRef)
-		data.Records++
 	}
 	return data, nil
 }
