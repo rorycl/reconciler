@@ -17,24 +17,31 @@ import (
 // for more information
 const batchSize = 200
 
+// runner holds the information required to parse Excel data, then login to salesforce
+// and run a batch update of the targeted records.
 type runner struct {
-	data          *Data
-	tokenType     token.TokenType
-	cfg           *config.Config
-	serverAddress string
-	log           *slog.Logger
-	vs            *valueStorer
-	sfClientMaker sfClientMakerFunc
-	loginAgent    oauth2Agent
+	data           *Data
+	tokenType      token.TokenType
+	cfg            *config.Config
+	serverAddress  string
+	log            *slog.Logger
+	vs             *valueStorer
+	sfClientMaker  sfClientMakerFunc
+	loginAgent     oauth2Agent
+	connectTimeout time.Duration
 }
 
-func newRunner(filename string, cfg *config.Config, sfMaker *sfClientMakerFunc, loginAgent oauth2Agent) (*runner, error) {
+// newRunner creates a runner. Please refer to types.go for information about the
+// sfClientMakerFunc, a factory func, and the loginAgent interface, both of which have
+// sensible default if provided as nil values.
+func newRunner(filename string, cfg *config.Config, sfMaker sfClientMakerFunc, loginAgent oauth2Agent) (*runner, error) {
 
 	r := &runner{
-		tokenType:     token.SalesforceToken,
-		cfg:           cfg,
-		serverAddress: cfg.Web.ListenAddress,
-		log:           slog.Default(),
+		tokenType:      token.SalesforceToken,
+		cfg:            cfg,
+		serverAddress:  cfg.Web.ListenAddress,
+		log:            slog.Default(),
+		connectTimeout: 60 * time.Second,
 	}
 
 	// Run the parser.
@@ -52,7 +59,7 @@ func newRunner(filename string, cfg *config.Config, sfMaker *sfClientMakerFunc, 
 	if sfMaker == nil {
 		r.sfClientMaker = sfClientMaker
 	} else {
-		r.sfClientMaker = *sfMaker
+		r.sfClientMaker = sfMaker
 	}
 
 	// Initialise the local store (in other contexts, a session store)
@@ -77,6 +84,8 @@ func newRunner(filename string, cfg *config.Config, sfMaker *sfClientMakerFunc, 
 
 }
 
+// run runs the runner, taking the user through the interactive login flow and on
+// success proceeding with the batch update process.
 func (r *runner) run() error {
 
 	// Context create.
@@ -120,7 +129,6 @@ func (r *runner) run() error {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errChan <- fmt.Errorf("server exit error: %w", err)
 		}
-		errChan <- nil
 	}()
 
 	select {
@@ -131,10 +139,10 @@ func (r *runner) run() error {
 		_ = webServer.Close()
 		close(errChan)
 		break
-	case <-time.After(60 * time.Second):
+	case <-time.After(r.connectTimeout):
 		_ = webServer.Close()
 		close(errChan)
-		return errors.New("no oauth2 connection response received in 60 seconds; timing out")
+		return fmt.Errorf("oauth2 connection timed out after %s seconds", r.connectTimeout)
 	}
 
 	// Initialise the salesforce client with the token.
