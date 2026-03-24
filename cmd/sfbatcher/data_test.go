@@ -58,6 +58,19 @@ func (p *pok) Rows() iter.Seq[[]string] {
 	}
 }
 
+type punlink struct{}
+
+func (p *punlink) Headers() []string { return []string{"ID", "Ref"} }
+func (p *punlink) Rows() iter.Seq[[]string] {
+	return func(yield func([]string) bool) {
+		for _, r := range [][]string{{"0033000000abcde", " "}, {"0063000000abcde", ""}} {
+			if !yield(r) {
+				return
+			}
+		}
+	}
+}
+
 type pbad struct{ headersBad bool }
 
 func (p *pbad) Headers() []string {
@@ -81,17 +94,21 @@ func TestDataNew(t *testing.T) {
 
 	tests := []struct {
 		parser Parser
+		action string
 		isErr  bool
 		errMsg string
 	}{
-		{&pok{}, false, ""},
-		{&pbad{false}, true, "row 1 (1 indexed) error: \"tooshort\" is an invalid Salesforce ID"},
-		{&pbad{true}, true, "header \"invalid\" found -- expected ID"},
+		{&pok{}, "link", false, ""},
+		{&pok{}, "unlink", true, "reference not empty for unlink"},
+		{&pok{}, "invalid", true, "must be 'link' or 'unlink'"},
+		{&punlink{}, "unlink", false, ""},
+		{&pbad{false}, "link", true, "row 1 (1 indexed) error: \"tooshort\" is an invalid Salesforce ID"},
+		{&pbad{true}, "link", true, "header \"invalid\" found -- expected ID"},
 	}
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
 
-			_, err := NewData(tt.parser)
+			_, err := NewData(tt.parser, tt.action)
 
 			if err != nil && !tt.isErr {
 				t.Fatalf("unexpected error: %v", err)

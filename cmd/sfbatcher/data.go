@@ -23,13 +23,20 @@ type Data struct {
 	idRefs   []salesforce.IDRef
 	uniqueID map[string]struct{}
 	Records  int
+	action   string
 }
 
 // NewData initialises a new Data and fills it with content from the provided parser.
-func NewData(parser Parser) (*Data, error) {
+func NewData(parser Parser, action string) (*Data, error) {
+	switch action {
+	case "link", "unlink":
+	default:
+		return nil, fmt.Errorf("action %q received, must be 'link' or 'unlink'", action)
+	}
 	data := &Data{
 		idRefs:   []salesforce.IDRef{},
 		uniqueID: map[string]struct{}{},
+		action:   action,
 	}
 	header := parser.Headers()
 	if err := data.validHeaders(header); err != nil {
@@ -72,14 +79,25 @@ func (d *Data) validateRow(row []string) (salesforce.IDRef, error) {
 	idRef := salesforce.IDRef{}
 
 	if len(row) < 2 {
-		return idRef, errors.New("row did not have at least 2 columns")
+		return idRef, errors.New("must have at least 2 columns")
 	}
 	idRef = salesforce.IDRef{row[0], row[1]}
 	if err := salesforce.IDsValid(idRef.ID); err != nil {
 		return idRef, err
 	}
 	if _, exists := d.uniqueID[idRef.ID]; exists {
-		return idRef, fmt.Errorf("duplicate ID %q found", idRef.ID)
+		return idRef, fmt.Errorf("duplicate ID %q", idRef.ID)
+	}
+	switch d.action {
+	case "link":
+		if len(strings.TrimSpace(idRef.Ref)) == 0 {
+			return idRef, fmt.Errorf("empty reference for link action: ID %s", idRef.ID)
+		}
+	case "unlink":
+		if len(strings.TrimSpace(idRef.Ref)) != 0 {
+			return idRef, fmt.Errorf("reference not empty for unlink action ID %s Ref %s", idRef.ID, idRef.Ref)
+		}
+		idRef.Ref = "" // ensure it is empty
 	}
 	d.uniqueID[idRef.ID] = struct{}{}
 	return idRef, nil
