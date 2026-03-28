@@ -71,7 +71,9 @@ func TestRunner(t *testing.T) {
 
 	runner, err := newRunner(
 		"testdata/valid.xlsx",
+		"link",
 		config,
+		slog.Default(),
 		testSFMaker,
 		testLoginAgent,
 	)

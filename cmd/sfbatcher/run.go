@@ -33,14 +33,29 @@ type runner struct {
 
 // newRunner creates a runner. Please refer to types.go for information about the
 // sfClientMakerFunc, a factory func, and the loginAgent interface, both of which have
-// sensible default if provided as nil values.
-func newRunner(filename string, cfg *config.Config, sfMaker sfClientMakerFunc, loginAgent oauth2Agent) (*runner, error) {
+// sensible default if provided as nil values. The action defines either a "link" action
+// or "unlink", the former to add a reference to salesforce records, the latter to
+// remove one by setting the field to an empty string.
+func newRunner(
+	filename string,
+	action string,
+	cfg *config.Config,
+	logger *slog.Logger,
+	sfMaker sfClientMakerFunc,
+	loginAgent oauth2Agent,
+) (*runner, error) {
+
+	switch action {
+	case "link", "unlink":
+	default:
+		return nil, fmt.Errorf("got invalid action %q, must be 'link' or 'unlink'", action)
+	}
 
 	r := &runner{
 		tokenType:      token.SalesforceToken,
 		cfg:            cfg,
 		serverAddress:  cfg.Web.ListenAddress,
-		log:            slog.Default(),
+		log:            logger,
 		connectTimeout: 60 * time.Second,
 	}
 
@@ -51,7 +66,7 @@ func newRunner(filename string, cfg *config.Config, sfMaker sfClientMakerFunc, l
 	}
 
 	// Validate the data.
-	r.data, err = NewData(parser)
+	r.data, err = NewData(parser, action)
 	if err != nil {
 		return r, err
 	}
@@ -155,7 +170,7 @@ func (r *runner) run() error {
 		return err
 	}
 
-	// Run the batch update.
+	// Run the batch update by iterating over the data in batches.
 	allOrNone := true
 	batchCount := 1
 	for idRefsBatch := range r.data.Batch(batchSize) {

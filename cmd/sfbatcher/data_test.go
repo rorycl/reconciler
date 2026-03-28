@@ -45,44 +45,16 @@ func TestDataBatch(t *testing.T) {
 	}
 }
 
-type pok struct{}
-
-func (p *pok) Headers() []string { return []string{"ID", "Ref"} }
-func (p *pok) Rows() iter.Seq[[]string] {
-	return func(yield func([]string) bool) {
-		for _, r := range [][]string{{"0033000000abcde", "1"}, {"0063000000abcde", "2"}} {
-			if !yield(r) {
-				return
-			}
-		}
-	}
+// p is a test Parser.
+type p struct {
+	headers []string
+	data    [][]string
 }
 
-type punlink struct{}
-
-func (p *punlink) Headers() []string { return []string{"ID", "Ref"} }
-func (p *punlink) Rows() iter.Seq[[]string] {
+func (p *p) Headers() []string { return p.headers }
+func (p *p) Rows() iter.Seq[[]string] {
 	return func(yield func([]string) bool) {
-		for _, r := range [][]string{{"0033000000abcde", " "}, {"0063000000abcde", ""}} {
-			if !yield(r) {
-				return
-			}
-		}
-	}
-}
-
-type pbad struct{ headersBad bool }
-
-func (p *pbad) Headers() []string {
-	if !p.headersBad {
-		return []string{"ID", "Ref"} // ok headers
-	} else {
-		return []string{"invalid", "Ref"} // invalid headers
-	}
-}
-func (p *pbad) Rows() iter.Seq[[]string] {
-	return func(yield func([]string) bool) {
-		for _, r := range [][]string{{"tooshort", "1"}} {
+		for _, r := range p.data {
 			if !yield(r) {
 				return
 			}
@@ -93,20 +65,75 @@ func (p *pbad) Rows() iter.Seq[[]string] {
 func TestDataNew(t *testing.T) {
 
 	tests := []struct {
+		name   string
 		parser Parser
 		action string
 		isErr  bool
 		errMsg string
 	}{
-		{&pok{}, "link", false, ""},
-		{&pok{}, "unlink", true, "reference not empty for unlink"},
-		{&pok{}, "invalid", true, "must be 'link' or 'unlink'"},
-		{&punlink{}, "unlink", false, ""},
-		{&pbad{false}, "link", true, "row 1 (1 indexed) error: \"tooshort\" is an invalid Salesforce ID"},
-		{&pbad{true}, "link", true, "header \"invalid\" found -- expected ID"},
+		{
+			name: "link ok",
+			parser: &p{
+				headers: []string{"ID", "Ref"},
+				data:    [][]string{{"0033000000abcde", "1"}, {"0063000000abcde", "2"}},
+			},
+			action: "link",
+			isErr:  false,
+			errMsg: "",
+		},
+		{
+			name: "unlink error ref not empty",
+			parser: &p{
+				headers: []string{"ID", "Ref"},
+				data:    [][]string{{"0033000000abcde", "1"}, {"0063000000abcde", "2"}},
+			},
+			action: "unlink",
+			isErr:  true,
+			errMsg: "reference not empty for unlink",
+		},
+		{
+			name: "invalid action",
+			parser: &p{
+				headers: []string{"ID", "Ref"},
+				data:    [][]string{{"0033000000abcde", "1"}, {"0063000000abcde", "2"}},
+			},
+			action: "invalid",
+			isErr:  true,
+			errMsg: "must be 'link' or 'unlink'",
+		},
+		{
+			name: "unlink ok",
+			parser: &p{
+				headers: []string{"ID", "Ref"},
+				data:    [][]string{{"0033000000abcde", " "}, {"0063000000abcde", ""}},
+			},
+			action: "unlink",
+			isErr:  false,
+			errMsg: "",
+		},
+		{
+			name: "link id too short",
+			parser: &p{
+				headers: []string{"ID", "Ref"},
+				data:    [][]string{{"tooshort", "1"}},
+			},
+			action: "link",
+			isErr:  true,
+			errMsg: "row 1 (1 indexed) error: \"tooshort\" is an invalid Salesforce ID",
+		},
+		{
+			name: "link invalid headername",
+			parser: &p{
+				headers: []string{"invalid", "Ref"},
+				data:    [][]string{{"tooshort", "1"}},
+			},
+			action: "link",
+			isErr:  true,
+			errMsg: "header \"invalid\" found -- expected ID",
+		},
 	}
 	for ii, tt := range tests {
-		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d_%s", ii, tt.name), func(t *testing.T) {
 
 			_, err := NewData(tt.parser, tt.action)
 
