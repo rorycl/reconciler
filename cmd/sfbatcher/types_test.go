@@ -28,9 +28,6 @@ func TestValueStorer(t *testing.T) {
 
 	vs.Put(ctx, "token", et)
 	token := vs.getExtendedToken("token")
-	if token == nil {
-		t.Fatal("token unexpectedly nil")
-	}
 	if got, want := token.Type, et.Type; got != want {
 		t.Errorf("got token %v want %v", token, et)
 	}
@@ -47,12 +44,14 @@ func TestSFClientMaker(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sf, err := sfClientMaker(t.Context(), cfg, slog.Default(), et)
+	_, err = sfClientMaker(t.Context(), cfg, slog.Default(), et)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := sf.(sfClienter); !ok {
-		t.Errorf("got type %T from sfClientMaker call", sf)
-	}
+
+	// self-evident.
+	// if _, ok := sf.(sfClienter); !ok {
+	// 	t.Errorf("got type %T from sfClientMaker call", sf)
+	// }
 
 }

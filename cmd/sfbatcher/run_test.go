@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -86,37 +87,42 @@ func TestRunner(t *testing.T) {
 	runner.vs = testLoginAgent.vs
 
 	// Run the runner in a goroutine since it depends on a web callback.
-	done := make(chan struct{})
+	errorChan := make(chan error)
 	go func() {
 		defer func() {
-			close(done)
+			close(errorChan)
 		}()
 
 		// Run the process.
 		err = runner.run()
 		if err != nil {
-			t.Fatal(err)
+			errorChan <- fmt.Errorf("runner.run error: %v", err)
+			return
 		}
 
 		// Check the number of processed records.
 		if got, want := runner.data.Records, 3; got != want {
-			t.Errorf("got %d want %d records", got, want)
+			errorChan <- fmt.Errorf("got %d want %d records", got, want)
+			return
 		}
 
 	}()
 
 	// Run an http client to trigger the callback, and continue processing.
-	go func() {
+	go func(t *testing.T) {
 		time.Sleep(3 * time.Millisecond) // wait for the server to spin up
 		resp, err := http.Get("http://" + config.Web.ListenAddress + "/" + config.Web.SalesforceCallBack)
 		if err != nil {
-			t.Fatalf("http get error: %v", err)
+			errorChan <- fmt.Errorf("http get error: %v", err)
 		}
 		if resp.StatusCode != 200 {
-			t.Fatalf("http status != 200: %d", resp.StatusCode)
+			errorChan <- fmt.Errorf("http status != 200: %d", resp.StatusCode)
 		}
-	}()
+	}(t)
 
-	<-done
+	err = <-errorChan
+	if err != nil {
+		t.Fatal(err)
+	}
 
 }

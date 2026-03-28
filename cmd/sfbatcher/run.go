@@ -111,6 +111,9 @@ func (r *runner) run() error {
 
 	// Generate the start of the OAuth 2 flow for Salesforce.
 	authURL, err := r.loginAgent.InitiateLogin(ctx)
+	if err != nil {
+		return err
+	}
 
 	// Run the web server in a go routine until it times out or returns.
 	errChan := make(chan error)

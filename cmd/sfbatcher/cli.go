@@ -94,7 +94,7 @@ func BuildCLI(runMaker runMaker) *cli.Command {
 
 		Commands: []*cli.Command{
 
-			&cli.Command{
+			{
 				Name:        "link",
 				Usage:       "link salesforce records with references",
 				UsageText:   "e.g. ./sfbatcher link -c <config> [-l <loglevel>] excelfile",
@@ -177,7 +177,7 @@ func BuildCLI(runMaker runMaker) *cli.Command {
 					return app.run()
 				},
 			},
-			&cli.Command{
+			{
 				Name:        "unlink",
 				Usage:       "unlink salesforce records",
 				UsageText:   "e.g. ./sfbatcher unlink -c <config> [-l <loglevel>] excelfile",

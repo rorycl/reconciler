@@ -27,8 +27,6 @@ func mockRunMaker(
 	return &mockRunner{}, nil
 }
 
-func verify() error { return nil }
-
 func TestParseCLI(t *testing.T) {
 
 	// Create a temporary dummy config file so os.Stat passes

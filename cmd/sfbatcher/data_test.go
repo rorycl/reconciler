@@ -15,7 +15,7 @@ func generate(d *Data, no int, t *testing.T) {
 	counter := 0
 	d.idRefs = make([]salesforce.IDRef, no)
 	for range no {
-		d.idRefs[counter] = salesforce.IDRef{strconv.Itoa(counter), "hi"}
+		d.idRefs[counter] = salesforce.IDRef{ID: strconv.Itoa(counter), Ref: "hi"}
 		counter++
 	}
 	d.Records = no

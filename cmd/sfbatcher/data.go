@@ -81,7 +81,7 @@ func (d *Data) validateRow(row []string) (salesforce.IDRef, error) {
 	if len(row) < 2 {
 		return idRef, errors.New("must have at least 2 columns")
 	}
-	idRef = salesforce.IDRef{row[0], row[1]}
+	idRef = salesforce.IDRef{ID: row[0], Ref: row[1]}
 	if err := salesforce.IDsValid(idRef.ID); err != nil {
 		return idRef, err
 	}
