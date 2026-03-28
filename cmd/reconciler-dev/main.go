@@ -36,7 +36,7 @@ func run(args []string) error {
 	// BuildCLI builds the command line application, injecting the app constructor for
 	// filling with cli arguments.
 	pin := newPin()
-	cmd := BuildCLI(AppMaker(appInitialiser), pin.check)
+	cmd := BuildCLI(appInitialiser, pin.check)
 
 	ctx := context.Background()
 

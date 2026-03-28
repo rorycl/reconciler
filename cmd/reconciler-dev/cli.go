@@ -38,7 +38,6 @@ type AppMaker func(configFile string, logLevel slog.Level, inDevelopment bool, s
 // BuildCLI creates a cli app to run the capabilities provided by
 // a WebRunner dependency. A verifier func can be provided to guard app running.
 func BuildCLI(apper AppMaker, verifier func() error) *cli.Command {
-	// func BuildCLI(apper AppMaker, verifier func() error) *cli.Command {
 
 	var configFile string
 
