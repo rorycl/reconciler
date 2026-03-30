@@ -38,11 +38,15 @@ func (web *WebApp) routes() http.Handler {
 
 	// Xero OAuth2 init and callback (the callback route is configured in web.cfg).
 	handleApp(r, "/xero/init", web.xeroWebClient.InitiateWebLogin()).Methods("GET")
-	handleApp(r, web.cfg.Web.XeroCallBack, web.xeroWebClient.WebLoginCallBack()).Methods("GET")
+	handleApp(r, web.cfg.Web.XeroCallBack, web.xeroWebClient.WebLoginCallBack(
+		"/connect", // connect is the callback redirect address on success.
+	)).Methods("GET")
 
 	// Salesforce OAuth2 init and callback (the callback route is configured in web.cfg).
 	handleApp(r, "/salesforce/init", web.sfWebClient.InitiateWebLogin()).Methods("GET")
-	handleApp(r, web.cfg.Web.SalesforceCallBack, web.sfWebClient.WebLoginCallBack()).Methods("GET")
+	handleApp(r, web.cfg.Web.SalesforceCallBack, web.sfWebClient.WebLoginCallBack(
+		"/connect", // connect is the callback redirect address on success.
+	)).Methods("GET")
 
 	/****************************************************************************************
 	// protected routes

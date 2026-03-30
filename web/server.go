@@ -174,7 +174,6 @@ func New(
 		token.SalesforceToken,
 		config.Salesforce.OAuth2Config,
 		scsSessionStore,
-		"/connect", // the redirect url
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not make salesforce web oauth2 client: %v", err)
@@ -184,7 +183,6 @@ func New(
 		token.XeroToken,
 		config.Xero.OAuth2Config,
 		scsSessionStore,
-		"/connect", // the redirect url
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not make xero web oauth2 client: %v", err)
