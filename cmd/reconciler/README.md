@@ -27,7 +27,7 @@ GLOBAL OPTIONS:
 
 ```
 
-### More inf
+### More info
 
 For more information about the project, please see the main project
 [README](https://github.com/rorycl/reconciler).
