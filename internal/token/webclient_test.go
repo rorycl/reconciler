@@ -96,7 +96,6 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 		SalesforceToken,
 		cfg.Salesforce.OAuth2Config,
 		sessionManager,
-		"/connect",
 	)
 	if err != nil {
 		t.Fatalf("NewTokenWebHander error: %v", err)
@@ -108,7 +107,7 @@ func TestAuthWebLoginAndCallback(t *testing.T) {
 		ec.ErrorChecker(twc.InitiateWebLogin()),
 	))
 	localMux.Handle("/salesforce/callback", sessionManager.LoadAndSave(
-		ec.ErrorChecker(twc.WebLoginCallBack()),
+		ec.ErrorChecker(twc.WebLoginCallBack("/connect")),
 	))
 
 	localServer := httptest.NewServer(localMux)
@@ -238,19 +237,17 @@ func TestNewTokenWebClient(t *testing.T) {
 		typer    TokenType
 		oauthCfg *oauth2.Config
 		vs       ValueStorer
-		redirURL string
 		err      error
 	}{
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), "/connect", nil},
-		{57, cfg.Salesforce.OAuth2Config, scs.New(), "/connect", errors.New("token type 57 invalid")},
-		{SalesforceToken, nil, scs.New(), "/connect", errors.New("nil oauthCfg provided")},
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, nil, "/connect", errors.New("nil ValueStorer")},
-		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), "", errors.New("empty redirection URL")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, scs.New(), nil},
+		{57, cfg.Salesforce.OAuth2Config, scs.New(), errors.New("token type 57 invalid")},
+		{SalesforceToken, nil, scs.New(), errors.New("nil oauthCfg provided")},
+		{SalesforceToken, cfg.Salesforce.OAuth2Config, nil, errors.New("nil ValueStorer")},
 	}
 
 	for ii, tt := range tests {
 		t.Run(fmt.Sprintf("test_%d", ii), func(t *testing.T) {
-			_, err := NewTokenWebClient(tt.typer, tt.oauthCfg, tt.vs, tt.redirURL)
+			_, err := NewTokenWebClient(tt.typer, tt.oauthCfg, tt.vs)
 			if err != nil && tt.err == nil {
 				t.Fatalf("unexpected error %v", err)
 			}

@@ -40,7 +40,6 @@ type TokenWebClient struct {
 	typer    TokenType
 	oauthCfg *oauth2.Config
 	vs       ValueStorer
-	redirURL string
 }
 
 // NewTokenWebClient creates a new TokenWebClient.
@@ -48,7 +47,6 @@ func NewTokenWebClient(
 	typer TokenType,
 	oauthCfg *oauth2.Config,
 	vs ValueStorer,
-	redirURL string, // eg "/connect"
 ) (*TokenWebClient, error) {
 	if !typer.Valid() {
 		return nil, fmt.Errorf("token type %d invalid", typer)
@@ -59,14 +57,10 @@ func NewTokenWebClient(
 	if vs == nil {
 		return nil, errors.New("nil ValueStorer (session) provided to NewTokenWebClient")
 	}
-	if redirURL == "" {
-		return nil, errors.New("empty redirection URL provided")
-	}
 	return &TokenWebClient{
 		typer:    typer,
 		oauthCfg: oauthCfg,
 		vs:       vs,
-		redirURL: redirURL,
 	}, nil
 }
 
@@ -139,11 +133,7 @@ func (twc *TokenWebClient) InitiateWebLogin() func(w http.ResponseWriter, r *htt
 
 // WebLoginCallBack is an http.Handler for receiving a web callback initiated from a web
 // interface with PKCE protection.
-func (twc *TokenWebClient) WebLoginCallBack() func(w http.ResponseWriter, r *http.Request) error {
-
-	if twc == nil {
-		panic("TokenWebClient nil at WebLoginCallBack")
-	}
+func (twc *TokenWebClient) WebLoginCallBack(redirURL string) func(w http.ResponseWriter, r *http.Request) error {
 
 	return func(w http.ResponseWriter, r *http.Request) error {
 		ctx := r.Context()
@@ -222,8 +212,8 @@ func (twc *TokenWebClient) WebLoginCallBack() func(w http.ResponseWriter, r *htt
 		}
 		twc.vs.Put(ctx, twc.SessionKey(), et)
 
-		// Success. Redirect to a url such as the "/connect" landing page.
-		http.Redirect(w, r, twc.redirURL, http.StatusSeeOther)
+		// Success. Redirect to the redirection url.
+		http.Redirect(w, r, redirURL, http.StatusSeeOther)
 		return nil
 	}
 }
