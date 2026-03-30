@@ -76,6 +76,15 @@ capabilities. Connections to Xero are read-only, whereas only the target
 linking field on the configured Salesforce object may be altered through
 Reconciler operations.
 
+In addition to the [main reconciler app](./cmd/reconciler/),
+the project also includes:
+
+* a development mode [app](./cmd/reconciler-dev/)  
+  for html template and sql development; not to be used in production.
+
+* a batch update [cmd](./cmd/sfbatcher/)  
+  for batch updating records identified by ID and Reference.
+
 ### Licence
 
 Reconciler is provided under the open-source MIT licence. Please read
