@@ -78,22 +78,35 @@ func (d *Data) validateRow(row []string) (salesforce.IDRef, error) {
 
 	idRef := salesforce.IDRef{}
 
-	if len(row) < 2 {
-		return idRef, errors.New("must have at least 2 columns")
-	}
-	idRef = salesforce.IDRef{ID: row[0], Ref: row[1]}
-	if err := salesforce.IDsValid(idRef.ID); err != nil {
-		return idRef, err
-	}
-	if _, exists := d.uniqueID[idRef.ID]; exists {
-		return idRef, fmt.Errorf("duplicate ID %q", idRef.ID)
-	}
 	switch d.action {
 	case "link":
+		if len(row) < 2 {
+			return idRef, errors.New("must have at least 2 columns")
+		}
+		idRef = salesforce.IDRef{ID: row[0], Ref: row[1]}
+		if err := salesforce.IDsValid(idRef.ID); err != nil {
+			return idRef, err
+		}
+		if _, exists := d.uniqueID[idRef.ID]; exists {
+			return idRef, fmt.Errorf("duplicate ID %q", idRef.ID)
+		}
 		if len(strings.TrimSpace(idRef.Ref)) == 0 {
 			return idRef, fmt.Errorf("empty reference for link action: ID %s", idRef.ID)
 		}
 	case "unlink":
+		if len(row) < 1 {
+			return idRef, errors.New("must have at least 1 column")
+		}
+		if len(row) >= 2 && strings.TrimSpace(row[1]) != "" { // forgive spaces in ref input
+			return idRef, fmt.Errorf("unexpected ref %q in unlink", row[1])
+		}
+		idRef = salesforce.IDRef{ID: row[0], Ref: ""}
+		if err := salesforce.IDsValid(idRef.ID); err != nil {
+			return idRef, err
+		}
+		if _, exists := d.uniqueID[idRef.ID]; exists {
+			return idRef, fmt.Errorf("duplicate ID %q", idRef.ID)
+		}
 		if len(strings.TrimSpace(idRef.Ref)) != 0 {
 			return idRef, fmt.Errorf("reference not empty for unlink action ID %s Ref %s", idRef.ID, idRef.Ref)
 		}

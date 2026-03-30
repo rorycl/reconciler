@@ -89,7 +89,7 @@ func TestDataNew(t *testing.T) {
 			},
 			action: "unlink",
 			isErr:  true,
-			errMsg: "reference not empty for unlink",
+			errMsg: "unexpected ref \"1\" in unlink",
 		},
 		{
 			name: "invalid action",
@@ -105,7 +105,8 @@ func TestDataNew(t *testing.T) {
 			name: "unlink ok",
 			parser: &p{
 				headers: []string{"ID", "Ref"},
-				data:    [][]string{{"0033000000abcde", " "}, {"0063000000abcde", ""}},
+				// forgive spaces in ref input
+				data: [][]string{{"0033000000abcde", " "}, {"0063000000abcde", ""}},
 			},
 			action: "unlink",
 			isErr:  false,
