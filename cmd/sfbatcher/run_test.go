@@ -42,9 +42,10 @@ type testLoginService struct {
 func (ts *testLoginService) InitiateLogin(ctx context.Context) (string, error) {
 	return "ok", nil
 }
-func (ts *testLoginService) WebLoginCallBack() func(w http.ResponseWriter, r *http.Request) error {
+func (ts *testLoginService) WebLoginCallBack(redirURL string) func(w http.ResponseWriter, r *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		ts.vs.Put(r.Context(), ts.sessionKey, ts.et)
+		ts.vs.Put(r.Context(), "redirURL", redirURL)
 		return nil
 	}
 }

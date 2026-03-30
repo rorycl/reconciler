@@ -86,7 +86,6 @@ func newRunner(
 			r.tokenType,
 			r.cfg.Salesforce.OAuth2Config,
 			r.vs,
-			r.cfg.Web.SalesforceCallBack,
 		)
 		if err != nil {
 			return r, err
@@ -137,7 +136,12 @@ func (r *runner) run() error {
 			})
 		}
 		mux := http.NewServeMux()
-		mux.Handle(r.cfg.Web.SalesforceCallBack, webConnectWrapper(r.loginAgent.WebLoginCallBack()))
+		mux.HandleFunc("/connected", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprint(w, "Connection successful. You can now close this tab.")
+		})
+		mux.Handle(r.cfg.Web.SalesforceCallBack, webConnectWrapper(
+			r.loginAgent.WebLoginCallBack("/connected"), // connected is the redirect target.
+		))
 		webServer.Handler = mux
 
 		// Ask the user to visit Salesforce to complete the oauth2 flow.
@@ -154,6 +158,8 @@ func (r *runner) run() error {
 		if err != nil {
 			return err
 		}
+		time.Sleep(50 * time.Millisecond) // allow time for redirection to /connected
+		r.log.Info("connection succesfully made")
 		_ = webServer.Close()
 		close(errChan)
 		break

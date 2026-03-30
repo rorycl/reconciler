@@ -70,5 +70,5 @@ type sfClientMakerFunc func(ctx context.Context, cfg *config.Config, logger *slo
 // oauth2Agent is an interface to the internal/token OAuth2 methods.
 type oauth2Agent interface {
 	InitiateLogin(ctx context.Context) (string, error)
-	WebLoginCallBack() func(w http.ResponseWriter, r *http.Request) error
+	WebLoginCallBack(redirURL string) func(w http.ResponseWriter, r *http.Request) error
 }
